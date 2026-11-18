@@ -27,7 +27,9 @@ header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;
 .iconbtn{background:rgba(255,255,255,.13);border:0;border-radius:10px;padding:6px 10px;color:#fff;font-weight:600;font-size:14px;line-height:1.2}
 .badge{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:20px;padding:3px 9px;background:var(--gold);color:#0E2841;white-space:nowrap}
 .badge.free{background:rgba(255,255,255,.18);color:#fff}
-.hero{background:var(--card);border-radius:16px;padding:16px;margin:4px 0 14px;border:1px solid var(--hair)}
+.hero{position:relative;background:var(--card);border-radius:16px;padding:16px;margin:4px 0 14px;border:1px solid var(--hair)}
+.modetop{position:absolute;top:10px;right:10px;z-index:2}
+.hero #course-switch{max-width:calc(100% - 110px)}
 .kicker{color:var(--teal);font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 .hero h2{margin:4px 0 6px;font-size:22px;color:var(--navy)}
 .muted{color:var(--grey);font-size:14px}
@@ -454,7 +456,8 @@ VIEWS.home = function () {
   app.appendChild(h("div", { class: "hero" },
     h("div", { style: "display:flex;gap:12px;align-items:center" }, h("button", { class: "avbtn", onclick: () => go("onboard", true), title: "Change photo" }, avi(p.photo || p.avatar, true)),
       h("div", { style: "flex:1;min-width:0" }, CFG.courses.length > 1 ? h("button", { class: "coursebtn", id: "course-switch", onclick: courseSheet }, course().emoji + " " + course().name + "  · Change ▾") : h("div", { class: "kicker" }, course().emoji + " " + course().name), h("h2", { style: "margin:2px 0" }, "Hi " + (p.name || "there").split(" ")[0] + " 👋"),
-        h("button", { class: "coursebtn", id: "mode-switch", style: "margin-bottom:4px", onclick: modeSheet }, (isTeacher() ? "👩‍🏫 Instructor mode" : "🎓 Student mode") + " · Switch ▾"), h("div", { class: "muted" }, p.school || ""))),
+        h("div", { class: "muted" }, p.school || ""))),
+    h("button", { class: "coursebtn modetop", id: "mode-switch", title: "Switch between student and instructor mode", onclick: modeSheet }, (isTeacher() ? "👩‍🏫 Instructor" : "🎓 Student") + " ▾"),
     h("div", { class: "grid4" },
       h("div", { class: "stat" }, h("b", {}, String(done)), h("span", {}, "✍️ answered")),
       h("div", { class: "stat" }, h("b", {}, pct(ok, done) + "%"), h("span", {}, "🎯 accuracy")),
@@ -1248,18 +1251,20 @@ function qCoach(card, answered) {
 
 /* ---------- 🎬 animated feature tour ---------- */
 const FEAT = [
-  { bg: "linear-gradient(160deg,#0E2841,#156082)", big: "⚗️", t: "Welcome to ChemFlip", s: "Chemistry practice that works the way you study.", pts: ["Intro to General Chemistry", "General Chemistry", "Organic Chemistry I & II", "How to Draw Mechanisms"] },
-  { big: "📖", t: "Thousands of questions", s: "Every question comes with a worked solution.", pts: ["🟢 Easy · 🟡 Medium · 🔴 Hard", "Structures and figures inside the questions", "⭐ Bookmark questions to review later"] },
+  { bg: "linear-gradient(160deg,#0E2841,#156082)", big: "⚗️", t: "Welcome to ChemFlip", s: "Chemistry practice for college and university students.", pts: ["General & Organic Chemistry", "Inorganic · Analytical · Physical", "Organometallic · Spectroscopy", "Intro Chemistry & Mechanisms"] },
+  { big: "📖", t: "Thousands of questions", s: "Every question comes with a worked solution.", pts: ["🟢 Easy · 🟡 Medium · 🔴 Hard", "📈 Spectra of unknowns to solve", "⭐ Bookmark questions to review later"] },
   { big: "🎓", t: "Learn how before you answer", s: "A quick coach shows how to tackle a question step by step.", pts: ["🔍 Read what's asked", "🧠 Plan the idea or formula", "✂️ Rule out wrong choices", "💡 Read the solution"] },
   { mech: true, t: "Draw the mechanism yourself", s: "Tap where the electrons start, then where they go. The app checks every arrow.", pts: ["➰ Curved arrows and 🪝 fishhooks", "⌨️ Keyboard of charges, lone pairs and symbols", "🎓 Guided tutorial before your first one"] },
   { big: "📝", t: "Build your own exam", s: "Pick the chapters and topics, set a timer, and test yourself.", pts: ["⏱️ Optional timer", "📊 Results by chapter, level and topic", "🎯 'Work more on these' shows your weak spots"] },
   { big: "🧮", t: "Drills and reference tables", s: "Practice calculations and look up what you need.", pts: ["Moles, molarity, gas laws, pH and more", "📚 pKa table, IR & NMR, reagents, constants"] },
+  { big: "🧪", t: "Chemistry Quest: Build Your Lab", s: "Earn XP and ChemCoins as you learn, and build your own virtual lab.", pts: ["⭐ Levels and daily challenges", "🔬 Unlock lab equipment", "🏆 Leaderboards"] },
   { big: "🎮", t: "Games: learn together", s: "Play in class, challenge a friend, or beat your best.", pts: ["📺 Live class quiz with a PIN and a podium", "🏳️ Team battles", "⚔️ 1-vs-1 duels", "🕹️ Solo arcade games, even offline"] },
-  { big: "👩‍🏫", t: "Classes for instructors", s: "Verified instructors (.edu email) run their own classes.", pts: ["🔑 Class codes for students", "🏆 Live leaderboards", "🧾 Class tests and student progress"] },
-  { big: "🏅", t: "Track your progress", s: "Your profile shows your stats, badges and streaks.", pts: ["📈 Progress for every chapter", "📤 Share it with your instructor or study group"] },
+  { big: "👩‍🏫", t: "Classes for instructors", s: "Verified instructors run their own classes.", pts: ["🔑 Class codes for students", "🏆 Live leaderboards", "🧾 Class tests and student progress"] },
+  { big: "🎓", t: "Works inside Canvas", s: "Your instructor picks the chapters; you open ChemFlip from your course.", pts: ["🔗 Canvas LMS (LTI 1.3)", "📚 Chapters chosen for your class", "📱 Phone, tablet, computer"] },
+  { big: "🔄", t: "Your progress, everywhere", s: "Stats, badges and streaks sync across your devices.", pts: ["📈 Progress for every chapter", "📤 Share it with your instructor or study group"] },
   { big: "🎁", t: "Invite friends, save 50%", s: "Share your invite code. When a friend joins, you get 50% off your first course.", pts: [] },
   { big: "💎", t: "Simple pricing", s: "Start free. Unlock full courses when you're ready.", pts: ["One course: $5.99/month or $59.99/year", "Each extra course: +$3/month or +$25/year", "🔑 Instructor access codes work too"] },
-  { big: "💻📱", t: "Everywhere you study", s: "Windows, Mac, Linux, Android, iPhone and the web.", pts: ["🌙 Dark mode", "🎵 Music and sounds you can turn off"] },
+  { big: "💻📱", t: "Everywhere you study", s: "Windows, Mac, Android, iPhone and the web at chemflip.org.", pts: ["🌙 Dark mode", "🎵 Music and sounds you can turn off"] },
   { bg: "linear-gradient(160deg,#156082,#0E2841)", big: "🚀", t: "You're ready!", s: "Pick a chapter and flip into chemistry.", pts: [] }];
 let FT = { i: 0, timer: null, play: true };
 function featStop() { if (FT.timer) { clearTimeout(FT.timer); FT.timer = null; } }
