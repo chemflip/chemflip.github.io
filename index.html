@@ -481,7 +481,6 @@ VIEWS.home = function () {
   tiles.appendChild(h("button", { class: "tile", id: "share-btn", onclick: () => shareProgress() }, h("i", {}, "📤"), "Share progress"));
   tiles.appendChild(h("button", { class: "tile", id: "tour-btn", onclick: () => startTour() }, h("i", {}, "🧭"), "App tour"));
   tiles.appendChild(h("button", { class: "tile", id: "review-btn", onclick: () => reviewSheet() }, h("i", {}, "⭐"), "Rate & review"));
-  tiles.appendChild(h("button", { class: "tile", id: "mode-btn", onclick: () => modeSheet() }, h("i", {}, isTeacher() ? "🎓" : "👩‍🏫"), isTeacher() ? "Student mode" : "Instructor mode"));
   app.appendChild(h("div", { class: "card", id: "invite-card", style: "border-left:5px solid var(--gold);display:flex;gap:12px;align-items:center" },
     h("div", { style: "font-size:30px" }, "🎁"), h("div", { style: "flex:1" }, h("b", {}, "Invite a friend, get 50% off"), h("div", { class: "muted", style: "font-size:13px" }, S.refHalf ? "✅ Your 50% reward is unlocked." : "When a friend joins ChemFlip with your invite code, you get 50% off your first course.")),
     h("button", { class: "btn small", id: "invite-btn", onclick: inviteFriendsSheet }, "Invite")));
