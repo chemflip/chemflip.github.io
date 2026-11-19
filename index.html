@@ -8,7 +8,7 @@
 <script>
 /* Installed apps, Canvas launches and invite/class links open the app directly */
 (function () { var s = location.search, hsh = location.hash, sa = window.matchMedia && matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  if (sa || /[?&](lti|invite|code|class|join|ref|pin|duel|view)=/i.test(s) || /^#./.test(hsh)) location.replace("/app/" + s + hsh); })();
+  if (sa || /[?&](lti|lti_error|invite|code|class|join|ref|pin|duel|view)=/i.test(s)) location.replace("/app/" + s + hsh); })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -41,6 +41,9 @@ section{padding:90px 0}.sh{max-width:720px;margin-bottom:44px}.sh h2{font-size:c
 .courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
 .course{border:1px solid var(--hair);border-radius:18px;padding:22px;background:#fff;transition:border-color .2s,box-shadow .2s}.course:hover{border-color:var(--sky);box-shadow:0 10px 30px rgba(15,39,66,.08)}
 .ce{font-size:30px}.course h3{font-size:21px;margin:10px 0 4px}.cn{display:inline-block;font-size:12.5px;font-weight:700;color:var(--teal);background:#E7F3F9;border-radius:99px;padding:2px 10px}.course p{color:var(--grey);font-size:14.5px;margin:10px 0 0}
+.tour{background:var(--paper)}.tour .wrap{display:grid;grid-template-columns:1fr auto;gap:60px;align-items:center}
+.tour video{display:block;width:340px;border-radius:30px;background:#08172A}.tour .vframe{border-radius:40px;background:#08172A;padding:10px;box-shadow:0 30px 60px rgba(15,39,66,.3)}
+@media(max-width:860px){.tour .wrap{grid-template-columns:1fr}.tour .vframe{justify-self:center}.tour video{width:min(320px,80vw)}}
 .feat{background:var(--paper)}.row{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;margin-bottom:90px}.row:last-child{margin-bottom:0}
 .row.rev .txt{order:2}.row h3{font-size:clamp(26px,3vw,36px);margin:10px 0 14px}.row p{color:var(--grey);font-size:17px}
 .row ul{padding:0;list-style:none;margin:18px 0 0}.row li{padding:6px 0 6px 30px;position:relative}.row li:before{content:"";position:absolute;left:0;top:12px;width:16px;height:16px;border-radius:50%;background:var(--gold);box-shadow:inset 0 0 0 4px #FFF4CF}
@@ -65,7 +68,7 @@ footer{background:#0A1C30;color:#9FB3C6;padding:40px 0;font-size:14px}footer .wr
 </style></head>
 <body>
 <nav><div class="wrap"><a class="logo" href="/"><img src="/img/logo.png" alt="">ChemFlip</a>
-<div class="links"><a href="#courses">Courses</a><a href="#features">Features</a><a href="#instructors">Instructors</a><a href="#pricing">Pricing</a><a href="#download">Download</a></div>
+<div class="links"><a href="#tour">Tour</a><a href="#courses">Courses</a><a href="#features">Features</a><a href="#instructors">Instructors</a><a href="#pricing">Pricing</a><a href="#download">Download</a></div>
 <a class="btn pri" href="/app/">Open ChemFlip</a></div></nav>
 
 <header class="hero dark"><div class="wrap">
@@ -81,6 +84,13 @@ footer{background:#0A1C30;color:#9FB3C6;padding:40px 0;font-size:14px}footer .wr
 <div class="stats"><div class="wrap">
 <div class="stat"><b>9,012</b><span>original practice questions</span></div><div class="stat"><b>11</b><span>college chemistry courses</span></div>
 <div class="stat"><b>300+</b><span>mechanisms you draw yourself</span></div><div class="stat"><b>100%</b><span>answers with worked solutions</span></div></div></div>
+
+<section class="tour" id="tour"><div class="wrap">
+<div class="sh" style="margin:0"><span class="eyebrow t">See how it works</span><h2>A one-minute tour of ChemFlip.</h2>
+<p>Courses, the study coach, drawable mechanisms, exams, Chemistry Quest, class games and Canvas, explained in 72 seconds.</p>
+<div class="cta" style="margin-top:26px"><a class="btn pri" href="/app/">Try it free</a><a class="btn sec" href="#courses">See all courses</a></div></div>
+<div class="vframe"><video src="/media/chemflip-tour.mp4" poster="/media/chemflip-tour.jpg" controls playsinline preload="none" width="340" height="604"></video></div>
+</div></section>
 
 <section id="courses"><div class="wrap">
 <div class="sh"><span class="eyebrow t">Courses</span><h2>Every chemistry course, one app.</h2><p>Pick the course you're taking. Questions go from 🟢 easy to 🔴 hard, organized chapter by chapter and topic by topic.</p></div>
