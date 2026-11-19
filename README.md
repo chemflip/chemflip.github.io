@@ -2,7 +2,7 @@
 
 Chemistry practice for college and university students: General, Organic, Inorganic, Analytical and Physical Chemistry, Spectroscopy, Organometallic chemistry, games and Canvas LMS integration.
 
-- Open: https://chemflip.org
+- Website: https://chemflip.org · Web app: https://chemflip.org/app/
 - Install on a phone or tablet: open the link, then **Share → Add to Home Screen** (iPhone/iPad) or **⋮ → Install app** (Android/Chrome).
 - Windows app: Microsoft Store (search “ChemFlip”).
 

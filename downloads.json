@@ -1,0 +1,110 @@
+{
+ "version": "4.2.0",
+ "downloads": [
+  {
+   "id": "web",
+   "icon": "🌐",
+   "name": "Any device",
+   "sub": "Runs in your browser — phone, tablet, Chromebook or computer.",
+   "status": "live",
+   "links": [
+    [
+     "Open ChemFlip",
+     "/app/",
+     true
+    ]
+   ],
+   "note": "On a phone: open it, then Share → Add to Home Screen (iPhone) or ⋮ → Install app (Android)."
+  },
+  {
+   "id": "win",
+   "icon": "🪟",
+   "name": "Windows",
+   "sub": "Windows 10 and 11",
+   "status": "live",
+   "links": [
+    [
+     "Get it from Microsoft Store",
+     "https://apps.microsoft.com/detail/9NQNJKJ1V80J",
+     true
+    ],
+    [
+     "Download installer (.exe)",
+     "/downloads/ChemFlip-Setup-4.2.0.exe",
+     false
+    ]
+   ],
+   "note": "If Windows shows “Windows protected your PC”, click More info → Run anyway."
+  },
+  {
+   "id": "mac",
+   "icon": "💻",
+   "name": "Mac",
+   "sub": "macOS 11 or later",
+   "status": "live",
+   "links": [
+    [
+     "Apple silicon (M1–M4)",
+     "/downloads/ChemFlip-Mac-arm64-4.2.0.zip",
+     true
+    ],
+    [
+     "Intel Mac",
+     "/downloads/ChemFlip-Mac-x64-4.2.0.zip",
+     false
+    ]
+   ],
+   "note": "Unzip, drag ChemFlip to Applications. The first time, right-click it → Open."
+  },
+  {
+   "id": "linux",
+   "icon": "🐧",
+   "name": "Linux",
+   "sub": "64-bit (x86_64)",
+   "status": "live",
+   "links": [
+    [
+     "AppImage",
+     "/downloads/ChemFlip-Linux-4.2.0.AppImage",
+     true
+    ],
+    [
+     ".deb (Ubuntu/Debian)",
+     "/downloads/ChemFlip-Linux-4.2.0-amd64.deb",
+     false
+    ]
+   ],
+   "note": "AppImage: make it executable (chmod +x) and double-click."
+  },
+  {
+   "id": "android",
+   "icon": "🤖",
+   "name": "Android",
+   "sub": "Google Play",
+   "status": "soon",
+   "links": [
+    [
+     "Use the web app",
+     "/app/",
+     true
+    ]
+   ],
+   "note": "Coming soon to Google Play. Until then, open the web app and tap ⋮ → Install app."
+  },
+  {
+   "id": "ios",
+   "icon": "📱",
+   "name": "iPhone & iPad",
+   "sub": "App Store",
+   "status": "soon",
+   "links": [
+    [
+     "Use the web app",
+     "/app/",
+     true
+    ]
+   ],
+   "note": "Coming soon to the App Store. Until then, open the web app in Safari and tap Share → Add to Home Screen."
+  }
+ ]
+}
