@@ -1,5 +1,5 @@
 {
- "version": "4.2.0",
+ "version": "4.2.1",
  "downloads": [
   {
    "id": "web",
@@ -30,7 +30,7 @@
     ],
     [
      "Download installer (.exe)",
-     "/downloads/ChemFlip-Setup-4.2.0.exe",
+     "/downloads/ChemFlip-Setup-4.2.1.exe",
      false
     ]
    ],
@@ -45,12 +45,12 @@
    "links": [
     [
      "Apple silicon (M1–M4)",
-     "/downloads/ChemFlip-Mac-arm64-4.2.0.zip",
+     "/downloads/ChemFlip-Mac-arm64-4.2.1.zip",
      true
     ],
     [
      "Intel Mac",
-     "/downloads/ChemFlip-Mac-x64-4.2.0.zip",
+     "/downloads/ChemFlip-Mac-x64-4.2.1.zip",
      false
     ]
    ],
@@ -65,12 +65,12 @@
    "links": [
     [
      "AppImage",
-     "/downloads/ChemFlip-Linux-4.2.0.AppImage",
+     "/downloads/ChemFlip-Linux-4.2.1.AppImage",
      true
     ],
     [
      ".deb (Ubuntu/Debian)",
-     "/downloads/ChemFlip-Linux-4.2.0-amd64.deb",
+     "/downloads/ChemFlip-Linux-4.2.1-amd64.deb",
      false
     ]
    ],
