@@ -296,6 +296,17 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 .work-strip{display:flex;gap:6px;flex-wrap:wrap}
 .work-th{padding:0;border:1px solid var(--rule,#D6DEE4);border-radius:6px;overflow:hidden;width:54px;height:54px;background:#fff;cursor:pointer}
 .work-th img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* 5.0 dashboards */
+.dh{font-family:var(--serif,inherit);color:var(--navy);font-size:17px;margin:18px 2px 8px}
+.dash{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:14px}
+.dcard{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:12px 14px;cursor:pointer;color:var(--ink);font:inherit}
+.dcard:hover{border-color:var(--teal,#156082)}.dcard:focus-visible{outline:3px solid var(--gold,#F2C14E);outline-offset:2px}
+.dcard .di{flex:0 0 36px;height:36px;border-radius:9px;background:var(--chip);color:var(--teal,#156082);display:flex;align-items:center;justify-content:center}
+.dcard .dt{display:flex;flex-direction:column;gap:2px;min-width:0}.dcard .dt b{color:var(--navy);font-size:15px}.dcard .dt .muted{font-size:13px}
+.dbadge{display:inline-block;margin-left:6px;min-width:20px;padding:0 6px;border-radius:10px;background:var(--gold,#F2C14E);color:#13202B;font-size:12px;text-align:center}
+.chip.ok{background:#E3F2EA;color:#1E6B45}
+.qbq{border-top:1px solid var(--hair);padding:8px 0}.qbq summary{cursor:pointer;line-height:1.45}.qbo{padding:3px 8px;margin:3px 0;border-radius:6px}.qbo.ok{background:#E3F2EA;font-weight:600}
 </style>
 </head>
 <body>
@@ -587,7 +598,21 @@ function renderSide() {
   const reset = (view, arg) => () => { stack = [{ view: "home" }]; if (view !== "home") stack.push({ view, arg }); render(); window.scrollTo(0, 0); };
   const brand = h("div", { class: "brand" }); brand.innerHTML = LOGO_SVG + "<span>" + CFG.short + "</span>"; side.appendChild(brand);
   if (CFG.courses.length > 1) { const c = course(); side.appendChild(h("button", { class: "crs", id: "side-course", onclick: courseSheet }, h("span", {}, h("small", {}, "Course"), h("b", {}, c.name)), ico("chev", 16))); }
-  const g1 = h("div", { class: "grp" });
+  const g1 = h("div", { class: "grp" }); const T0 = isTeacher();
+  if (T0) {   // 5.0: instructors get their own navigation
+    g1.appendChild(navItem("home", "home", "Dashboard", reset("home"), { on: v === "home" }));
+    g1.appendChild(navItem("teach", "teach", "My classes", reset("teach"), { on: ["teach", "cls", "newtest", "ctest", "student"].includes(v) }));
+    g1.appendChild(navItem("qbank", "book", "Question bank", reset("qbank"), { on: v === "qbank" }));
+    g1.appendChild(navItem("canvas", "canvas", "Canvas", reset("canvasSetup"), { on: v === "canvasSetup" }));
+    g1.appendChild(navItem("games", "game", "Class games", reset("games"), { on: PLAY_VIEWS.has(v) && v !== "features" && v !== "onboard" }));
+    g1.appendChild(navItem("ref", "calc", "Reference tables", reset("ref"), { on: v === "ref" }));
+    side.appendChild(g1);
+    const g2 = h("div", { class: "grp" });
+    g2.appendChild(navItem("profile", "user", "My profile", reset("profile"), { on: v === "profile" }));
+    g2.appendChild(navItem("settings", "gear", "Settings", reset("settings"), { on: v === "settings" }));
+    g2.appendChild(navItem("about", "info", "About & tips", reset("about"), { on: v === "about" }));
+    side.appendChild(g2);
+  } else {
   g1.appendChild(navItem("home", "home", "Home", reset("home"), { on: v === "home" }));
   g1.appendChild(navItem("exam", "exam", "Practice exam", reset("exam"), { on: v === "exam" }));
   g1.appendChild(navItem("wrong", "redo", "Review mistakes", () => { stack = [{ view: "home" }]; startList("wrong"); }, { count: S.w.length || "" }));
@@ -605,6 +630,8 @@ function renderSide() {
   g2.appendChild(navItem("settings", "gear", "Settings", reset("settings"), { on: v === "settings" }));
   g2.appendChild(navItem("about", "info", "About & tips", reset("about"), { on: v === "about" }));
   side.appendChild(g2);
+  }
+  const T = T0;
   side.appendChild(h("button", { class: "nv", id: "nav-mode", onclick: modeSheet, style: "margin-top:auto;font-size:13px" }, ico(T ? "teach" : "school", 16), h("span", {}, (T ? "Instructor" : "Student") + " mode · switch")));
 }
 function greet() { const hr = new Date().getHours(); return hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening"; }
@@ -691,6 +718,8 @@ VIEWS.onboard = function (edit) {
 
 VIEWS.home = function () {
   if (!S.profile) { stack = [{ view: "onboard" }]; render(); return; }
+  document.body.classList.remove("ihome");
+  if (isTeacher()) { VIEWS.ihome(); return; }
   if (!S.refHalf && DB && (!S.refAt || Date.now() - S.refAt > 864e5)) { S.refAt = Date.now(); checkInviteReward().then(() => { if (S.refHalf) render(); }); }
   const chs = CH(); let done = 0, ok = 0, total = 0, mastered = 0;
   const stats = chs.map(c => { const s = chStats(c); done += s.done; ok += s.ok; total += s.total; if (s.done >= s.total * .8 && pct(s.ok, s.done) >= 80) mastered++; return s; });
@@ -735,6 +764,7 @@ VIEWS.home = function () {
     h("button", { class: "btn sec2", id: "review-quick", onclick: () => startList("wrong") }, "Review mistakes (" + S.w.length + ")"),
     h("button", { class: "btn ghost", id: "class-quick", onclick: () => go("classes") }, "Join your class")));
   app.appendChild(duo);
+  { const sd = studentDash(T); if (sd) app.appendChild(sd); }
   // the chapter table
   const head = h("div", { class: "sech" }, h("div", { class: "sec" }, "Your chapter table"),
     h("div", { class: "legend", "aria-hidden": "true" }, h("span", {}, "Mastery"), h("i", { style: "border:1px solid var(--hair);background:var(--m0)" }), h("i", { style: "background:var(--m1)" }), h("i", { style: "background:var(--m2)" }), h("i", { style: "background:var(--m3)" }), h("span", {}, "100%")));
@@ -2720,7 +2750,7 @@ VIEWS.classes = function () {
     try { await DB.ins("classes", { code, name: nm.value.trim(), school: S.profile.school, teacher: S.profile.name, teacher_sid: sid(), app: CFG.app, course: course().id, pin_hash: sha256("pin:" + code + ":" + pin) });
       await DB.ups("members", { class_code: code, sid: sid(), name: S.profile.name, avatar: myAv(), school: S.profile.school, stu_id: (S.profile.sid || "").trim() }, "class_code,sid");
       S.cls = { code, name: nm.value.trim(), role: "teacher" }; S.tclasses = (S.tclasses || []).concat([{ code, name: nm.value.trim() }]); save(); sfx("win"); stack.pop(); go("cls", code);
-    } catch (e) { toast("Couldn't create the class — check your connection."); } } }, "Create class")));
+    } catch (e) { if (e.status === 403) { toast("👩‍🏫 " + e.message); eduApply((S.edu || {}).email || "", { status: "none" }); setTimeout(eduSheet, 400); } else toast("Couldn't create the class — check your connection."); } } }, "Create class")));
   if (isTeacher()) app.appendChild(t); else app.appendChild(h("p", { class: "muted", style: "text-align:center" }, "👩‍🏫 Instructors: choose “I am an instructor” in your profile to create and manage classes."));
 };
 
@@ -2945,6 +2975,22 @@ function showTour() {
 /* ---------- instructor mode ---------- */
 function isTeacher() { return !!(S.profile && S.profile.role === "instructor" && eduOk()); }
 function eduOk() { return !!(S.edu && S.edu.ok); }
+// 5.0: the server decides who is an instructor (cf ops "instructor"/"me"); the device only caches the answer for the interface.
+const PERSONAL_MAIL = /@(gmail|googlemail|yahoo|ymail|outlook|hotmail|live|msn|icloud|me|mac|aol|proton|protonmail|gmx|mail|zoho|yandex|qq|163)\.(com|me)$/i;
+function eduPrecheck(e) { e = String(e || "").trim(); if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(e)) return "Enter a full email address, like name@college.edu."; if (PERSONAL_MAIL.test(e)) return "Use the email address your school gave you, not a personal address."; return ""; }
+function eduLocalClass(e) { return isEdu(e) && !/@(.+\.)?(student|students|stu|my|alumni)\./i.test(e) && !/\d{6,}/.test(e.split("@")[0]) ? "verified" : "pending"; }  // preview builds only
+function eduApply(email, st) { const was = eduOk(); S.edu = { email: (st && st.email) || email, ok: !!st && st.status === "verified", status: (st && st.status) || "none", review: st && st.review, at: Date.now() }; if (was && !S.edu.ok && S.profile.role === "instructor") S.profile.role = "student"; save(); return S.edu; }
+async function eduRefresh(force) {
+  if (!DB || !DB.live || !S.edu || !S.edu.email) return;
+  if (!force && S.edu.chk && Date.now() - S.edu.chk < 10 * 60e3) return;
+  try { const st = await DB.call({ op: "me" }); const before = S.edu.status, wasOk = eduOk();
+    if (st.status === "none" && S.edu.ok && !S.edu.status) { eduApply(S.edu.email, { status: "none" }); toast("👩‍🏫 ChemFlip now confirms instructor accounts on its server. Please verify your school email once more."); }
+    else if (st.status !== "none" || S.edu.status) eduApply(S.edu.email, st);
+    S.edu.chk = Date.now(); save();
+    if (!wasOk && eduOk()) { S.profile.role = "instructor"; save(); toast("✅ Your instructor account was approved."); render(); }
+    else if (wasOk && !eduOk()) render();
+  } catch (e) {}
+}
 function isEdu(e) { return /^[^@\s]+@([a-z0-9-]+\.)*[a-z0-9-]+\.edu(\.[a-z]{2})?$/i.test(String(e || "").trim()); }
 async function sbAuth(path, body) {
   const r = await fetch(CFG.sb.url.replace(/\/$/, "") + "/auth/v1/" + path, { method: "POST", headers: { apikey: CFG.sb.key, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -2954,7 +3000,7 @@ async function sbAuth(path, body) {
 function eduSheet() {
   sheet("edu-sheet", "👩‍🏫 Verify you're an instructor", (box, close) => {
     const live = !!(CFG.sb && CFG.sb.url && CFG.sb.key), demo = !live && CFG.demoDb;
-    box.appendChild(h("p", { class: "muted" }, "Instructor tools (classes, student progress, class codes) are for teachers. Enter your academic email ending in .edu and we'll email you a 6-digit code."));
+    box.appendChild(h("p", { class: "muted" }, "Instructor tools (classes, student progress, class codes) are for teachers. Enter the email address your school gave you and we'll email you a 6-digit code. Faculty addresses at recognised institutions (.edu, .ac.uk and similar) are approved right away; other school addresses are reviewed by a ChemFlip administrator."));
     if (!live && !demo) { box.appendChild(h("p", { class: "muted", style: "color:var(--bad)" }, "Instructor verification needs ChemFlip's online service, which isn't connected in this version yet. Email chemflipp@gmail.com and we'll help you get set up.")); return; }
     const em = h("input", { class: "field", id: "edu-email", placeholder: "name@college.edu", type: "email", autocomplete: "email" }); em.value = (S.edu && S.edu.email) || (S.profile && /\.edu/i.test(S.profile.email || "") ? S.profile.email : "");
     const msg = h("div", { class: "muted", id: "edu-msg", style: "margin-top:6px" });
@@ -2964,13 +3010,18 @@ function eduSheet() {
       if (tok.length < 6) { msg.textContent = "Enter the 6-digit code from the email."; return; }
       verifyBtn.disabled = true; msg.textContent = "Checking…";
       try {
-        if (demo) { if (tok !== "123456") throw new Error("Wrong code"); } else await sbAuth("verify", { type: "email", email, token: tok });
-        S.edu = { email, ok: true, at: Date.now() }; S.profile.role = "instructor"; save(); sfx("win"); toast("✅ Verified! Instructor mode is on."); close(); stack = [{ view: "home" }]; render();
+        let st;
+        if (demo) { if (tok !== "123456") throw new Error("Wrong code"); st = { status: eduLocalClass(email) }; }
+        else { const j = await sbAuth("verify", { type: "email", email, token: tok }); try { st = await DB.call({ op: "instructor", token: j.access_token, name: S.profile.name, school: S.profile.school }); } catch (e2) { msg.textContent = "❌ " + e2.message; msg.style.color = "var(--bad)"; verifyBtn.disabled = false; return; } }
+        eduApply(email, st);
+        if (st.status === "verified") { S.profile.role = "instructor"; save(); sfx("win"); toast("✅ Verified! Instructor mode is on."); close(); stack = [{ view: "home" }]; render(); return; }
+        verifyBtn.style.display = "none"; codeIn.style.display = "none"; msg.style.color = "";
+        msg.textContent = st.status === "pending" ? "📨 Thanks — your email is confirmed. Because " + email.split("@")[1] + " " + (/student/i.test(st.review || "") ? "looks like a student address" : "isn't on our list of approved institutions yet") + ", a ChemFlip administrator will review your instructor request (usually within one business day). Until then you can use ChemFlip as a student." : "❌ This address can't be used for instructor access. Contact chemflipp@gmail.com if you think this is a mistake.";
       } catch (e) { msg.textContent = "❌ That code didn't work (" + e.message + "). Check the email or send a new code."; msg.style.color = "var(--bad)"; verifyBtn.disabled = false; }
     } }, "✅ Verify");
     const sendBtn = h("button", { class: "btn sec2", id: "edu-send", onclick: async () => {
       const email = em.value.trim();
-      if (!isEdu(email)) { msg.textContent = "Please use your academic email address ending in .edu."; msg.style.color = "var(--bad)"; return; }
+      const pre = eduPrecheck(email); if (pre) { msg.textContent = pre; msg.style.color = "var(--bad)"; return; }
       sendBtn.disabled = true; msg.style.color = ""; msg.textContent = "Sending…";
       try {
         if (!demo) await sbAuth("otp", { email, create_user: true });
@@ -2980,7 +3031,8 @@ function eduSheet() {
       } catch (e) { msg.textContent = "❌ Couldn't send the code: " + e.message; msg.style.color = "var(--bad)"; }
       sendBtn.disabled = false;
     } }, "📧 Email me a code");
-    box.appendChild(h("label", { class: "f", for: "edu-email" }, "Academic email (.edu)")); box.appendChild(em);
+    if (S.edu && S.edu.status === "pending") box.appendChild(h("div", { class: "card", id: "edu-pending", style: "background:var(--chip)" }, h("b", {}, "⏳ Request under review"), h("div", { class: "muted" }, "Your instructor request for " + S.edu.email + " is waiting for an administrator. You'll be switched to instructor mode automatically once it's approved.")));
+    box.appendChild(h("label", { class: "f", for: "edu-email" }, "School email")); box.appendChild(em);
     box.appendChild(h("div", { class: "btnrow" }, sendBtn)); box.appendChild(codeIn); box.appendChild(h("div", { class: "btnrow" }, verifyBtn)); box.appendChild(msg);
   });
 }
@@ -3004,6 +3056,8 @@ async function loadClassInfo() {
   return null;
 }
 VIEWS.teach = function () {
+  eduRefresh();
+  if (!isTeacher()) { app.appendChild(h("div", { class: "card", id: "teach-locked" }, h("b", {}, "Instructors only"), h("p", { class: "muted" }, "Verify your school email as an instructor to create and manage classes."), h("div", { class: "btnrow" }, h("button", { class: "btn", id: "teach-verify", onclick: eduSheet }, "Verify my school email")))); return; }
   app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "👩‍🏫 Instructor dashboard"), h("h2", {}, "Your classes"),
     h("div", { class: "muted" }, "Open a class to see each student's progress, weak topics and test results, assign chapters, post announcements and create class or team tests.")));
   if (!DB) { notConnected(); return; }
@@ -3024,7 +3078,7 @@ VIEWS.teach = function () {
     const code = randCode();
     try { await DB.ins("classes", { code, name: nm.value.trim(), school: S.profile.school, teacher: S.profile.name, teacher_sid: sid(), app: CFG.app, course: course().id, pin_hash: sha256("pin:" + code + ":" + pin.value) });
       S.tclasses = list.concat([{ code, name: nm.value.trim() }]); S.cls = { code, name: nm.value.trim(), role: "teacher" }; save(); sfx("win"); CLSTAB = 0; go("cls", code);
-    } catch (e) { toast("Couldn't create the class — check your connection."); } } }, "Create class")));
+    } catch (e) { if (e.status === 403) { toast("👩‍🏫 " + e.message); eduApply((S.edu || {}).email || "", { status: "none" }); setTimeout(eduSheet, 400); } else toast("Couldn't create the class — check your connection."); } } }, "Create class")));
   app.appendChild(t);
   const a = h("div", { class: "card" }, h("b", {}, "🔑 Manage an existing class on this device"));
   const cc = h("input", { class: "field code", id: "claim-code", placeholder: "Class code", maxlength: "6" }); const cp = h("input", { class: "field", id: "claim-pin", inputmode: "numeric", placeholder: "Instructor PIN", style: "margin-top:8px" });
@@ -3419,12 +3473,140 @@ VIEWS.about = function () {
     h("p", { class: "muted" }, "Chemistry is a skill, and skills grow with practice. Every question you miss is information about what to study next — not a judgment of your ability. Keep going, one question at a time. You can do this! 💪")));
 };
 
+/* ---------- 5.0 dashboards: separate instructor and student home screens ---------- */
+function dashCard(id, icon, title, sub, onclick, badge) {
+  return h("button", { class: "dcard", id: "d-" + id, onclick }, h("span", { class: "di" }, ico(icon, 22)), h("span", { class: "dt" }, h("b", {}, title, badge ? h("span", { class: "dbadge" }, String(badge)) : null), h("span", { class: "muted" }, sub)));
+}
+function pickClass(then) {
+  const list = S.tclasses || [];
+  if (!list.length) { toast("Create a class first."); go("teach"); return; }
+  const open = k => { S.cls = { code: k.code, name: k.name, role: "teacher" }; save(); then(k); };
+  if (list.length === 1) { open(list[0]); return; }
+  sheet("pick-class", "Choose a class", (box, close) => list.forEach(k => box.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "pick-" + k.code, onclick: () => { close(); open(k); } }, h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), h("div", { class: "meta" }, "Class code " + k.code)))))));
+}
+const toTab = (tab) => (k) => { CLSTAB = { students: 0, board: 1, tests: 2, feed: 3, assign: 4 }[tab] || 0; go("cls", k.code); };
+VIEWS.ihome = function () {
+  const p = S.profile, first = (p.name || "").trim().split(/\s+/)[0];
+  document.body.classList.add("ihome");
+  app.appendChild(h("section", { class: "h5", "aria-label": "Instructor summary" },
+    h("div", { style: "display:flex;gap:14px;align-items:center;min-width:0" }, h("button", { class: "avbtn av", onclick: () => go("onboard", true), "aria-label": "Edit profile" }, avi(p.photo || p.avatar, true)),
+      h("div", { style: "min-width:0" }, h("h2", {}, greet() + (first ? ", " + first : "")),
+        h("div", { class: "sub" }, h("span", { class: "chip ok", id: "inst-verified" }, "Verified instructor · " + ((S.edu && S.edu.email) || "")),
+          h("button", { class: "coursebtn", id: "mode-switch", onclick: modeSheet }, "Instructor mode"))))));
+  { const cvc = typeof canvasCard === "function" ? canvasCard() : null; if (cvc) app.appendChild(cvc); }
+  const list = S.tclasses || [];
+  const mc = h("div", { class: "card", id: "my-classes" }, h("div", { style: "display:flex;align-items:center;justify-content:space-between" }, h("b", {}, "My classes"), h("button", { class: "btn small", id: "ih-new-class", onclick: () => go("teach") }, "+ New class")));
+  if (!list.length) mc.appendChild(h("p", { class: "muted" }, "No classes yet. Create one and give students the 6-character code."));
+  list.forEach(k => { const cnt = h("span", { class: "meta", id: "cnt-" + k.code }, "Class code " + k.code);
+    mc.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "ih-cls-" + k.code, onclick: () => { S.cls = { code: k.code, name: k.name, role: "teacher" }; save(); CLSTAB = 0; go("cls", k.code); } }, h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), cnt))));
+    if (DB) DB.get("members", "class_code=eq." + k.code).then(m => { const n = (m || []).filter(x => x.sid !== sid()).length; cnt.textContent = "Class code " + k.code + " · " + n + " student" + (n === 1 ? "" : "s"); }).catch(() => {}); });
+  app.appendChild(mc);
+  const g = h("div", { class: "dash", id: "inst-dash", role: "list" });
+  [dashCard("assign", "pen", "Create assignment", "Assign chapters with a due date", () => pickClass(toTab("assign"))),
+   dashCard("test", "exam", "Create test", "Class or team test from chosen chapters", () => pickClass(toTab("tests"))),
+   dashCard("progress", "users", "Student progress", "Accuracy, weak topics, test results, CSV", () => pickClass(toTab("students"))),
+   dashCard("announce", "info", "Class announcements", "Message shown on students' home screens", () => pickClass(toTab("assign"))),
+   dashCard("qbank", "book", "Question bank", "Browse every question with answers and solutions", () => go("qbank")),
+   dashCard("courses", "grid", "My courses", course().name + " · change course", courseSheet),
+   dashCard("canvas", "canvas", "Canvas integration", "Connect ChemFlip to your Canvas course", () => go("canvasSetup")),
+   dashCard("games", "game", "Live class games", "Host a quiz game on the projector", () => go("games")),
+   dashCard("settings", "gear", "Settings", "Sync, sound, theme, privacy", () => go("settings"))].forEach(x => g.appendChild(x));
+  app.appendChild(h("h3", { class: "dh" }, "Teaching tools")); app.appendChild(g);
+};
+VIEWS.qbank = function () {
+  if (!isTeacher()) { toast("The question bank with answers is for verified instructors."); back(); return; }
+  document.getElementById("title").textContent = "Question bank";
+  const Q = VIEWS.qbank.st = VIEWS.qbank.st || { course: course().id, ch: 0, L: 0, q: "", n: 40 };
+  const crs = CFG.courses.find(c => c.id === Q.course) || course();
+  const chs = crs.ch.map(n => CHBYN[n]).filter(Boolean); if (!Q.ch || !chs.some(c => c.n === Q.ch)) Q.ch = chs[0] && chs[0].n;
+  const top = h("div", { class: "card", id: "qb-filters" });
+  const sc = h("select", { class: "field", id: "qb-course", onchange: e => { Q.course = e.target.value; Q.ch = 0; render(); } }, CFG.courses.map(c => h("option", { value: c.id, selected: c.id === Q.course ? "" : null }, c.name)));
+  const sch = h("select", { class: "field", id: "qb-ch", onchange: e => { Q.ch = +e.target.value; Q.n = 40; render(); } }, chs.map((c, i) => h("option", { value: c.n, selected: c.n === Q.ch ? "" : null }, (i + 1) + ". " + c.title)));
+  const sl = h("select", { class: "field", id: "qb-level", onchange: e => { Q.L = +e.target.value; render(); } }, [[0, "All levels"]].concat((crs.levels || [1, 2, 3]).map(L => [L, LV[L]])).map(([v, t]) => h("option", { value: v, selected: v === Q.L ? "" : null }, t)));
+  const si = h("input", { class: "field", id: "qb-search", type: "search", placeholder: "Search question text or topic", value: Q.q });
+  si.oninput = () => { Q.q = si.value; clearTimeout(VIEWS.qbank.t); VIEWS.qbank.t = setTimeout(() => { render(); const e = document.getElementById("qb-search"); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 300); };
+  top.appendChild(h("label", { class: "f", for: "qb-course" }, "Course")); top.appendChild(sc);
+  top.appendChild(h("label", { class: "f", for: "qb-ch" }, "Chapter")); top.appendChild(sch);
+  top.appendChild(h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, h("div", { style: "flex:1 1 160px" }, h("label", { class: "f", for: "qb-level" }, "Difficulty"), sl), h("div", { style: "flex:2 1 220px" }, h("label", { class: "f", for: "qb-search" }, "Search"), si)));
+  app.appendChild(top);
+  const ch = CHBYN[Q.ch]; if (!ch) return;
+  const needle = Q.q.trim().toLowerCase();
+  const qs = ch.qs.filter(q => (!Q.L || q.L === Q.L) && (!needle || (q.q + " " + (q.tp || "")).toLowerCase().includes(needle)));
+  const lc = h("div", { class: "card", id: "qb-list" }, h("b", {}, qs.length + " question" + (qs.length === 1 ? "" : "s") + " · " + ch.title));
+  qs.slice(0, Q.n).forEach(q => { const det = h("details", { class: "qbq" }, h("summary", {}, h("span", { class: "chip" }, LV[q.L] || ""), q.nw ? h("span", { class: "chip new" }, "New") : null, " ", q.mk ? "🖊️ Mechanism: " : "", q.q.length > 180 ? q.q.slice(0, 180) + "…" : q.q));
+    det.addEventListener("toggle", () => { if (!det.open || det.dataset.f) return; det.dataset.f = 1;
+      if (q.im && FIGS[q.im]) det.appendChild(h("div", { class: "fig", html: FIGS[q.im] }));
+      (q.o || []).forEach((o, i) => det.appendChild(h("div", { class: "qbo" + (i === q.a ? " ok" : "") }, "ABCD"[i] + ". " + o + (i === q.a ? "  ✓" : ""))));
+      if (q.s) det.appendChild(h("div", { class: "muted", style: "margin-top:6px;white-space:pre-wrap" }, q.s));
+      det.appendChild(h("div", { class: "muted", style: "font-size:12px;margin-top:4px" }, "Topic: " + (q.tp || "–") + " · ID " + q.id)); });
+    lc.appendChild(det); });
+  if (qs.length > Q.n) lc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "qb-more", onclick: () => { Q.n += 60; render(); } }, "Show more")));
+  app.appendChild(lc);
+};
+function studentDash(T) {
+  if (T) return null;
+  const g = h("div", { class: "dash", id: "stu-dash", role: "list" });
+  const CI = (S.cls && S.clsInfo && S.clsInfo.code === S.cls.code) ? S.clsInfo : null;
+  const nA = CI && CI.assigned ? CI.assigned.length : 0;
+  const tests = dashCard("tests", "exam", "Upcoming tests", S.cls ? "Class and team tests from " + S.cls.name : "Join your class to see its tests", () => { if (S.cls) { CLSTAB = 1; go("classes"); } else go("classes"); });
+  if (DB && S.cls && S.cls.role !== "teacher") DB.get("tests", "class_code=eq." + S.cls.code).then(ts => { const open = (ts || []).filter(t => !(S.tdone && S.tdone[t.id])).length; if (open) { const b = tests.querySelector("b"); b.appendChild(h("span", { class: "dbadge" }, String(open))); } }).catch(() => {});
+  const weak = myStats().weak;
+  [dashCard("assign", "pen", "My assignments", nA ? nA + " chapter" + (nA > 1 ? "s" : "") + " assigned" + (CI.due ? " · due " + CI.due : "") : (S.cls ? "Nothing assigned right now" : "Join your class with its code"), () => go("classes"), nA || null),
+   tests,
+   dashCard("practice", "exam", "Practice tests", "Build a test from any chapters and topics", () => go("exam")),
+   dashCard("progress", "user", "My progress", "Chapters, accuracy, badges", () => go("profile")),
+   dashCard("recs", "compass", "Study recommendations", weak.length ? "Start with: " + weak[0][0] : "Answer a few questions to get suggestions", () => go("recs"), weak.length || null),
+   dashCard("games", "game", "Chemistry games", "Arcade, duels and class games", () => go("games")),
+   dashCard("settings", "gear", "Settings", "Sync, sound, theme, privacy", () => go("settings"))].forEach(x => g.appendChild(x));
+  return h("div", {}, h("h3", { class: "dh" }, "My dashboard"), g);
+}
+VIEWS.recs = function () {
+  document.getElementById("title").textContent = "Study recommendations";
+  const st = myStats(), all = CH();
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "Based on your answers"), h("h2", {}, "What to study next"), h("div", { class: "muted" }, "Topics where you've answered at least 3 questions and got fewer than 60% right, weakest first.")));
+  const c = h("div", { class: "card", id: "recs-list" });
+  if (!st.weak.length) c.appendChild(h("p", { class: "muted" }, "No weak topics yet. Keep practising — suggestions appear once you've answered at least 3 questions in a topic."));
+  st.weak.forEach(([tp, ok, n], i) => { const qs = []; all.forEach(ch => usable(ch).forEach(q => { if (q.tp === tp) qs.push(q); }));
+    c.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "rec-" + i, onclick: () => startQuiz(qs.sort((a, b) => ((S.a[a.id] && S.a[a.id].r) ? 1 : 0) - ((S.a[b.id] && S.a[b.id].r) ? 1 : 0) || a.L - b.L).slice(0, 15), tp, {}) },
+      h("div", { style: "flex:1" }, h("div", { class: "t" }, tp), h("div", { class: "meta" }, ok + " of " + n + " correct · " + qs.length + " questions to practise")), h("span", { class: "btn small" }, "Practise")))); });
+  app.appendChild(c);
+};
+
+/* ---------- administrator: instructor approvals (5.0) ---------- */
+const ADMIN_EMAILS = ["chemflipp@gmail.com"];
+function adminHint() { return !!(S.acct && S.acct.email && ADMIN_EMAILS.includes(S.acct.email.toLowerCase())) || !!S.isAdmin; }
+VIEWS.admin = function () {
+  document.getElementById("title").textContent = "Instructor approvals";
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "Administrator"), h("h2", {}, "Instructor approvals"), h("div", { class: "muted" }, "Requests from school addresses that couldn't be approved automatically (student-looking addresses, non-.edu institutions). Approving lets that person create classes; revoking removes instructor access on all their devices.")));
+  const box = h("div", { id: "admin-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  const call = async (body) => { const t = await acctToken(); if (!t) throw Object.assign(new Error("Sign in with the administrator email under Settings → Sync first."), { status: 401 }); return DB.call(Object.assign({ op: "admin", token: t }, body)); };
+  call({ action: "list" }).then(j => {
+    S.isAdmin = true; save(); box.innerHTML = "";
+    const groups = [["pending", "⏳ Waiting for review"], ["verified", "✅ Verified"], ["rejected", "⛔ Rejected"], ["revoked", "🚫 Revoked"]];
+    groups.forEach(([st, t]) => { const rows = j.instructors.filter(r => r.status === st); if (!rows.length && st !== "pending") return;
+      const card = h("div", { class: "card", id: "admin-" + st }, h("b", {}, t + " (" + rows.length + ")"));
+      if (!rows.length) card.appendChild(h("p", { class: "muted" }, "Nothing waiting. 🎉"));
+      rows.forEach(r => { const act = (a, label, sty) => h("button", { class: "btn small " + (sty || "sec2"), id: "adm-" + a + "-" + r.email.replace(/[^a-z0-9]/gi, "_"), onclick: async () => { try { await call({ action: a, email: r.email }); toast(r.email + ": " + { approve: "approved", reject: "rejected", revoke: "revoked" }[a]); render(); } catch (e) { toast("❌ " + e.message); } } }, label);
+        card.appendChild(h("div", { style: "padding:8px 0;border-top:1px solid var(--hair)" }, h("div", {}, h("b", {}, r.email), r.name ? " · " + r.name : "", r.school ? " · " + r.school : ""),
+          h("div", { class: "muted", style: "font-size:13px" }, (r.reason ? r.reason + " · " : "") + "requested " + new Date(r.requested_at).toLocaleString() + (r.decided_by ? " · decided by " + r.decided_by : "")),
+          h("div", { class: "btnrow" }, st !== "verified" ? act("approve", "Approve", "") : null, st === "pending" ? act("reject", "Reject", "ghost") : null, st === "verified" ? act("revoke", "Revoke", "ghost") : null))); });
+      box.appendChild(card); });
+    const dc = h("div", { class: "card", id: "admin-domains" }, h("b", {}, "🏫 Institution rules"), h("p", { class: "muted" }, "Approve a whole institution's domain (for example a college that uses .org), send every request from a domain to review, or mark a student-only domain."));
+    j.domains.forEach(d => dc.appendChild(h("div", { style: "padding:4px 0;display:flex;gap:8px;align-items:center" }, h("span", { style: "flex:1" }, d.domain + " — " + ({ instructor: "auto-approve", review: "always review", student: "student domain" }[d.rule] || d.rule)),
+      h("button", { class: "btn ghost small", onclick: async () => { try { await call({ action: "domain", domain: d.domain, rule: "remove" }); render(); } catch (e) { toast("❌ " + e.message); } } }, "Remove"))));
+    const di = h("input", { class: "field", id: "adm-domain", placeholder: "college.org" }); const sel = h("select", { class: "field", id: "adm-rule" }, h("option", { value: "instructor" }, "Auto-approve instructors"), h("option", { value: "review" }, "Always review"), h("option", { value: "student" }, "Student domain"));
+    dc.appendChild(di); dc.appendChild(sel); dc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "adm-add", onclick: async () => { try { await call({ action: "domain", domain: di.value, rule: sel.value }); toast("Saved"); render(); } catch (e) { toast("❌ " + e.message); } } }, "Save rule")));
+    box.appendChild(dc);
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, h("b", {}, "Administrators only"), h("p", { class: "muted" }, e.status === 403 ? "This account isn't an administrator." : e.message))); });
+};
+
 /* ---------- settings ---------- */
 VIEWS.settings = function () {
   app.appendChild(h("div", { class: "card", id: "sync-card" }, h("b", {}, "☁️ Sync across devices"), h("p", { class: "muted" }, S.acct && S.acct.email ? "Signed in as " + S.acct.email + (S.syncAt ? " · last synced " + new Date(S.syncAt).toLocaleString() : "") : "Sign in with your e-mail to continue on any device (Windows, Mac, iPhone, Android, web)."), h("button", { class: "btn small", id: "sync-btn", onclick: acctSheet }, S.acct && S.acct.email ? "Manage sync" : "☁️ Turn on sync")));
   { const wc = h("div", { class: "card", id: "work-card" }, h("b", {}, "📄 Photos of my work"), h("p", { class: "muted", id: "work-count" }, "Photos you take of your handwritten work are kept on this device, with their question."));
     app.appendChild(wc); workList().then(l => { const kb = l.reduce((a, r) => a + (r.kb || 0), 0); document.getElementById("work-count") && (document.getElementById("work-count").textContent = l.length ? l.length + " photo" + (l.length > 1 ? "s" : "") + " stored on this device (" + (kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB") + "). Open a question to see its photos." : "No photos yet. Use 📷 Photo of my work on any question to save your handwritten calculation with it.");
       if (l.length) wc.appendChild(h("button", { class: "btn ghost small", id: "work-clear", style: "color:var(--bad)", onclick: () => confirmBox("Delete all photos of my work?", "This removes every saved work photo from this device. It can't be undone.", async () => { await workClear(); render(); toast("Photos deleted"); }, "Delete all") }, "Delete all photos")); }); }
+  if (adminHint() && DB && DB.live) app.appendChild(h("div", { class: "card", id: "admin-card" }, h("b", {}, "🛡️ Instructor approvals"), h("p", { class: "muted" }, "Review instructor requests and institution rules."), h("button", { class: "btn sec2 small", id: "admin-btn", onclick: () => go("admin") }, "Open approvals")));
   if (OWNER) app.appendChild(h("div", { class: "card" }, h("b", {}, "🛠️ Owner tools"), h("p", { class: "muted" }, "For the app owner: edit questions, prices and messages, and publish one update to every version."), h("button", { class: "btn sec2", id: "owner-btn", onclick: () => go("owner") }, "Open owner tools")));
   const cmpSeg = h("div", { class: "seg" }); [[true, "✅ Include my results"], [false, "🚫 Don't include"]].forEach(([v2, t]) => cmpSeg.appendChild(h("button", { class: ((S.profile || {}).compare !== false) === v2 ? "on" : "", id: "cmp-" + v2, onclick: async () => { S.profile.compare = v2; save(); if (!v2 && DB) { try { await DB.del("school_scores", "sid=eq." + sid()); } catch (e) {} } render(); } }, t)));
   app.appendChild(h("div", { class: "card" }, h("b", {}, "🏫 School comparisons"), h("p", { class: "muted" }, "Your accuracy and number of questions count toward your school's average (no name is shown)."), cmpSeg));
@@ -3467,7 +3649,7 @@ async function checkContent() {
     document.body.appendChild(bar);
   } catch (e) {}
 }
-loadRemote(); setTimeout(checkContent, 1500); setTimeout(() => syncSchool(), 3000); setTimeout(() => { if (S.cls && S.cls.role !== "teacher") { syncScore(); loadClassInfo().then(() => { if (cur() && cur().view === "home") render(); }); } }, 2500);
+loadRemote(); setTimeout(checkContent, 1500); setTimeout(() => eduRefresh(true), 1200); setTimeout(() => syncSchool(), 3000); setTimeout(() => { if (S.cls && S.cls.role !== "teacher") { syncScore(); loadClassInfo().then(() => { if (cur() && cur().view === "home") render(); }); } }, 2500);
 stack = [{ view: S.profile ? "home" : "onboard" }];
 if (window.matchMedia) try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") applyTheme(); }); } catch (e) {}
 render();
