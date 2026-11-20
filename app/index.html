@@ -307,6 +307,10 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 .dbadge{display:inline-block;margin-left:6px;min-width:20px;padding:0 6px;border-radius:10px;background:var(--gold,#F2C14E);color:#13202B;font-size:12px;text-align:center}
 .chip.ok{background:#E3F2EA;color:#1E6B45}
 .qbq{border-top:1px solid var(--hair);padding:8px 0}.qbq summary{cursor:pointer;line-height:1.45}.qbo{padding:3px 8px;margin:3px 0;border-radius:6px}.qbo.ok{background:#E3F2EA;font-weight:600}
+
+/* 5.0 deadlines */
+.chip.warn{background:#FFF4D6;color:#7A5300}.chip.bad{background:#FBE3E1;color:#9B2C22}.qbo.bad{background:#FBE3E1}
+.asgc .cd{color:var(--teal,#156082);font-weight:600}
 </style>
 </head>
 <body>
@@ -866,6 +870,7 @@ VIEWS.quiz = function () {
   const top = h("div", { class: "progress" }, h("span", {}, "Question " + (Z.i + 1) + " of " + n), h("div", { class: "bar" }, h("i", { style: "width:" + pct(Z.i, n) + "%" })));
   if (!Z.exam && Z.run >= 3) top.appendChild(h("span", { class: "streak" }, "🔥 " + Z.run));
   if (Z.exam && Z.deadline) top.appendChild(h("span", { class: "timer", id: "timer" }, ""));
+  if (Z.asg) { top.appendChild(h("span", { class: "chip", id: "asg-save", role: "status", "aria-live": "polite" }, "")); setTimeout(asgSaveChip, 0); }
   top.appendChild(h("button", { class: "btn sec2 small", id: "quiz-ref", style: "margin-left:8px;padding:4px 10px", onclick: () => openRefSheet() }, "📚 Tables"));
   app.appendChild(top);
   if (Z.exam && Z.deadline) tick();
@@ -932,10 +937,11 @@ VIEWS.quiz = function () {
 };
 function tick() {
   const Z = QUIZ; if (!Z || !Z.deadline) return;
-  const upd = () => { const el = document.getElementById("timer"); const left = Math.max(0, Z.deadline - Date.now()); if (el) el.textContent = "⏱️ " + Math.floor(left / 60000) + ":" + String(Math.floor(left / 1000) % 60).padStart(2, "0"); if (left <= 0) { clearInterval(Z.timer); Z.timer = null; if (cur().view === "quiz") { if (Z.picked != null) Z.ans[Z.list[Z.i].id] = Z.picked; toast("⏰ Time is up!"); finish(); } } };
+  const upd = () => { const el = document.getElementById("timer"); const left = Math.max(0, Z.deadline - Date.now()); if (el) el.textContent = "⏱️ " + Math.floor(left / 60000) + ":" + String(Math.floor(left / 1000) % 60).padStart(2, "0"); if (Z.asg) asgAutosave(false); if (left <= 0) { clearInterval(Z.timer); Z.timer = null; if (cur().view === "quiz") { if (Z.picked != null) Z.ans[Z.list[Z.i].id] = Z.picked; toast("⏰ Time is up!"); finish(); } } };
   if (!Z.timer) Z.timer = setInterval(upd, 1000); upd();
 }
 function finish() {
+  if (QUIZ && QUIZ.asg) { asgFinish(); return; }
   const Z = QUIZ; if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
   const elapsed = Date.now() - Z.started; const nAns = Z.list.filter(q => Z.ans[q.id] != null).length || 1;
   if (Z.exam) Z.list.forEach(q => { if (Z.ans[q.id] != null) record(q, Z.ans[q.id] === q.a, elapsed / nAns); });
@@ -2762,7 +2768,7 @@ VIEWS.cls = function (code) {
     h("div", { class: "muted" }, "Class code: ", h("b", {}, c.code), " · share it with classmates"),
     h("div", { class: "btnrow" }, h("button", { class: c.role === "teacher" ? "btn small" : "btn sec2 small", id: "invite", onclick: () => inviteSheet(c, S.clsPrem) }, c.role === "teacher" ? "📤 Send class code to students" : "📤 Invite"),
       h("button", { class: "btn ghost small", id: "leave", onclick: () => confirmBox("Leave this class?", "You can rejoin later with the class code.", () => { if (c.role === "teacher") S.tclasses = (S.tclasses || []).filter(x => x.code !== c.code); if (S.prem && S.prem.src === "class") S.prem = null; S.cls = null; save(); stack = [{ view: "home" }]; render(); }, "Leave") }, c.role === "teacher" ? "Remove from my list" : "Leave class"))));
-  const TABS = c.role === "teacher" ? [["students", "👩‍🎓 Students"], ["board", "🏆 Ranks"], ["tests", "📝 Tests"], ["feed", "💬 Feed"], ["assign", "📌 Assign"]] : [["board", "🏆 Leaderboard"], ["tests", "📝 Tests"], ["feed", "💬 Feed"]];
+  const TABS = c.role === "teacher" ? [["students", "👩‍🎓 Students"], ["board", "🏆 Ranks"], ["tests", "📝 Tests"], ["feed", "💬 Feed"], ["assign", "📌 Assign"], ["graded", "🗓️ Graded & deadlines"]] : [["board", "🏆 Leaderboard"], ["tests", "📝 Tests"], ["feed", "💬 Feed"]];
   if (CLSTAB >= TABS.length) CLSTAB = 0; const key = TABS[CLSTAB][0];
   const seg = h("div", { class: "seg", style: "flex-wrap:wrap" }); TABS.forEach(([k, t], i) => seg.appendChild(h("button", { class: CLSTAB === i ? "on" : "", id: "ctab-" + k, onclick: () => { CLSTAB = i; render(); } }, t)));
   if (c.role === "teacher") loadClassInfo();
@@ -2773,6 +2779,7 @@ VIEWS.cls = function (code) {
   const done = (el) => { if (cur() === v) { box.innerHTML = ""; box.appendChild(el); } };
   box.appendChild(h("div", { class: "card muted" }, "⏳ Loading…"));
   if (key === "students") teacherStudents(c, done);
+  else if (key === "graded") teacherAsg(c, done);
   else if (key === "assign") teacherAssign(c, done);
   else if (key === "board") {
     syncScore().then(() => DB.get("scores", "class_code=eq." + c.code)).then(rows => {
@@ -3484,7 +3491,7 @@ function pickClass(then) {
   if (list.length === 1) { open(list[0]); return; }
   sheet("pick-class", "Choose a class", (box, close) => list.forEach(k => box.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "pick-" + k.code, onclick: () => { close(); open(k); } }, h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), h("div", { class: "meta" }, "Class code " + k.code)))))));
 }
-const toTab = (tab) => (k) => { CLSTAB = { students: 0, board: 1, tests: 2, feed: 3, assign: 4 }[tab] || 0; go("cls", k.code); };
+const toTab = (tab) => (k) => { CLSTAB = { students: 0, board: 1, tests: 2, feed: 3, assign: 4, graded: 5 }[tab] || 0; go("cls", k.code); };
 VIEWS.ihome = function () {
   const p = S.profile, first = (p.name || "").trim().split(/\s+/)[0];
   document.body.classList.add("ihome");
@@ -3502,7 +3509,9 @@ VIEWS.ihome = function () {
     if (DB) DB.get("members", "class_code=eq." + k.code).then(m => { const n = (m || []).filter(x => x.sid !== sid()).length; cnt.textContent = "Class code " + k.code + " · " + n + " student" + (n === 1 ? "" : "s"); }).catch(() => {}); });
   app.appendChild(mc);
   const g = h("div", { class: "dash", id: "inst-dash", role: "list" });
-  [dashCard("assign", "pen", "Create assignment", "Assign chapters with a due date", () => pickClass(toTab("assign"))),
+  [dashCard("assign", "pen", "Create assignment", "Graded work with open, due and lock dates", () => pickClass(toTab("graded"))),
+   dashCard("deadlines", "exam", "Deadlines & extensions", "Extend for a student, a group or the class", () => pickClass(toTab("graded"))),
+   dashCard("chapters", "book", "Assign chapters", "Practice chapters and a due note", () => pickClass(toTab("assign"))),
    dashCard("test", "exam", "Create test", "Class or team test from chosen chapters", () => pickClass(toTab("tests"))),
    dashCard("progress", "users", "Student progress", "Accuracy, weak topics, test results, CSV", () => pickClass(toTab("students"))),
    dashCard("announce", "info", "Class announcements", "Message shown on students' home screens", () => pickClass(toTab("assign"))),
@@ -3551,7 +3560,7 @@ function studentDash(T) {
   const tests = dashCard("tests", "exam", "Upcoming tests", S.cls ? "Class and team tests from " + S.cls.name : "Join your class to see its tests", () => { if (S.cls) { CLSTAB = 1; go("classes"); } else go("classes"); });
   if (DB && S.cls && S.cls.role !== "teacher") DB.get("tests", "class_code=eq." + S.cls.code).then(ts => { const open = (ts || []).filter(t => !(S.tdone && S.tdone[t.id])).length; if (open) { const b = tests.querySelector("b"); b.appendChild(h("span", { class: "dbadge" }, String(open))); } }).catch(() => {});
   const weak = myStats().weak;
-  [dashCard("assign", "pen", "My assignments", nA ? nA + " chapter" + (nA > 1 ? "s" : "") + " assigned" + (CI.due ? " · due " + CI.due : "") : (S.cls ? "Nothing assigned right now" : "Join your class with its code"), () => go("classes"), nA || null),
+  [dashCard("assign", "pen", "My assignments", S.cls ? "Graded work, deadlines and scores" + (nA ? " · " + nA + " practice chapter" + (nA > 1 ? "s" : "") : "") : "Join your class with its code", () => go(S.cls ? "myasg" : "classes"), S.asgCount || null),
    tests,
    dashCard("practice", "exam", "Practice tests", "Build a test from any chapters and topics", () => go("exam")),
    dashCard("progress", "user", "My progress", "Chapters, accuracy, badges", () => go("profile")),
@@ -3571,6 +3580,246 @@ VIEWS.recs = function () {
       h("div", { style: "flex:1" }, h("div", { class: "t" }, tp), h("div", { class: "meta" }, ok + " of " + n + " correct · " + qs.length + " questions to practise")), h("span", { class: "btn small" }, "Practise")))); });
   app.appendChild(c);
 };
+
+/* ---------- 5.0 Phase E: graded assignments with deadlines, locking and extensions (server-enforced) ---------- */
+const ASG = { off: 0, tz: null };   // off = server clock − device clock (ms); only used to show countdowns
+async function asgCall(body) { if (!DB || !DB.live || !DB.call) throw new Error("Graded assignments need ChemFlip's online service."); const j = await DB.call(Object.assign({ op: "asg" }, body)); if (j && j.now) ASG.off = Date.parse(j.now) - Date.now(); return j; }
+const srvNow = () => Date.now() + ASG.off;
+const TZS = ["America/Los_Angeles", "America/Denver", "America/Phoenix", "America/Chicago", "America/New_York", "America/Anchorage", "Pacific/Honolulu", "America/Puerto_Rico", "Europe/London", "Europe/Berlin", "Asia/Tehran", "Asia/Dubai", "Asia/Kolkata", "Asia/Shanghai", "Asia/Tokyo", "Australia/Sydney"];
+function localTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Los_Angeles"; } catch (e) { return "America/Los_Angeles"; } }
+function fmtTz(iso, tz, withZone) {
+  if (!iso) return "—";
+  try { return new Intl.DateTimeFormat("en-US", { timeZone: tz || undefined, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: withZone === false ? undefined : "short" }).format(new Date(iso)); }
+  catch (e) { return new Date(iso).toLocaleString(); }
+}
+// "2026-11-21T23:59" typed in time zone tz → ISO (UTC). Two passes handle daylight-saving changes.
+function tzOffsetMs(ms, tz) { const p = {}; new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(new Date(ms)).forEach(x => p[x.type] = x.value); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000; }
+function zonedToIso(local, tz) { if (!local) return null; const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local); if (!m) return null; const g = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]); let t = g - tzOffsetMs(g, tz); t = g - tzOffsetMs(t, tz); return new Date(t).toISOString(); }
+function isoToZoned(iso, tz) { if (!iso) return ""; const ms = Date.parse(iso) + tzOffsetMs(Date.parse(iso), tz); return new Date(ms).toISOString().slice(0, 16); }
+function left(ms) { if (ms <= 0) return "0:00"; const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60); return d ? d + "d " + hh + "h" : hh ? hh + "h " + mm + "m" : mm + ":" + String(s % 60).padStart(2, "0"); }
+const KIND = { assignment: "Assignment", quiz: "Quiz", test: "Test" };
+const STATE = { open: ["Open", "ok"], late: ["Late — still accepted", "warn"], closed: ["Closed", "bad"], not_open: ["Not open yet", ""] };
+
+/* ----- instructor: list in the class screen ----- */
+function teacherAsg(c, done) {
+  asgCall({ action: "list", class_code: c.code }).then(j => {
+    ASG.tz = j.tz || null; const tz = j.tz || localTz();
+    const wrap = h("div", { id: "asg-wrap" });
+    const tzc = h("div", { class: "card", id: "asg-tz" }, h("b", {}, "Time zone for deadlines"), h("p", { class: "muted" }, "Students see every date in this time zone, whatever their device says."));
+    const sel = h("select", { class: "field", id: "asg-tz-sel" }, [...new Set([tz].concat(TZS))].map(z => h("option", { value: z, selected: z === tz ? "" : null }, z.replace(/_/g, " "))));
+    tzc.appendChild(sel); tzc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "asg-tz-save", onclick: async () => { try { await asgCall({ action: "tz", class_code: c.code, tz: sel.value }); toast("Time zone saved"); render(); } catch (e) { toast("❌ " + e.message); } } }, j.tz ? "Change time zone" : "Use this time zone")));
+    if (!j.tz) tzc.style.borderLeft = "5px solid var(--gold)";
+    wrap.appendChild(tzc);
+    const card = h("div", { class: "card", id: "asg-list" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center" }, h("b", {}, "Graded assignments, quizzes and tests"), h("button", { class: "btn small", id: "asg-new", onclick: () => go("asgedit", { code: c.code }) }, "+ New")));
+    if (!j.assignments.length) card.appendChild(h("p", { class: "muted" }, "None yet. Each one has its own open, due and lock dates, time limit, attempts and late policy, and you can extend deadlines for one student, a group or the whole class."));
+    j.assignments.forEach(a => card.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "asg-" + a.id.slice(0, 8), onclick: () => go("asgdetail", { id: a.id, code: c.code }) },
+      h("div", { style: "flex:1" }, h("div", { class: "t" }, KIND[a.kind] + ": " + a.title), h("div", { class: "meta" }, "Due " + fmtTz(a.due_at, tz) + (a.lock_at && a.lock_at !== a.due_at ? " · locks " + fmtTz(a.lock_at, tz, false) : "") + " · " + a.submitted + " submitted" + (a.extensions ? " · " + a.extensions + " extension" + (a.extensions > 1 ? "s" : "") : "")))))));
+    wrap.appendChild(card); done(wrap);
+  }).catch(e => done(h("div", { class: "card muted" }, "❌ " + e.message)));
+}
+
+/* ----- instructor: create / edit ----- */
+VIEWS.asgedit = function (arg) {
+  if (!isTeacher()) { back(); return; }
+  document.getElementById("title").textContent = arg.a ? "Edit " + arg.a.title : "New assignment";
+  const a = arg.a || {}, tz = ASG.tz || localTz(), F = VIEWS.asgedit.f = (VIEWS.asgedit.f && VIEWS.asgedit.f.key === (a.id || arg.code)) ? VIEWS.asgedit.f : { key: a.id || arg.code, chs: new Set(), n: 10, L: 0, qids: a.qids ? a.qids.slice() : null };
+  const card = h("div", { class: "card", id: "asg-form" });
+  const inp = (id, lab, type, val, extra) => { const i = h("input", Object.assign({ class: "field", id, type: type || "text" }, extra || {})); if (val != null) i.value = val; card.appendChild(h("label", { class: "f", for: id }, lab)); card.appendChild(i); return i; };
+  const title = inp("ae-title", "Title", "text", a.title || "", { placeholder: "e.g. Homework 3: Stoichiometry" });
+  const kind = h("select", { class: "field", id: "ae-kind" }, Object.entries(KIND).map(([k, t]) => h("option", { value: k, selected: (a.kind || "assignment") === k ? "" : null }, t)));
+  card.appendChild(h("label", { class: "f", for: "ae-kind" }, "Type")); card.appendChild(kind);
+  card.appendChild(h("b", { style: "display:block;margin-top:14px" }, "Questions"));
+  const qc = h("div", { class: "muted", id: "ae-qcount" }); card.appendChild(qc);
+  const chBox = h("div", { style: "max-height:180px;overflow:auto;border:1px solid var(--hair);border-radius:8px;padding:6px;margin:6px 0" });
+  CH().forEach(ch => { const id = "ae-ch-" + ch.n, cb = h("input", { type: "checkbox", id, onchange: e => { e.target.checked ? F.chs.add(ch.n) : F.chs.delete(ch.n); } }); cb.checked = F.chs.has(ch.n); chBox.appendChild(h("label", { class: "check", for: id }, cb, h("span", {}, ch.title))); });
+  card.appendChild(chBox);
+  const nIn = h("input", { class: "field", id: "ae-n", type: "number", min: "1", max: "100", value: F.n, style: "max-width:120px" });
+  const lvl = h("select", { class: "field", id: "ae-level", style: "max-width:180px" }, [[0, "Mixed difficulty"]].concat(course().levels.map(L => [L, LV[L]])).map(([v, t]) => h("option", { value: v, selected: v === F.L ? "" : null }, t)));
+  card.appendChild(h("div", { style: "display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" }, h("div", {}, h("label", { class: "f", for: "ae-n" }, "How many"), nIn), h("div", {}, h("label", { class: "f", for: "ae-level" }, "Difficulty"), lvl),
+    h("button", { class: "btn sec2", id: "ae-pick", onclick: () => { F.n = Math.max(1, Math.min(100, +nIn.value || 10)); F.L = +lvl.value; const pool = []; CH().filter(ch => F.chs.has(ch.n)).forEach(ch => cqs(ch).forEach(q => { if (!q.mk && (!F.L || q.L === F.L)) pool.push(q.id); }));
+      if (!pool.length) { toast("Choose at least one chapter."); return; } F.qids = shuffle(pool).slice(0, F.n); showQ(); } }, "Pick questions")));
+  const showQ = () => { qc.textContent = F.qids && F.qids.length ? F.qids.length + " questions selected (random from the chosen chapters). Press Pick questions again for a different set." : "Choose chapters, how many questions and difficulty, then press Pick questions."; };
+  showQ();
+  card.appendChild(h("b", { style: "display:block;margin-top:14px" }, "Dates (" + tz.replace(/_/g, " ") + ")"));
+  const now = new Date(srvNow()), wk = new Date(srvNow() + 7 * 864e5);
+  const openI = inp("ae-open", "Opens (optional)", "datetime-local", isoToZoned(a.open_at, tz));
+  const dueI = inp("ae-due", "Due", "datetime-local", a.due_at ? isoToZoned(a.due_at, tz) : isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59");
+  const lockI = inp("ae-lock", "Locks — no submissions after this (optional; defaults to the due date)", "datetime-local", isoToZoned(a.lock_at, tz));
+  const limI = inp("ae-limit", "Time limit in minutes (optional)", "number", a.time_limit_min || "", { min: "1", max: "600" });
+  const attI = inp("ae-att", "Maximum attempts (optional)", "number", a.max_attempts || "", { min: "1", max: "50" });
+  const lp = a.late_policy || { mode: "accept" };
+  const lateS = h("select", { class: "field", id: "ae-late" }, [["accept", "Accept late work until the lock date (marked late)"], ["penalty", "Accept late work with a penalty"], ["reject", "No late work (closes at the due date)"]].map(([v, t]) => h("option", { value: v, selected: lp.mode === v ? "" : null }, t)));
+  card.appendChild(h("label", { class: "f", for: "ae-late" }, "Late submissions")); card.appendChild(lateS);
+  const penI = h("input", { class: "field", id: "ae-pen", type: "number", min: "1", max: "100", value: lp.pct_per_day || 10, style: "max-width:120px" }), maxI = h("input", { class: "field", id: "ae-penmax", type: "number", min: "1", max: "100", value: lp.max_pct || 50, style: "max-width:120px" });
+  const penRow = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, h("div", {}, h("label", { class: "f", for: "ae-pen" }, "% off per day late"), penI), h("div", {}, h("label", { class: "f", for: "ae-penmax" }, "Maximum % off"), maxI));
+  card.appendChild(penRow); const showPen = () => penRow.style.display = lateS.value === "penalty" ? "" : "none"; lateS.onchange = showPen; showPen();
+  const grI = inp("ae-grade", "Release grades on (optional; default: right after submitting)", "datetime-local", isoToZoned(a.grade_release_at, tz));
+  const soI = inp("ae-sol", "Release answers and solutions on (optional; default: at the lock date)", "datetime-local", isoToZoned(a.solution_release_at, tz));
+  const msg = h("div", { class: "muted", id: "ae-msg", role: "status" });
+  card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ae-save", onclick: async () => {
+    if (!F.qids || !F.qids.length) { msg.textContent = "Pick the questions first."; return; }
+    const key = {}; F.qids.forEach(id => { if (QBYID[id]) key[id] = QBYID[id].a; });
+    const body = { action: "save", id: a.id, class_code: arg.code, kind: kind.value, title: title.value.trim(), qids: F.qids, answer_key: key, open_at: zonedToIso(openI.value, tz), due_at: zonedToIso(dueI.value, tz), lock_at: zonedToIso(lockI.value, tz),
+      time_limit_min: limI.value ? +limI.value : null, max_attempts: attI.value ? +attI.value : null, late_policy: lateS.value === "penalty" ? { mode: "penalty", pct_per_day: +penI.value, max_pct: +maxI.value } : { mode: lateS.value },
+      grade_release_at: zonedToIso(grI.value, tz), solution_release_at: zonedToIso(soI.value, tz), tz };
+    msg.textContent = "Saving…";
+    try { const r = await asgCall(body); VIEWS.asgedit.f = null; toast("✅ " + KIND[r.assignment.kind] + " saved — students see it now"); stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
+    catch (e) { msg.textContent = "❌ " + e.message; } } }, a.id ? "Save changes" : "Create and publish")));
+  card.appendChild(msg); app.appendChild(card);
+};
+
+/* ----- instructor: one assignment — roster, effective dates, extensions, groups, history ----- */
+VIEWS.asgdetail = function (arg) {
+  if (!isTeacher()) { back(); return; }
+  const box = h("div", { id: "ad-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  asgCall({ action: "detail", id: arg.id }).then(j => {
+    const a = j.assignment, tz = a.tz; box.innerHTML = ""; document.getElementById("title").textContent = a.title;
+    box.appendChild(h("div", { class: "card", id: "ad-head" }, h("b", {}, KIND[a.kind] + ": " + a.title),
+      h("div", { class: "muted" }, a.qids.length + " questions" + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "") + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode])),
+      h("div", { style: "margin-top:6px" }, (a.open_at ? "Opens " + fmtTz(a.open_at, tz) + " · " : "") + "Due " + fmtTz(a.due_at, tz) + " · Locks " + fmtTz(a.lock_at || a.due_at, tz)),
+      h("div", { class: "muted", style: "font-size:13px" }, "Grades: " + (a.grade_release_at ? fmtTz(a.grade_release_at, tz) : "right after submitting") + " · Solutions: " + (a.solution_release_at ? fmtTz(a.solution_release_at, tz) : "after the lock date")),
+      h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go("asgedit", { code: arg.code, a }) }, "Edit"),
+        h("button", { class: "btn sec2 small", id: "ad-class-ext", onclick: () => extSheet(a, "class", null, "the whole class", null, j) }, "Extend for whole class"),
+        h("button", { class: "btn sec2 small", id: "ad-group", onclick: () => groupSheet(a, j) }, "Groups & group extension"),
+        h("button", { class: "btn ghost small", id: "ad-del", onclick: () => confirmBox("Delete " + a.title + "?", "Students won't see it any more. Submissions are kept in the database.", async () => { await asgCall({ action: "delete", id: a.id }); toast("Deleted"); back(); }, "Delete") }, "Delete"))));
+    const live = j.overrides.filter(o => !o.removed_at);
+    const accom = j.roster.filter(r => r.effective.accommodation);
+    const rc = h("div", { class: "card", id: "ad-roster" }, h("b", {}, "Students (" + j.roster.length + ")" + (accom.length ? " · " + accom.length + " with accommodations" : "")));
+    const onlyAcc = h("input", { type: "checkbox", id: "ad-only-acc" }); rc.appendChild(h("label", { class: "check", for: "ad-only-acc" }, onlyAcc, h("span", {}, "Show only students with accommodations")));
+    const tb = h("table", { class: "t" }); rc.appendChild(tb);
+    const draw = () => { tb.innerHTML = ""; tb.appendChild(h("tr", {}, h("th", {}, "Student"), h("th", {}, "Due (" + (tz.split("/")[1] || tz).replace(/_/g, " ") + ")"), h("th", {}, "Locks"), h("th", { class: "n" }, "Score"), h("th", {}, "")));
+      j.roster.filter(r => !onlyAcc.checked || r.effective.accommodation).forEach(r => { const done = r.attempts.filter(x => x.status !== "in_progress"), best = done.length ? done.reduce((m, x) => x.score > m.score ? x : m) : null, e = r.effective;
+        tb.appendChild(h("tr", { id: "ad-r-" + r.sid }, h("td", {}, avi(r.avatar), " " + r.name, e.source !== "base" ? h("span", { class: "chip " + (e.source === "student" ? "new" : ""), title: "Effective dates come from a " + e.source + " extension" }, e.source === "student" ? "Extension" : e.source === "group" ? "Group ext." : "Class ext.") : null, e.accommodation ? h("span", { class: "chip ok" }, "Accommodation") : null),
+          h("td", {}, fmtTz(e.due_at, tz, false)), h("td", {}, fmtTz(e.lock_at, tz, false)), h("td", { class: "n" }, best ? best.score + "/" + best.total + (best.late ? " (late" + (best.penalty_pct ? ", −" + best.penalty_pct + "%" : "") + ")" : "") : r.attempts.some(x => x.status === "in_progress") ? "in progress" : "–"),
+          h("td", {}, h("button", { class: "btn sec2 small", id: "ad-ext-" + r.sid, onclick: () => extSheet(a, "student", r.sid, r.name, live.find(o => o.scope === "student" && o.target === r.sid), j) }, "Extend / reopen")))); }); };
+    onlyAcc.onchange = draw; draw(); box.appendChild(rc);
+    const ec = h("div", { class: "card", id: "ad-exts" }, h("b", {}, "Active extensions (" + live.length + ")"));
+    if (!live.length) ec.appendChild(h("p", { class: "muted" }, "None. Every student has the dates above."));
+    live.forEach(o => { const who = o.scope === "class" ? "Whole class" : o.scope === "group" ? "Group " + o.target : ((j.roster.find(r => r.sid === o.target) || {}).name || "Student");
+      ec.appendChild(h("div", { style: "padding:6px 0;border-top:1px solid var(--hair)" }, h("b", {}, who), h("div", { class: "muted", style: "font-size:13px" }, [o.due_at ? "due " + fmtTz(o.due_at, tz, false) : "", o.lock_at ? "locks " + fmtTz(o.lock_at, tz, false) : "", o.extra_minutes ? "+" + o.extra_minutes + " min" : "", o.extra_attempts ? "+" + o.extra_attempts + " attempt(s)" : "", o.accommodation ? "accommodation" : "", o.note || ""].filter(Boolean).join(" · ")),
+        h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", onclick: () => extSheet(a, o.scope, o.target, who, o, j) }, "Modify"), h("button", { class: "btn ghost small", id: "ad-rm-" + o.id.slice(0, 8), onclick: async () => { try { await asgCall({ action: "override_remove", id: o.id }); toast("Extension removed"); render(); } catch (e) { toast("❌ " + e.message); } } }, "Remove")))); });
+    box.appendChild(ec);
+    const hc = h("details", { class: "card", id: "ad-history" }, h("summary", {}, h("b", {}, "History of changes (" + j.audit.length + ")")));
+    j.audit.forEach(x => hc.appendChild(h("div", { class: "muted", style: "font-size:13px;padding:3px 0;border-top:1px solid var(--hair)" }, fmtTz(x.at, tz, false) + " — " + x.action.replace(/_/g, " ") + (x.details && x.details.target ? " for " + ((j.roster.find(r => r.sid === x.details.target) || {}).name || x.details.target) : "") + (x.details && x.details.due_at ? " · due " + fmtTz(x.details.due_at, tz, false) : "") + (x.details && x.details.lock_at ? " · lock " + fmtTz(x.details.lock_at, tz, false) : ""))));
+    box.appendChild(hc);
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+function extSheet(a, scope, target, who, cur, j) {
+  const tz = a.tz;
+  sheet("ext-sheet", "Extension for " + who, (box, close) => {
+    box.appendChild(h("p", { class: "muted" }, "Only " + (scope === "class" ? "the whole class" : who) + " gets these dates; everyone else keeps theirs. Leave a field empty to keep the regular value. To reopen a closed assignment, set a new lock date."));
+    const f = (id, lab, type, val, ex) => { const i = h("input", Object.assign({ class: "field", id, type }, ex || {})); if (val != null) i.value = val; box.appendChild(h("label", { class: "f", for: id }, lab)); box.appendChild(i); return i; };
+    const due = f("ext-due", "New due date (" + tz.replace(/_/g, " ") + ")", "datetime-local", cur ? isoToZoned(cur.due_at, tz) : "");
+    const lock = f("ext-lock", "New lock date", "datetime-local", cur ? isoToZoned(cur.lock_at, tz) : "");
+    const mins = f("ext-min", "Extra minutes on the time limit", "number", cur ? cur.extra_minutes || "" : "", { min: "0", max: "1440" });
+    const att = f("ext-att", "Extra attempts", "number", cur ? cur.extra_attempts || "" : "", { min: "0", max: "50" });
+    const acc = h("input", { type: "checkbox", id: "ext-acc" }); acc.checked = !!(cur && cur.accommodation);
+    if (scope === "student") box.appendChild(h("label", { class: "check", for: "ext-acc" }, acc, h("span", {}, "This is an accommodation (e.g. extended time from disability services)")));
+    const note = f("ext-note", "Note (only instructors see this)", "text", cur ? cur.note || "" : "");
+    const msg = h("div", { class: "muted", id: "ext-msg" }); box.appendChild(msg);
+    box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ext-save", onclick: async () => {
+      try { await asgCall({ action: "override", id: cur ? cur.id : undefined, assignment_id: a.id, scope, target, due_at: zonedToIso(due.value, tz), lock_at: zonedToIso(lock.value, tz), extra_minutes: +mins.value || 0, extra_attempts: +att.value || 0, accommodation: acc.checked, note: note.value });
+        close(); toast("✅ Extension saved for " + who); render(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, cur ? "Save changes" : "Give extension")));
+  });
+}
+function groupSheet(a, j) {
+  sheet("grp-sheet", "Groups", (box, close) => {
+    box.appendChild(h("p", { class: "muted" }, "Make a group (e.g. a lab section), then give the whole group an extension. A student can be in several groups."));
+    const nm = h("input", { class: "field", id: "grp-name-in", placeholder: "Group name, e.g. Lab B", list: "grp-names" }); box.appendChild(h("datalist", { id: "grp-names" }, j.groups.map(g => h("option", { value: g }))));
+    box.appendChild(nm); const pick = new Set();
+    const list = h("div", { style: "max-height:220px;overflow:auto;margin:6px 0" }); j.roster.forEach(r => { const id = "gm-" + r.sid, cb = h("input", { type: "checkbox", id, onchange: e => e.target.checked ? pick.add(r.sid) : pick.delete(r.sid) }); list.appendChild(h("label", { class: "check", for: id }, cb, h("span", {}, r.name + (r.groups.length ? " (" + r.groups.join(", ") + ")" : "")))); });
+    nm.oninput = () => { pick.clear(); list.querySelectorAll("input").forEach(cb => { const r = j.roster.find(x => "gm-" + x.sid === cb.id); cb.checked = !!(r && r.groups.includes(nm.value.trim())); if (cb.checked) pick.add(r.sid); }); };
+    box.appendChild(list);
+    box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "grp-save-btn", onclick: async () => { if (!nm.value.trim()) { toast("Name the group."); return; } try { await asgCall({ action: "groups", class_code: a.class_code, grp: nm.value.trim(), sids: [...pick] }); toast("Group saved"); close(); render(); } catch (e) { toast("❌ " + e.message); } } }, "Save group"),
+      h("button", { class: "btn", id: "grp-ext-btn", onclick: () => { if (!nm.value.trim()) { toast("Choose a group."); return; } const g = nm.value.trim(); close(); setTimeout(() => extSheet(a, "group", g, "group " + g, j.overrides.find(o => !o.removed_at && o.scope === "group" && o.target === g), j), 200); } }, "Extend for this group")));
+  });
+}
+
+/* ----- student: my assignments, take, submit, review ----- */
+VIEWS.myasg = function () {
+  document.getElementById("title").textContent = "My assignments";
+  const c = myClass(); if (!c) { app.appendChild(h("div", { class: "card" }, h("b", {}, "Join your class first"), h("p", { class: "muted" }, "Your instructor's assignments appear here after you join with the class code."), h("button", { class: "btn", onclick: () => go("classes") }, "Join a class"))); return; }
+  const box = h("div", { id: "ma-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  asgCall({ action: "mine", class_code: c.code }).then(j => {
+    const tz = j.tz || localTz(); box.innerHTML = ""; S.asgCount = j.assignments.filter(a => a.state === "open" || a.state === "late").length; save();
+    box.appendChild(h("p", { class: "muted", id: "ma-tz" }, "Times are shown in your class's time zone (" + tz.replace(/_/g, " ") + "). Deadlines are checked by ChemFlip's server, so changing your device clock doesn't change them."));
+    if (!j.assignments.length) box.appendChild(h("div", { class: "card muted" }, "No graded assignments yet."));
+    j.assignments.forEach(a => { const e = a.effective, st = STATE[a.state] || ["", ""], usedUp = e.max_attempts && a.attempts_used >= e.max_attempts;
+      const cd = h("span", { class: "cd", "data-due": e.due_at, "data-lock": e.lock_at });
+      const card = h("div", { class: "card asgc", id: "ma-" + a.id.slice(0, 8) }, h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, KIND[a.kind] + ": " + a.title), h("span", { class: "chip " + st[1] }, st[0])),
+        h("div", {}, "Due " + fmtTz(e.due_at, tz) + (e.source !== "base" ? " (your extension)" : ""), " ", cd),
+        h("div", { class: "muted", style: "font-size:13px" }, [e.open_at && a.state === "not_open" ? "Opens " + fmtTz(e.open_at, tz) : "", e.lock_at !== e.due_at ? "Late work until " + fmtTz(e.lock_at, tz, false) : "", e.time_limit_min ? e.time_limit_min + " min time limit" : "", e.max_attempts ? a.attempts_used + " of " + e.max_attempts + " attempts used" : a.attempts_used + " attempt(s) so far", a.qids.length + " questions"].filter(Boolean).join(" · ")),
+        a.grade ? h("div", { style: "margin-top:4px" }, h("b", {}, "Score: " + a.grade.score + "/" + a.grade.total), a.grade.late ? " (late" + (a.grade.penalty_pct ? ", −" + a.grade.penalty_pct + "%" : "") + ")" : "") : a.submitted && !a.grade_released ? h("div", { class: "muted" }, "Submitted. Your grade is released " + fmtTz(a.grade_release_at, tz) + ".") : null);
+      const btns = h("div", { class: "btnrow" });
+      if (a.in_progress) btns.appendChild(h("button", { class: "btn", id: "ma-resume-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, "Resume (" + left(Date.parse(a.in_progress.ends_at) - srvNow()) + " left)"));
+      else if ((a.state === "open" || a.state === "late") && !usedUp) btns.appendChild(h("button", { class: "btn", id: "ma-start-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, a.attempts_used ? "Start another attempt" : "Start"));
+      if (a.submitted) btns.appendChild(h("button", { class: "btn sec2", id: "ma-review-" + a.id.slice(0, 8), onclick: () => asgReview(a, tz) }, "Review"));
+      card.appendChild(btns); box.appendChild(card); });
+    const tickCd = () => { if (!document.getElementById("ma-box")) return; document.querySelectorAll(".cd").forEach(el => { const d = Date.parse(el.dataset.due) - srvNow(), l = Date.parse(el.dataset.lock) - srvNow(); el.textContent = d > 0 ? "· " + left(d) + " left" : l > 0 ? "· late, locks in " + left(l) : ""; }); setTimeout(tickCd, 1000); };
+    tickCd();
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+async function asgStart(a, tz) {
+  const go1 = async () => {
+    try { const r = await asgCall({ action: "start", assignment_id: a.id });
+      const list = r.qids.map(id => QBYID[id]).filter(Boolean);
+      if (list.length < r.qids.length) toast("Some questions need the latest ChemFlip update — reload the page.");
+      QUIZ = Object.assign({ list, i: 0, label: a.title, ans: Object.assign({}, r.answers || {}), exam: true, picked: null, run: 0, bestRun: 0, started: Date.now() },
+        { asg: { id: a.id, attempt: r.attempt_id, endsAt: Date.parse(r.ends_at), tz, saved: JSON.stringify(r.answers || {}), savedAt: r.resumed ? Date.now() : 0, kind: a.kind }, deadline: Date.parse(r.ends_at) - ASG.off });
+      QUIZ.picked = QUIZ.ans[list[0] && list[0].id] ?? null;
+      go("quiz"); if (r.resumed) toast("↩️ Resumed — your saved answers are back");
+    } catch (e) { toast("❌ " + e.message); render(); } };
+  if (a.effective.time_limit_min && !a.in_progress) confirmBox("Start " + a.title + "?", "You'll have " + a.effective.time_limit_min + " minutes once you start (the timer keeps running if you leave). " + (a.effective.max_attempts ? "Attempts: " + (a.attempts_used + 1) + " of " + a.effective.max_attempts + "." : ""), go1, "Start now");
+  else go1();
+}
+async function asgAutosave(force) {
+  const Z = QUIZ; if (!Z || !Z.asg || Z.asg.busy) return;
+  const ans = Object.assign({}, Z.ans); if (Z.picked != null && Z.list[Z.i]) ans[Z.list[Z.i].id] = Z.picked;
+  const js = JSON.stringify(ans); if (!force && (js === Z.asg.saved || Date.now() - (Z.asg.try || 0) < 5000)) return;
+  Z.asg.busy = true; Z.asg.try = Date.now(); const el = document.getElementById("asg-save");
+  try { await asgCall({ action: "autosave", attempt_id: Z.asg.attempt, answers: ans }); Z.asg.saved = js; Z.asg.savedAt = Date.now(); Z.asg.err = null; }
+  catch (e) { Z.asg.err = e.message; }
+  Z.asg.busy = false; asgSaveChip();
+}
+function asgSaveChip() { const Z = QUIZ, el = document.getElementById("asg-save"); if (!el || !Z || !Z.asg) return; el.textContent = Z.asg.err ? "⚠️ Not saved — retrying" : Z.asg.savedAt ? "✓ Saved " + new Date(Z.asg.savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Not saved yet"; el.className = "chip " + (Z.asg.err ? "warn" : "ok"); }
+async function asgFinish() {
+  const Z = QUIZ; if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
+  if (Z.picked != null && Z.list[Z.i]) Z.ans[Z.list[Z.i].id] = Z.picked;
+  const box = h("div", { class: "card", id: "asg-submitting" }, "⏳ Submitting…"); app.innerHTML = ""; app.appendChild(box);
+  for (let k = 0; k < 4; k++) {
+    try { const r = await asgCall({ action: "submit", attempt_id: Z.asg.attempt, answers: Z.ans }); QUIZ = null; stack.pop(); go("asgdone", Object.assign({ title: Z.label, tz: Z.asg.tz }, r)); return; }
+    catch (e) { if (e.status === 409) { QUIZ = null; stack.pop(); go("asgdone", { title: Z.label, tz: Z.asg.tz, already: true }); return; } box.textContent = "⚠️ Couldn't reach ChemFlip (" + e.message + "). Retrying…"; await new Promise(r => setTimeout(r, 2500)); }
+  }
+  box.innerHTML = ""; box.appendChild(h("b", {}, "Your answers are saved on the server, but the submission didn't go through."));
+  box.appendChild(h("p", { class: "muted" }, "Check your internet and press Submit again before the time runs out. If time runs out, ChemFlip grades the answers it saved."));
+  box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "asg-resubmit", onclick: asgFinish }, "Submit again")));
+}
+VIEWS.asgdone = function (r) {
+  document.getElementById("title").textContent = r.title;
+  const c = h("div", { class: "card", id: "asg-done" });
+  if (r.already) c.appendChild(h("b", {}, "This attempt was already submitted."));
+  else {
+    c.appendChild(h("h2", { style: "margin:0 0 6px" }, r.accepted === false ? "⏰ Time was up" : "✅ Submitted"));
+    c.appendChild(h("div", { class: "muted" }, "Received " + fmtTz(r.submitted_at, r.tz) + (r.late ? " — late" + (r.penalty_pct ? " (−" + r.penalty_pct + "%)" : "") : "") + (r.accepted === false ? ". Your saved answers were graded." : ".")));
+    c.appendChild(r.grade_released ? h("div", { style: "font-size:22px;margin-top:10px" }, h("b", {}, r.score + " / " + r.total)) : h("p", {}, "Your grade will be released " + fmtTz(r.grade_release_at, r.tz) + "."));
+  }
+  c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "asg-back", onclick: () => { stack = [{ view: "home" }]; go("myasg"); } }, "Back to my assignments")));
+  app.appendChild(c);
+};
+async function asgReview(a, tz) {
+  try { const r = await asgCall({ action: "review", assignment_id: a.id });
+    sheet("asg-review", "Review: " + a.title, (box) => {
+      if (!r.solutions_released) box.appendChild(h("p", { class: "muted" }, "Answers and solutions are released " + fmtTz(r.solution_release_at, tz) + ". Until then you can see your own answers."));
+      const last = r.attempts[r.attempts.length - 1] || { answers: {} };
+      if (r.grade_released && last.score != null) box.appendChild(h("p", {}, h("b", {}, "Attempt " + last.n + ": " + last.score + "/" + last.total)));
+      r.qids.forEach((id, i) => { const q = QBYID[id]; if (!q) return; const mine = last.answers[id], key = r.answer_key ? r.answer_key[id] : null;
+        const d = h("div", { style: "padding:8px 0;border-top:1px solid var(--hair)" }, h("div", {}, h("b", {}, (i + 1) + ". "), q.q));
+        q.o.forEach((o, k) => d.appendChild(h("div", { class: "qbo" + (key === k ? " ok" : "") + (mine === k && key != null && key !== k ? " bad" : "") }, "ABCD"[k] + ". " + o + (mine === k ? "  ← your answer" : "") + (key === k ? "  ✓" : ""))));
+        if (key != null && q.s) d.appendChild(h("div", { class: "muted", style: "white-space:pre-wrap;margin-top:4px" }, q.s));
+        box.appendChild(d); });
+    });
+  } catch (e) { toast("❌ " + e.message); }
+}
 
 /* ---------- administrator: instructor approvals (5.0) ---------- */
 const ADMIN_EMAILS = ["chemflipp@gmail.com"];
