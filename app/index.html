@@ -294,6 +294,14 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 .crop .nw{left:-11px;top:-11px;cursor:nwse-resize}.crop .ne{right:-11px;top:-11px;cursor:nesw-resize}.crop .sw{left:-11px;bottom:-11px;cursor:nesw-resize}.crop .se{right:-11px;bottom:-11px;cursor:nwse-resize}
 .work{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .work-strip{display:flex;gap:6px;flex-wrap:wrap}
+.ce{margin:8px 0}.ce .ce-input{flex:1;font-size:17px;min-width:0}.ce-preview{min-height:1.4em;margin:6px 2px;font-size:16px}.ce-pv{font-weight:700;color:var(--navy)}
+.ce-pad{margin-top:6px;border:1px solid var(--hair);border-radius:10px;padding:6px;background:var(--chip)}.ce-tabs{margin-bottom:6px}
+.ce-keys,.se-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:5px}
+.ce-key{min-height:40px;border:1px solid var(--hair);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+.ce-key:focus-visible{outline:3px solid var(--teal);outline-offset:1px}.ce-key.on{background:var(--teal);color:#fff;border-color:var(--teal)}.ce-wide{grid-column:span 2}
+.ce-hint{font-size:12.5px;margin-top:4px}.se-wrap{margin-top:8px;border:1px solid var(--hair);border-radius:10px;background:var(--card);touch-action:manipulation}
+.se-canvas{display:block;width:100%;height:auto;cursor:crosshair}.se-info{margin-top:6px;font-size:14px;min-height:1.3em;overflow-wrap:anywhere}
+.pq-chip{font-size:12px}.typed-ans{margin-top:6px}
 .work-th{padding:0;border:1px solid var(--rule,#D6DEE4);border-radius:6px;overflow:hidden;width:54px;height:54px;background:#fff;cursor:pointer}
 .work-th img{width:100%;height:100%;object-fit:cover;display:block}
 
@@ -536,7 +544,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", results: "Results", exam: "Build an exam", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 function render() {
   applyTheme(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
@@ -744,6 +752,7 @@ VIEWS.home = function () {
   if (!prem) app.appendChild(h("div", { class: "card", style: "display:flex;gap:14px;align-items:center;flex-wrap:wrap" }, h("div", { style: "flex:1 1 240px" }, h("b", {}, (S.trial && !storeFlavor()) ? "Unlock every chapter" : "Try Premium free for 7 days"),
     h("div", { class: "muted" }, "All " + total + " questions in " + course().name + ", with worked solutions.")), h("button", { class: "btn gold", id: "go-premium", onclick: () => go("premium") }, (S.trial && !storeFlavor()) ? "See Premium" : "Start free trial")));
   { const cvc = typeof canvasCard === "function" ? canvasCard() : null; if (cvc) app.appendChild(cvc); }
+  { const rc = pqResumeCard(); if (rc) app.appendChild(rc); }
   if (S.profile.role === "instructor" && !eduOk()) app.appendChild(h("div", { class: "card", id: "edu-card" }, h("b", {}, "Verify your instructor account"),
     h("p", { class: "muted" }, "Confirm your .edu email to use classes, student progress and class codes."), h("div", { class: "btnrow" }, h("button", { class: "btn", id: "edu-open", onclick: eduSheet }, "Verify with my .edu email"))));
   if (CFG.notice) app.appendChild(h("div", { class: "card", id: "global-notice" }, h("b", {}, "From ChemFlip"), h("div", { style: "white-space:pre-wrap;margin-top:4px" }, CFG.notice)));
@@ -764,7 +773,7 @@ VIEWS.home = function () {
     CI.announcement ? h("div", { style: "white-space:pre-wrap" }, CI.announcement) : null,
     CI.assigned && CI.assigned.length ? h("div", { style: "margin-top:6px" }, h("b", {}, "Assigned: "), CI.assigned.map(n => CHBYN[n] ? CHBYN[n].title : "").filter(Boolean).join(", "), CI.due ? h("span", { class: "muted" }, " · due " + CI.due) : null) : null));
   else duo.appendChild(h("div", { class: "due" }, h("div", { class: "lab" }, "Practice your way"),
-    h("button", { class: "btn sec2", id: "exam-quick", onclick: () => go("exam") }, "Build a practice exam"),
+    h("button", { class: "btn sec2", id: "exam-quick", onclick: () => go("exam") }, "Build a practice test"),
     h("button", { class: "btn sec2", id: "review-quick", onclick: () => startList("wrong") }, "Review mistakes (" + S.w.length + ")"),
     h("button", { class: "btn ghost", id: "class-quick", onclick: () => go("classes") }, "Join your class")));
   app.appendChild(duo);
@@ -789,7 +798,7 @@ VIEWS.home = function () {
   app.appendChild(h("div", { class: "sec h-more" }, "More"));
   const tile = (id, icon, label, fn) => h("button", { class: "tile", id, onclick: fn }, h("i", {}, ico(icon, 24)), label);
   const tiles = h("div", { class: "tiles" },
-    tile("exam-btn", "exam", "Build an exam", () => go("exam")), tile("review-all", "redo", "Review mistakes", () => startList("wrong")), tile("bm-btn", "mark", "Bookmarks", () => startList("bm")),
+    tile("exam-btn", "exam", "Practice test", () => go("exam")), tile("review-all", "redo", "Review mistakes", () => startList("wrong")), tile("bm-btn", "mark", "Bookmarks", () => startList("bm")), tile("draw-btn", "pen", "Draw a structure", () => go("draw")),
     tile("class-btn", T ? "teach" : "users", T ? "My classes" : "My class", () => go(T ? "teach" : "classes")));
   if (isOrg()) { tiles.appendChild(tile("mech-btn", "pen", "Mechanisms", () => go("mechs"))); tiles.appendChild(tile("drills-btn", "calc", "Drills", () => go("drills"))); }
   else tiles.appendChild(tile("mech-btn", "calc", "Drills", () => go("drills")));
@@ -865,15 +874,18 @@ function startList(kind) {
   startQuiz(list, kind === "wrong" ? "Review mistakes" : "Bookmarks", { review: kind === "wrong" });
 }
 VIEWS.quiz = function () {
-  const Z = QUIZ; const q = Z.list[Z.i]; const n = Z.list.length;
+  const Z = QUIZ; const q = Z.list[Z.i]; const n = Z.target || Z.list.length;
+  pqSave();
   document.getElementById("title").textContent = Z.label;
   const top = h("div", { class: "progress" }, h("span", {}, "Question " + (Z.i + 1) + " of " + n), h("div", { class: "bar" }, h("i", { style: "width:" + pct(Z.i, n) + "%" })));
   if (!Z.exam && Z.run >= 3) top.appendChild(h("span", { class: "streak" }, "🔥 " + Z.run));
-  if (Z.exam && Z.deadline) top.appendChild(h("span", { class: "timer", id: "timer" }, ""));
+  if (Z.deadline) top.appendChild(h("span", { class: "timer", id: "timer" }, ""));
+  if (Z.adaptive) top.appendChild(h("span", { class: "diff L" + Z.adaptive.level, id: "adapt-level", title: "Adaptive difficulty" }, "🎯 " + LV[Z.adaptive.level]));
   if (Z.asg) { top.appendChild(h("span", { class: "chip", id: "asg-save", role: "status", "aria-live": "polite" }, "")); setTimeout(asgSaveChip, 0); }
+  if (pqEligible(Z)) top.appendChild(h("span", { class: "chip pq-chip", id: "pq-save", role: "status", title: "Your place and answers are saved as you go" }, "✓ Saved" + ((S.acct && S.acct.at) || ltiOn() ? " · syncs" : "")));
   top.appendChild(h("button", { class: "btn sec2 small", id: "quiz-ref", style: "margin-left:8px;padding:4px 10px", onclick: () => openRefSheet() }, "📚 Tables"));
   app.appendChild(top);
-  if (Z.exam && Z.deadline) tick();
+  if (Z.deadline) tick();
   const answered = Z.ans[q.id];
   if (Z.shownId !== q.id) { Z.shownId = q.id; Z.shownAt = Date.now(); }
   const star = h("button", { class: "star" + (S.b.includes(q.id) ? " on" : ""), id: "star", "aria-label": "Bookmark", onclick: () => { const i = S.b.indexOf(q.id); if (i >= 0) S.b.splice(i, 1); else S.b.push(q.id); save(); sfx("tap"); star.className = "star" + (S.b.includes(q.id) ? " on" : ""); star.textContent = S.b.includes(q.id) ? "★" : "☆"; } }, S.b.includes(q.id) ? "★" : "☆");
@@ -902,12 +914,28 @@ VIEWS.quiz = function () {
       card.appendChild(h("div", { class: "muted", style: "margin-top:8px" }, "➡️ Final product:"));
       card.appendChild(h("div", { class: "prodbox", html: mm.steps[mm.steps.length - 1].prod }));
     }
+  } else if (typedOn(Z, q) && (Z.exam ? Z.picked == null || (Z.typed && Z.typed[q.id] != null) : answered == null)) {
+    const ci = chemInput({ id: "ta", value: (Z.typed && Z.typed[q.id]) || "", onEnter: () => checkTyped() });
+    card.appendChild(ci.el);
+    if (Z.exam && Z.typed && Z.typed[q.id] != null) card.appendChild(h("div", { class: "muted typed-ans", id: "typed-saved" }, "Saved answer: ", h("span", { html: chemFormat(Z.typed[q.id]) })));
+    card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "type-check", onclick: () => checkTyped() }, Z.exam ? "Save answer" : "Check answer")));
+    setTimeout(() => ci.focus(), 0);
+    function checkTyped() {
+      const v = ci.get().trim(); if (!v) { toast("Type an answer first."); return; }
+      if (!parseNumAnswer(v)) { toast("Type a number, e.g. 0.25 or 1.5×10^-3, with its unit if there is one."); return; }
+      Z.typed = Z.typed || {}; Z.typed[q.id] = v;
+      const idx = q.o.findIndex(o => numMatches(v, o).ok);
+      const m = numMatches(v, q.o[q.a]); Z.typedNote = Z.typedNote || {}; Z.typedNote[q.id] = m.unitBad ? "unit" : m.missingUnit ? "nounit" : "";
+      pick(idx >= 0 ? idx : -1);
+    }
   } else q.o.forEach((t, i) => {
     let cls = "opt";
     if (showFeedback) { if (i === q.a) cls += " right"; else if (i === answered) cls += " wrong"; }
     else if (Z.exam && Z.picked === i) cls += " sel";
     card.appendChild(h("button", { class: cls, id: "opt-" + "ABCD"[i], disabled: showFeedback, onclick: () => pick(i) }, h("span", { class: "L" }, "ABCD"[i]), h("span", {}, t)));
   });
+  if (showFeedback && !q.mk && Z.typed && Z.typed[q.id] != null) card.appendChild(h("div", { class: "typed-ans", id: "typed-ans" }, "You typed: ", h("b", { html: chemFormat(Z.typed[q.id]) }),
+    Z.typedNote && Z.typedNote[q.id] === "unit" ? h("div", { class: "muted" }, "⚠️ The number is close, but the unit doesn't match.") : Z.typedNote && Z.typedNote[q.id] === "nounit" ? h("div", { class: "muted" }, "ℹ️ Include the unit next time.") : null));
   if (showFeedback && !q.mk) {
     const ok = answered === q.a;
     const praise = ["✅ Correct!", "🎉 Nice work!", "💪 You got it!", "⭐ Excellent!", "🙌 Right on!"];
@@ -915,6 +943,7 @@ VIEWS.quiz = function () {
     card.appendChild(h("button", { class: "qrep", id: "qrep", onclick: () => reportQuestion(q) }, "Report a problem with this question"));
   }
   const qc = q.mk ? null : qCoach(card, answered); if (qc) app.appendChild(qc);
+  if (typedAllowed(Z, q) && (Z.exam || answered == null)) card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "type-toggle", "aria-pressed": S.typeMode ? "true" : "false", onclick: () => { S.typeMode = !S.typeMode; save(); render(); } }, S.typeMode ? "🔘 Choose from options instead" : "⌨️ Type my answer instead")));
   if (!q.mk && typeof workPanel === "function") card.appendChild(workPanel(q));
   app.appendChild(card);
   if (qc && answered != null) { const sol = card.querySelector(".sol"); if (sol) sol.style.boxShadow = "0 0 0 3px var(--teal)"; }
@@ -924,14 +953,17 @@ VIEWS.quiz = function () {
       h("button", { class: "btn", id: "next", disabled: Z.picked == null, onclick: () => { Z.ans[q.id] = Z.picked; if (last) finish(); else { Z.i++; Z.picked = Z.ans[Z.list[Z.i].id] ?? null; render(); window.scrollTo(0, 0); } } }, last ? "🏁 Finish exam" : "Next ›")]);
   } else {
     bottom([h("button", { class: "btn ghost", id: "end", onclick: finish }, "📊 End & see results"),
-      h("button", { class: "btn", id: "next", disabled: answered == null, onclick: () => { if (last) finish(); else { Z.i++; render(); window.scrollTo(0, 0); } } }, last ? "🏁 See results" : "Next ›")]);
+      h("button", { class: "btn", id: "next", disabled: answered == null, onclick: () => { if (last) { finish(); return; }
+        if (Z.adaptive && Z.i + 1 >= Z.list.length) { const nx = adaptNext(Z); if (!nx) { toast("That's every question at this level in your topics."); finish(); return; } Z.list.push(nx); }
+        Z.i++; render(); window.scrollTo(0, 0); } }, last ? "🏁 See results" : "Next ›")]);
   }
   function pick(i) {
-    if (Z.exam) { Z.picked = i; sfx("tap"); render(); return; }
+    if (Z.exam) { Z.picked = i; if (i >= 0 && Z.typed && !typedOn(Z, q)) delete Z.typed[q.id]; sfx("tap"); render(); return; }
     if (Z.ans[q.id] != null) return;
     Z.ans[q.id] = i; const ok = i === q.a; record(q, ok, Date.now() - Z.shownAt); sfx(ok ? "ok" : "bad");
     Z.run = ok ? Z.run + 1 : 0; Z.bestRun = Math.max(Z.bestRun, Z.run);
     if (ok && (Z.run === 5 || Z.run === 10)) toast("🔥 " + Z.run + " in a row!");
+    if (Z.adaptive) adaptUpdate(Z, ok);
     render();
   }
 };
@@ -942,10 +974,13 @@ function tick() {
 }
 function finish() {
   if (QUIZ && QUIZ.asg) { asgFinish(); return; }
-  const Z = QUIZ; if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
+  const Z = QUIZ; if (!Z || Z.finished) return; Z.finished = true;   // one result per test, even if the timer and a click land together
+  if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
+  if (Z.exam && Z.picked != null && Z.list[Z.i] && Z.ans[Z.list[Z.i].id] == null) Z.ans[Z.list[Z.i].id] = Z.picked;
+  pqClear();
   const elapsed = Date.now() - Z.started; const nAns = Z.list.filter(q => Z.ans[q.id] != null).length || 1;
   if (Z.exam) Z.list.forEach(q => { if (Z.ans[q.id] != null) record(q, Z.ans[q.id] === q.a, elapsed / nAns); });
-  const res = Z.list.filter(q => Z.ans[q.id] != null).map(q => ({ q, ok: Z.ans[q.id] === q.a, pick: Z.ans[q.id] }));
+  const res = Z.list.filter(q => Z.ans[q.id] != null).map(q => ({ q, ok: Z.ans[q.id] === q.a, pick: Z.ans[q.id], typed: Z.typed && Z.typed[q.id] }));
   const okn = res.filter(r => r.ok).length;
   const key = Z.ch ? "c" + Z.ch : "x"; S.hist[key] = S.hist[key] || []; S.hist[key].push({ t: Date.now(), n: res.length, ok: okn }); if (S.hist[key].length > 20) S.hist[key].shift();
   if (Z.exam && res.length >= 10 && okn / res.length >= .9) S.best.examAce = true;
@@ -955,8 +990,42 @@ function finish() {
   if (Z.classTest) submitTestResult(Z.classTest, okn, Z.list.length, elapsed, Z.grp);
   syncScore(); syncSchool();
   S.nres = (S.nres || 0) + 1; save();
-  stack.pop(); go("results", { res, label: Z.label, exam: Z.exam, ch: Z.ch, bestRun: Z.bestRun, elapsed, classTest: Z.classTest });
+  if (Z.pt) { S.pt = (S.pt || []).concat([{ t: Date.now(), mode: Z.pt.mode, course: Z.pt.course, n: res.length, ok: okn, ms: elapsed, level: Z.adaptive ? Z.adaptive.level : null }]).slice(-50); save(); }
+  stack.pop(); go("results", { res, label: Z.label, exam: Z.exam, ch: Z.ch, bestRun: Z.bestRun, elapsed, classTest: Z.classTest, pt: Z.pt || null, adaptive: Z.adaptive ? { path: Z.adaptive.path, level: Z.adaptive.level, start: Z.adaptive.start } : null, timedOut: !!(Z.deadline && Date.now() >= Z.deadline) });
   if (S.nres === 3 && !S.reviewed && !S.reviewAsked) { S.reviewAsked = true; save(); setTimeout(() => reviewSheet(true), 2500); }
+}
+
+/* ---------- 5.0 Phase H: typed answers, practice autosave and resume ---------- */
+function typedAllowed(Z, q) { return !Z.asg && !Z.classTest && typeof numericQuestion === "function" && numericQuestion(q); }
+function typedOn(Z, q) { return !!S.typeMode && typedAllowed(Z, q); }
+function pqEligible(Z) { return Z && !Z.asg && !Z.classTest && !Z.finished; }
+function pqSave() {
+  const Z = QUIZ; if (!pqEligible(Z)) return;
+  const snap = { ids: Z.list.map(q => q.id), i: Z.i, ans: Z.ans, typed: Z.typed || {}, picked: Z.picked, label: Z.label, exam: !!Z.exam, review: !!Z.review, pt: Z.pt || null, deadline: Z.deadline || null,
+    started: Z.started, target: Z.target || null, ch: Z.ch || null, run: Z.run, bestRun: Z.bestRun, course: course().id,
+    adaptive: Z.adaptive ? { pool: Z.adaptive.pool.map(q => q.id), level: Z.adaptive.level, up: Z.adaptive.up, path: Z.adaptive.path, start: Z.adaptive.start } : null };
+  const js = JSON.stringify(snap); if (js === pqSave._last) return; pqSave._last = js;
+  S.qz = Object.assign(snap, { t: Date.now() }); save();
+}
+function pqClear() { S.qz = { gone: true, t: Date.now() }; pqSave._last = null; save(); }
+function pqResumeCard() {
+  const z = S.qz; if (!z || z.gone || !z.ids || Date.now() - z.t > 7 * 864e5) return null;
+  if (QUIZ && !QUIZ.finished && cur().view === "quiz") return null;
+  const done = Object.keys(z.ans || {}).length, n = z.target || z.ids.length, ago = Math.max(1, Math.round((Date.now() - z.t) / 60000));
+  return h("div", { class: "card", id: "pq-resume", style: "border-left:5px solid var(--teal)" }, h("b", {}, "▶️ Unfinished: " + z.label),
+    h("div", { class: "muted" }, done + " of " + n + " answered · saved " + (ago < 60 ? ago + " min" : Math.round(ago / 60) + " h") + " ago" + (z.deadline ? (z.deadline > Date.now() ? " · timer still running" : " · time is up") : "")),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "pq-resume-go", onclick: pqResume }, z.deadline && z.deadline <= Date.now() ? "See results" : "Resume"),
+      h("button", { class: "btn ghost", id: "pq-discard", onclick: () => confirmBox("Discard this test?", "Your answers so far still count in your progress.", () => { pqClear(); render(); }, "Discard") }, "Discard")));
+}
+function pqResume() {
+  const z = S.qz; if (!z || z.gone) return;
+  if (z.course && S.profile.course !== z.course) { S.profile.course = z.course; save(); }
+  const list = z.ids.map(id => QBYID[id]).filter(Boolean); if (!list.length) { pqClear(); render(); return; }
+  QUIZ = { list, i: Math.min(z.i || 0, list.length - 1), label: z.label, ans: z.ans || {}, typed: z.typed || {}, exam: z.exam, picked: z.picked ?? null, run: z.run || 0, bestRun: z.bestRun || 0, started: z.started || Date.now(),
+    review: z.review, pt: z.pt, deadline: z.deadline, target: z.target, ch: z.ch,
+    adaptive: z.adaptive ? { pool: z.adaptive.pool.map(id => QBYID[id]).filter(Boolean), level: z.adaptive.level, up: z.adaptive.up, path: z.adaptive.path || [], start: z.adaptive.start } : null };
+  if (QUIZ.deadline && QUIZ.deadline <= Date.now()) { stack = [{ view: "home" }, { view: "quiz" }]; finish(); return; }
+  stack = [{ view: "home" }]; go("quiz"); toast("▶️ Picked up where you left off");
 }
 
 /* ---------- results ---------- */
@@ -978,6 +1047,17 @@ VIEWS.results = function (R) {
     h("div", {}, h("div", { class: "kicker" }, R.all ? "All your answers in this chapter" : (R.exam ? "Exam" : "Session") + " summary"),
       h("h2", { style: "margin:4px 0;color:var(--navy)" }, head), h("div", {}, ok + " of " + n + " correct" + (R.bestRun >= 3 ? " · 🔥 best streak " + R.bestRun : "")),
       h("div", { class: "muted" }, R.label || "")))));
+  if (R.pt) {
+    const mm = PT_MODES[R.pt.mode] || PT_MODES.exam, mins = Math.floor((R.elapsed || 0) / 60000), secs = Math.round(((R.elapsed || 0) % 60000) / 1000);
+    const pc = h("div", { class: "card", id: "pt-summary" }, h("b", {}, mm.e + " " + mm.t + " practice test"),
+      h("div", { class: "muted" }, "Time used: " + mins + " min " + secs + " s" + (R.timedOut ? " · ⏰ time ran out, unanswered questions are left out" : "")),
+      h("div", { class: "muted", id: "pt-nograde-res", style: "margin-top:4px" }, "🧪 Practice only: not sent to your instructor, graded assignments or Canvas."));
+    if (R.adaptive && R.adaptive.path.length) {
+      pc.appendChild(h("div", { style: "margin-top:8px" }, h("b", {}, "Difficulty path: "), ...R.adaptive.path.map(x => h("span", { class: "diff L" + x.L, style: "margin:2px", title: x.ok ? "right" : "missed" }, (x.ok ? "✓ " : "✗ ") + LV[x.L]))));
+      pc.appendChild(h("div", { id: "pt-level-end" }, "You finished at ", h("b", {}, LV[R.adaptive.level]), R.adaptive.level > R.adaptive.start ? " ⬆️ (started at " + LV[R.adaptive.start] + ")" : R.adaptive.level < R.adaptive.start ? " (started at " + LV[R.adaptive.start] + ")" : "."));
+    }
+    app.appendChild(pc);
+  }
   const dt = h("table", { class: "t" });
   [1, 2, 3].forEach(L => { const v = sm.lv[L]; if (v) dt.appendChild(h("tr", {}, h("td", {}, h("span", { class: "diff L" + L }, LV[L])), h("td", { class: "n" }, v.ok + "/" + v.n), h("td", { class: "n" }, pct(v.ok, v.n) + "%", bar(v.ok / v.n, 1)))); });
   app.appendChild(h("div", { class: "card" }, h("b", {}, "📶 By difficulty"), dt));
@@ -986,6 +1066,9 @@ VIEWS.results = function (R) {
   const tt = h("table", { class: "t" });
   rows.forEach(([k, v]) => tt.appendChild(h("tr", {}, h("td", {}, (v.ok / v.n >= .7 ? "✅ " : "⚠️ ") + k), h("td", { class: "n" }, v.ok + "/" + v.n), h("td", { class: "n" }, pct(v.ok, v.n) + "%", bar(v.ok / v.n, 1)))));
   app.appendChild(h("div", { class: "card" }, h("b", {}, "🧩 By topic"), tt));
+  if (R.pt) { const cm = {}; res.forEach(r => { (cm[r.q.ch] = cm[r.q.ch] || { n: 0, ok: 0 }); cm[r.q.ch].n++; if (r.ok) cm[r.q.ch].ok++; });
+    if (Object.keys(cm).length > 1) { const ct = h("table", { class: "t", id: "pt-bych" }); Object.entries(cm).sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n).forEach(([cn, v]) => ct.appendChild(h("tr", {}, h("td", {}, CHBYN[cn].title), h("td", { class: "n" }, v.ok + "/" + v.n), h("td", { class: "n" }, pct(v.ok, v.n) + "%", bar(v.ok / v.n, 1)))));
+      app.appendChild(h("div", { class: "card" }, h("b", {}, "📖 By chapter"), ct)); } }
   const weak = rows.filter(([k, v]) => v.ok / v.n < 0.7);
   if (weak.length) {
     const ul = h("ul", { style: "margin:6px 0 0;padding-left:20px" });
@@ -997,11 +1080,11 @@ VIEWS.results = function (R) {
     app.appendChild(h("div", { class: "good" }, h("b", {}, "🌟 No weak topics — every topic is at 70% or higher."), h("div", { class: "muted" }, "Try the 🔴 Hard questions or build an exam next.")));
   }
   const wrongRes = res.filter(r => !r.ok);
-  if (R.exam && res.length) {
+  if ((R.exam || R.pt) && res.length) {
     const rv = h("div", { class: "card review" }, h("b", {}, "🔎 Review your answers"));
     res.forEach((r, i) => rv.appendChild(h("details", {}, h("summary", {}, (r.ok ? "✅ " : "❌ ") + (i + 1) + ". " + r.q.q.slice(0, 80) + (r.q.q.length > 80 ? "…" : "")),
       r.q.im && FIGS[r.q.im] ? h("div", { class: "fig", html: FIGS[r.q.im] }) : null,
-      h("p", {}, h("b", {}, "Your answer: "), r.pick != null ? r.q.o[r.pick] : "—"), h("p", {}, h("b", {}, "Correct: "), r.q.o[r.q.a]), h("p", { class: "muted" }, r.q.s), workedSolution(r.q))));
+      h("p", {}, h("b", {}, "Your answer: "), r.typed != null ? h("span", { html: chemFormat(r.typed) + " (typed)" }) : r.pick != null && r.pick >= 0 ? r.q.o[r.pick] : "—"), h("p", {}, h("b", {}, "Correct: "), r.q.o[r.q.a]), h("p", { class: "muted" }, r.q.s), workedSolution(r.q))));
     app.appendChild(rv);
   }
   const shareTxt = () => {
@@ -1022,48 +1105,144 @@ VIEWS.results = function (R) {
     h("button", { class: "btn sec2", id: "email", onclick: () => emailText("My " + CFG.short + " results", shareTxt()) }, "✉️ Email"),
     h("button", { class: "btn sec2", id: "share-class", onclick: () => postToClass(shareTxt()) }, "👥 Share with my class"),
     h("button", { class: "btn ghost", id: "copy", onclick: () => copyText(shareTxt()) }, "📋 Copy")));
+  if (R.pt) app.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "pt-again", onclick: () => { const st = R.pt.settings; Object.assign(EX, { mode: R.pt.mode, count: st.count, L: st.L, tmode: st.tmode, mins: st.mins, sel: Object.assign({}, st.sel) }); if (S.profile.course !== R.pt.course) { S.profile.course = R.pt.course; save(); } exSave(); stack.pop(); ptStart(); } }, "🔄 Same settings again"),
+    h("button", { class: "btn ghost", id: "pt-change", onclick: () => { stack.pop(); go("exam"); } }, "⚙️ Change settings")));
   if (R.classTest) app.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn gold wide", id: "see-rank", onclick: () => { stack.pop(); if (cur().view === "ctest") stack.pop(); go("ctest", R.classTest); } }, "🏆 See the class ranking")));
   bottom([h("button", { class: "btn ghost", id: "home", onclick: () => { stack = [{ view: "home" }]; render(); } }, "🏠 Home"),
     h("button", { class: "btn", id: "review-wrong", disabled: !wrongRes.length && !R.all, onclick: () => { const l = R.all ? S.w.map(id => QBYID[id]).filter(q => q && q.ch === R.ch && canUse(q)) : wrongRes.map(r => r.q); stack.pop(); startQuiz(l, "Review mistakes", { ch: R.ch, review: true }); } }, "🔁 Review mistakes")]);
 };
 
-/* ---------- exam builder (by topic) ---------- */
-const EX = { sel: {}, count: 20, timed: true, L: 0 };
+/* ---------- practice tests (5.0 Phase G; grew out of the exam builder) ---------- */
+// Four modes. Practice never touches graded assignments, class tests or Canvas: QUIZ.pt is set, QUIZ.asg/classTest never are.
+const PT_MODES = {
+  learn: { t: "Learning", e: "📘", d: "See the answer and the worked solution after every question." },
+  exam: { t: "Exam simulation", e: "⏱️", d: "Like the real thing: no feedback until you finish, timer on." },
+  mistakes: { t: "Mistake review", e: "🔁", d: "Only questions you've missed before. A right answer clears it from the list." },
+  adapt: { t: "Adaptive", e: "🎯", d: "Starts at medium. Gets harder after two right in a row, easier after a miss, and favours your weakest topics." },
+};
+const EX = { sel: {}, count: 20, timed: true, L: 0, mode: "exam", tmode: "perq", mins: 30 };
+function exLoad() { if (EX._loaded) return; EX._loaded = true; const o = S.ex || {}; ["count", "L", "mode", "tmode", "mins"].forEach(k => { if (o[k] != null) EX[k] = o[k]; }); if (o.sel && o.course === course().id) EX.sel = Object.assign({}, o.sel); if (!PT_MODES[EX.mode]) EX.mode = "exam"; }
+function exSave() { S.ex = { count: EX.count, L: EX.L, mode: EX.mode, tmode: EX.tmode, mins: EX.mins, sel: EX.sel, course: course().id }; save(); }
+function ptPool(mode) {
+  const out = [], any = Object.values(EX.sel).some(Boolean);
+  CH().forEach(c => usable(c).forEach(q => {
+    if (any && !EX.sel[c.n + "|" + q.tp]) return;
+    if (!any && mode !== "mistakes") return;                       // nothing chosen: only Mistake review uses the whole course
+    if (mode === "mistakes" && !S.w.includes(q.id)) return;
+    if (mode === "adapt" && q.mk) return;                          // adaptive needs one-tap answers
+    if (mode !== "adapt" && mode !== "mistakes" && EX.L && q.L !== EX.L) return;
+    out.push(q);
+  }));
+  return out;
+}
+function ptDeadline(n) { return EX.tmode === "perq" ? Date.now() + n * 90000 : EX.tmode === "total" ? Date.now() + Math.max(1, Math.min(600, +EX.mins || 30)) * 60000 : null; }
+function topicAcc(tp, chn) { let n = 0, c = 0; cqs(CHBYN[chn]).forEach(q => { if (q.tp === tp && S.a[q.id]) { n += S.a[q.id].n; c += S.a[q.id].c; } }); return n ? c / n : null; }
+// Adaptive: next question at the current level, weakest topics first, unseen questions preferred.
+function adaptNext(Z) {
+  const A = Z.adaptive, used = new Set(Z.list.map(q => q.id)), lv = course().levels;
+  for (const d of [0, 1, -1, 2, -2]) {
+    const L = A.level + d; if (!lv.includes(L)) continue;
+    const cand = A.pool.filter(q => q.L === L && !used.has(q.id)); if (!cand.length) continue;
+    const score = q => { const a = topicAcc(q.tp, q.ch); return (a == null ? 0.5 : 1 - a) + (S.a[q.id] ? 0 : 0.3) + Math.random() * 0.25; };
+    return cand.reduce((b, q) => (score(q) > score(b) ? q : b));
+  }
+  return null;
+}
+function adaptUpdate(Z, ok) {
+  const A = Z.adaptive, lv = course().levels; A.path.push({ L: Z.list[Z.i].L, ok });
+  if (ok) { A.up++; if (A.up >= 2) { A.up = 0; const i = lv.indexOf(A.level); if (i < lv.length - 1) { A.level = lv[i + 1]; toast("⬆️ Moving up to " + LV[A.level]); } } }
+  else { A.up = 0; const i = lv.indexOf(A.level); if (i > 0) { A.level = lv[i - 1]; } }
+}
+function ptStart() {
+  const mode = EX.mode, P = ptPool(mode), n = Math.max(1, Math.min(100, Math.round(+EX.count || 20)));
+  if (!P.length) { toast(mode === "mistakes" ? "🎉 No missed questions in your choices." : "Choose at least one topic."); return; }
+  const pt = { mode, course: course().id, settings: { count: n, L: EX.L, tmode: EX.tmode, mins: EX.mins, sel: Object.assign({}, EX.sel) } };
+  const label = "Practice test · " + PT_MODES[mode].t;
+  exSave();
+  if (mode === "adapt") {
+    const lv = course().levels, start = lv.includes(2) ? 2 : lv[Math.floor(lv.length / 2)];
+    const Z = { adaptive: { pool: P, level: start, up: 0, path: [], start }, list: [] };
+    const first = adaptNext(Z); if (!first) { toast("No questions here yet."); return; }
+    startQuiz([first], label, { pt, adaptive: Z.adaptive, target: Math.min(n, P.length), deadline: ptDeadline(Math.min(n, P.length)) });
+    return;
+  }
+  const list = shuffle(P).slice(0, n);
+  if (mode === "exam") list.sort((a, b) => a.L - b.L);
+  startQuiz(list, label, { pt, exam: mode === "exam", review: mode === "mistakes", deadline: ptDeadline(list.length) });
+}
 VIEWS.exam = function () {
-  const prem = isPremium();
-  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "🎯 Exam review"), h("h2", {}, "Build your own exam"), h("div", { class: "muted" }, "Pick whole chapters or individual topics. Questions are drawn at random, and you see the answers at the end.")));
-  const card = h("div", { class: "card" }, h("b", {}, "1️⃣ Choose topics"));
+  exLoad();
+  const prem = isPremium(), mode = EX.mode;
+  document.getElementById("title").textContent = "Practice test";
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "🎯 Practice test"), h("h2", {}, "Build a practice test"),
+    h("div", { class: "muted" }, "Choose a mode, the chapters and topics, and how long. Practice tests never count toward class grades, graded assignments or Canvas.")));
+  // 1. mode
+  const mc = h("div", { class: "card", id: "pt-modes" }, h("b", {}, "1️⃣ Mode"));
+  const grid = h("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:8px" });
+  Object.entries(PT_MODES).forEach(([k, m]) => grid.appendChild(h("button", { class: "opt" + (mode === k ? " sel" : ""), id: "pt-mode-" + k, "aria-pressed": mode === k ? "true" : "false", style: "display:block;text-align:left;height:auto",
+    onclick: () => { EX.mode = k; if (k === "learn" || k === "mistakes") EX.tmode = "none"; if (k === "exam" && EX.tmode === "none") EX.tmode = "perq"; exSave(); render(); } },
+    h("b", {}, m.e + " " + m.t), h("div", { class: "muted", style: "font-size:13px;margin-top:2px" }, m.d))));
+  mc.appendChild(grid); app.appendChild(mc);
+  // 2. course
+  const courses = CFG.courses.filter(c => typeof ltiCourseOk !== "function" || ltiCourseOk(c.id));
+  if (courses.length > 1) {
+    const sel = h("select", { class: "field", id: "pt-course", onchange: e => { S.profile.course = e.target.value; EX.sel = {}; save(); exSave(); render(); } }, ...courses.map(c => h("option", { value: c.id, selected: c.id === course().id ? "selected" : null }, c.emoji + " " + c.name)));
+    app.appendChild(h("div", { class: "card" }, h("b", {}, "2️⃣ Course"), sel));
+  }
+  // 3. chapters and topics
+  const card = h("div", { class: "card" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px" }, h("b", {}, "3️⃣ Chapters and topics"),
+    h("span", {}, h("button", { class: "btn ghost small", id: "pt-all", onclick: () => { CH().forEach(c => c.topics.forEach(tp => EX.sel[c.n + "|" + tp] = true)); exSave(); render(); } }, "All"), " ",
+      h("button", { class: "btn ghost small", id: "pt-none", onclick: () => { EX.sel = {}; exSave(); render(); } }, "None"))));
   const counter = h("div", { class: "muted", id: "ex-count", style: "margin:4px 0 8px" });
   card.appendChild(counter);
-  const pool = () => { const out = []; CH().forEach(c => usable(c).forEach(q => { if (EX.sel[c.n + "|" + q.tp] && (!EX.L || q.L === EX.L)) out.push(q); })); return out; };
+  if (mode === "mistakes") card.appendChild(h("div", { class: "muted", style: "font-size:13px;margin-bottom:6px" }, "Leave everything unticked to review every missed question in this course."));
   CH().forEach(c => {
     const tps = c.topics.filter(tp => usable(c).some(q => q.tp === tp));
     if (!tps.length) return;
-    const all = h("input", { type: "checkbox", id: "exc-" + c.n, onclick: e => e.stopPropagation(), onchange: e => { tps.forEach(tp => EX.sel[c.n + "|" + tp] = e.target.checked); render(); } });
+    const all = h("input", { type: "checkbox", id: "exc-" + c.n, "aria-label": "Whole chapter: " + c.title, onclick: e => e.stopPropagation(), onchange: e => { tps.forEach(tp => EX.sel[c.n + "|" + tp] = e.target.checked); exSave(); render(); } });
     all.checked = tps.every(tp => EX.sel[c.n + "|" + tp]); all.indeterminate = !all.checked && tps.some(tp => EX.sel[c.n + "|" + tp]);
     const body = h("div", { class: "body" });
-    tps.forEach((tp, i) => { const id = "ext-" + c.n + "-" + i; const cb = h("input", { type: "checkbox", id, onchange: e => { EX.sel[c.n + "|" + tp] = e.target.checked; render(); } }); cb.checked = !!EX.sel[c.n + "|" + tp];
-      body.appendChild(h("label", { class: "check", for: id }, cb, h("span", { style: "flex:1" }, tp), h("span", { class: "muted" }, String(usable(c).filter(q => q.tp === tp).length)))); });
+    tps.forEach((tp, i) => { const id = "ext-" + c.n + "-" + i; const cb = h("input", { type: "checkbox", id, onchange: e => { EX.sel[c.n + "|" + tp] = e.target.checked; exSave(); render(); } }); cb.checked = !!EX.sel[c.n + "|" + tp];
+      const acc = topicAcc(tp, c.n), miss = usable(c).filter(q => q.tp === tp && S.w.includes(q.id)).length;
+      body.appendChild(h("label", { class: "check", for: id }, cb, h("span", { style: "flex:1" }, tp),
+        acc != null ? h("span", { class: "chip", title: "Your accuracy on this topic so far" }, Math.round(acc * 100) + "%") : null,
+        mode === "mistakes" ? h("span", { class: "muted" }, miss + " missed") : h("span", { class: "muted" }, String(usable(c).filter(q => q.tp === tp).length)))); });
     const det = h("details", { class: "acc" }, h("summary", {}, all, h("span", { style: "flex:1" }, c.title), h("span", { class: "muted" }, "▾")), body);
     if (all.indeterminate) det.open = true;
     card.appendChild(det);
   });
   app.appendChild(card);
-  const c2 = h("div", { class: "card" }, h("b", {}, "2️⃣ Difficulty"));
-  const segL = h("div", { class: "seg" }); [[0, "Mixed"]].concat(course().levels.map(L => [L, LV[L]])).forEach(([L, t]) => segL.appendChild(h("button", { class: EX.L === L ? "on" : "", onclick: () => { EX.L = L; render(); } }, t)));
-  c2.appendChild(segL);
-  c2.appendChild(h("b", {}, "3️⃣ Number of questions"));
-  const seg = h("div", { class: "seg" }); [10, 20, 30, 50].forEach(k => seg.appendChild(h("button", { class: EX.count === k ? "on" : "", onclick: () => { EX.count = k; render(); } }, String(k))));
-  c2.appendChild(seg); c2.appendChild(h("b", {}, "4️⃣ Timer"));
-  const seg2 = h("div", { class: "seg" }); [[true, "⏱️ 90 s per question"], [false, "No timer"]].forEach(([v, t]) => seg2.appendChild(h("button", { class: EX.timed === v ? "on" : "", onclick: () => { EX.timed = v; render(); } }, t)));
-  c2.appendChild(seg2); app.appendChild(c2);
-  if (!prem) app.appendChild(h("p", { class: "muted" }, "🔒 Free version: exams use the free questions only. 💎 Premium uses every question."));
-  const P = pool(); counter.textContent = P.length + " questions match your choices";
-  const startBtn = h("button", { class: "btn", id: "exam-start", disabled: !P.length, onclick: () => {
-    const list = shuffle(P).slice(0, EX.count).sort((a, b) => a.L - b.L);
-    startQuiz(list, "Exam", { exam: true, deadline: EX.timed ? Date.now() + list.length * 90000 : null });
-  } }, "🚀 Start exam (" + Math.min(EX.count, P.length) + ")");
-  bottom([h("button", { class: "btn ghost", onclick: () => { EX.sel = {}; render(); } }, "Clear"), startBtn]);
+  // 4. difficulty, count, timer
+  const c2 = h("div", { class: "card" });
+  if (mode === "adapt") c2.appendChild(h("div", {}, h("b", {}, "4️⃣ Difficulty"), h("div", { class: "muted" }, "Adaptive chooses the difficulty as you go.")));
+  else if (mode !== "mistakes") {
+    c2.appendChild(h("b", {}, "4️⃣ Difficulty"));
+    const segL = h("div", { class: "seg", id: "pt-level" }); [[0, "Mixed"]].concat(course().levels.map(L => [L, LV[L]])).forEach(([L, t]) => segL.appendChild(h("button", { class: EX.L === L ? "on" : "", onclick: () => { EX.L = L; exSave(); render(); } }, t)));
+    c2.appendChild(segL);
+  }
+  c2.appendChild(h("b", {}, "5️⃣ Number of questions"));
+  const seg = h("div", { class: "seg" }); [10, 20, 30, 50].forEach(k => seg.appendChild(h("button", { class: +EX.count === k ? "on" : "", onclick: () => { EX.count = k; exSave(); render(); } }, String(k))));
+  c2.appendChild(seg);
+  c2.appendChild(h("label", { class: "muted", for: "pt-n", style: "display:block;margin-top:6px;font-size:13px" }, "Or type a number (1–100)"));
+  c2.appendChild(h("input", { class: "field", id: "pt-n", type: "number", min: "1", max: "100", value: String(EX.count), style: "max-width:120px", onchange: e => { EX.count = Math.max(1, Math.min(100, Math.round(+e.target.value || 20))); exSave(); render(); } }));
+  c2.appendChild(h("b", { style: "display:block;margin-top:10px" }, "6️⃣ Timer"));
+  const seg2 = h("div", { class: "seg", id: "pt-timer" }); [["none", "No timer"], ["perq", "⏱️ 90 s per question"], ["total", "⏱️ Total time"]].forEach(([v, t]) => seg2.appendChild(h("button", { class: EX.tmode === v ? "on" : "", id: "pt-t-" + v, onclick: () => { EX.tmode = v; EX.timed = v !== "none"; exSave(); render(); } }, t)));
+  c2.appendChild(seg2);
+  if (EX.tmode === "total") c2.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:6px" }, h("input", { class: "field", id: "pt-mins", type: "number", min: "1", max: "600", value: String(EX.mins), style: "max-width:110px", "aria-label": "Total minutes", onchange: e => { EX.mins = Math.max(1, Math.min(600, Math.round(+e.target.value || 30))); exSave(); } }), h("span", { class: "muted" }, "minutes in total")));
+  app.appendChild(c2);
+  app.appendChild(h("div", { class: "card", id: "pt-nograde", style: "background:var(--chip)" }, h("b", {}, "🧪 Practice only"), h("div", { class: "muted" }, "Results stay in your practice history. They're never sent to your instructor's gradebook, graded assignments or Canvas.")));
+  // recent practice tests
+  const hist = (S.pt || []).filter(x => x.course === course().id).slice(-5).reverse();
+  if (hist.length) {
+    const t = h("table", { class: "t", id: "pt-hist" });
+    hist.forEach(x => t.appendChild(h("tr", {}, h("td", {}, (PT_MODES[x.mode] || PT_MODES.exam).e + " " + (PT_MODES[x.mode] || PT_MODES.exam).t), h("td", { class: "n" }, x.ok + "/" + x.n), h("td", { class: "n" }, pct(x.ok, x.n) + "%", bar(x.ok / Math.max(1, x.n), 1)), h("td", { class: "muted" }, new Date(x.t).toLocaleDateString(undefined, { month: "short", day: "numeric" })))));
+    app.appendChild(h("div", { class: "card" }, h("b", {}, "🗂️ Your recent practice tests"), t));
+  }
+  if (!prem) app.appendChild(h("p", { class: "muted" }, "🔒 Free version: practice tests use the free questions only. 💎 Premium uses every question."));
+  const P = ptPool(mode), n = Math.max(1, Math.min(100, Math.round(+EX.count || 20))), real = mode === "adapt" ? Math.min(n, P.length) : Math.min(n, P.length);
+  counter.textContent = P.length + (mode === "mistakes" ? " missed questions" : " questions") + " match your choices";
+  const startBtn = h("button", { class: "btn", id: "exam-start", disabled: !P.length, onclick: ptStart }, "🚀 Start " + PT_MODES[mode].t.toLowerCase() + " (" + real + ")");
+  bottom([h("button", { class: "btn ghost", onclick: () => { EX.sel = {}; exSave(); render(); } }, "Clear"), startBtn]);
 };
 
 /* ---------- mechanisms ---------- */
@@ -2328,7 +2507,7 @@ function acctSheet() {
     [em, send, code, verify, msg].forEach(x => box.appendChild(x));
   });
 }
-const SYNC_KEYS = ["a", "w", "b", "days", "mech", "best", "hist", "cs", "quest", "arc", "mtut", "qtut", "featSeen", "theme", "music", "sfx", "myc"];
+const SYNC_KEYS = ["a", "w", "b", "days", "mech", "best", "hist", "cs", "quest", "arc", "mtut", "qtut", "featSeen", "theme", "music", "sfx", "myc", "qz", "pt", "ex", "draw", "typeMode"];
 function syncPayload() { const o = { _t: Date.now() }; SYNC_KEYS.forEach(k => { if (S[k] !== undefined) o[k] = S[k]; }); if (S.profile) { const p = Object.assign({}, S.profile); delete p.photo; delete p.photoS; o.profile = p; } return o; }
 function mergeState(L, R) {
   if (!R) return L; if (!L) return R;
@@ -2341,6 +2520,9 @@ function mergeState(L, R) {
   M.mech = Object.assign({}, R.mech || {}, L.mech || {}); M.best = Object.assign({}, R.best || {}, L.best || {});
   Object.keys(M.best).forEach(k => { M.best[k] = Math.max((L.best || {})[k] || 0, (R.best || {})[k] || 0); });
   M.arc = Object.assign({}, R.arc || {}, L.arc || {});
+  if (L.qz || R.qz) M.qz = ((L.qz && L.qz.t) || 0) >= ((R.qz && R.qz.t) || 0) ? L.qz : R.qz;   // newest unfinished practice test wins
+  if (L.pt || R.pt) { const seen = new Set(); M.pt = [].concat(R.pt || [], L.pt || []).filter(x => { const k = x.t + "|" + x.mode; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a.t - b.t).slice(-50); }
+  M.draw = Object.assign({}, R.draw || {}, L.draw || {});
   if (L.quest || R.quest) {
     const q1 = L.quest || {}, q2 = R.quest || {}, newer = (q1._t || 0) >= (q2._t || 0) ? q1 : q2;
     const Q = Object.assign({}, q2, q1);
@@ -2759,8 +2941,268 @@ function workPanel(q) {
     const ph = await photoCapture({ title: "📷 Photo of my work", facing: "environment", hint: "Photograph your handwritten calculation or drawn structure for this question." });
     if (!ph) return; try { await workAdd(q.id, ph); toast("📄 Saved with this question (" + ph.kb + " KB)"); refresh(); } catch (e) { toast("Couldn't save the photo on this device (storage full or private browsing)."); } } }, "📷 Photo of my work");
   refresh();
-  return h("div", { class: "work", id: "work-panel" }, btn, strip);
+  const dthumb = h("span", { id: "work-draw-th" });
+  const showDraw = () => { const m = S.draw && S.draw[q.id]; dthumb.innerHTML = ""; if (m && typeof structSvg === "function") dthumb.appendChild(h("button", { class: "work-th", "aria-label": "Open my drawn structure", onclick: () => structSheet(q.id, showDraw), html: structSvg(m, 72, 54) })); };
+  const dbtn = typeof structSheet === "function" ? h("button", { class: "btn sec2 small", id: "work-draw", onclick: () => structSheet(q.id, showDraw) }, "✏️ Draw structure") : null;
+  showDraw();
+  return h("div", { class: "work", id: "work-panel" }, h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" }, btn, dbtn), strip, dthumb);
 }
+
+/* ================= 5.0 Phase H: chemistry answer editor + molecular structure editor ================= */
+/* ---------- formatting and parsing typed chemistry ---------- */
+const CE_ESC = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// "Fe2(SO4)3", "SO4^2-", "1.5x10^-3 mol L^-1", "CH3COO^-", "H2O(l)" -> HTML with real sub/superscripts.
+function chemFormat(text) {
+  let s = CE_ESC(text || "");
+  s = s.replace(/\s*[x×*]\s*10\^\(?([+\-−]?\d+)\)?/g, (m, e) => " × 10<sup>" + e.replace("-", "−") + "</sup>");
+  s = s.replace(/\^\(?([0-9]*[+\-−]|[+\-−]?[0-9]+)\)?/g, (m, e) => "<sup>" + e.replace("-", "−") + "</sup>");
+  // subscripts: digits right after an element symbol, ")" or "]" — but not in plain numbers or after "10"
+  s = s.replace(/([A-Z][a-z]?|\)|\])(\d+)/g, (m, a, d) => a + "<sub>" + d + "</sub>");
+  s = s.replace(/&lt;=&gt;/g, "⇌").replace(/-&gt;/g, "→");
+  return s;
+}
+// Number (with optional unit) typed by a student: "1.5e-3", "1.5 x 10^-3 M", "−2,500 J", "6.02×10^23".
+function parseNumAnswer(text) {
+  let s = String(text || "").trim().replace(/−/g, "-").replace(/,(?=\d{3}\b)/g, "").replace(/\s+/g, " ");
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(?:\s*(?:[eE]([+-]?\d+)|\s*[x×*]\s*10\s*\^\s*\(?([+-]?\d+)\)?))?\s*(.*)$/.exec(s);
+  if (!m) return null;
+  const v = parseFloat(m[1]) * Math.pow(10, +(m[2] || m[3] || 0));
+  if (!Number.isFinite(v)) return null;
+  const sig = (m[1].replace(/^[+-]/, "").replace(/^0*\.?0*/, "").replace(".", "").length) || 1;
+  return { value: v, unit: m[4].trim(), sig, raw: s };
+}
+function unitNorm(u) { return String(u || "").toLowerCase().replace(/\s+/g, "").replace(/·|\*/g, "").replace(/°/g, "deg").replace(/^m$/, "mol/l").replace(/mol\/l|moll\^-1|moll-1/g, "mol/l"); }
+// A typed number matches an option when within 1 % (or 1e-12 absolute for zero). Unit must match when both are given.
+function numMatches(typed, option) {
+  const a = parseNumAnswer(typed), b = parseNumAnswer(option); if (!a || !b) return { ok: false };
+  const close = b.value === 0 ? Math.abs(a.value) < 1e-12 : Math.abs(a.value - b.value) / Math.abs(b.value) <= 0.01;
+  const unitBad = !!(a.unit && b.unit && unitNorm(a.unit) !== unitNorm(b.unit));
+  return { ok: close && !unitBad, close, unitBad, missingUnit: close && !a.unit && !!b.unit };
+}
+function numericQuestion(q) { return !q.mk && q.o && q.o.length >= 2 && q.o.every(o => { const p = parseNumAnswer(o); return p && !/[a-z]{4,}/i.test(p.unit); }); }
+
+/* ---------- the chemistry keyboard ---------- */
+const CE_KEYS = {
+  "123": ["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", ".", "−", "×10^", "^", "(", ")", "±", "/"],
+  "Chem": ["→", "⇌", "+", "^+", "^−", "^2+", "^2−", "(s)", "(l)", "(g)", "(aq)", "°", "Δ", "·", "↑", "↓", "[", "]"],
+  "Greek": ["α", "β", "γ", "δ", "ε", "λ", "μ", "ν", "π", "σ", "θ", "Ω"],
+  "Units": ["mol", "g", "kg", "L", "mL", "M", "K", "°C", "atm", "kPa", "mmHg", "J", "kJ", "kJ/mol", "nm", "Hz", "s", "%"],
+};
+// opts: { id, placeholder, value, onEnter, label }  -> { el, input, get(), set(v), focus() }
+function chemInput(opts) {
+  opts = opts || {};
+  const id = opts.id || "ce";
+  const input = h("input", { class: "field ce-input", id: id + "-input", type: "text", autocomplete: "off", spellcheck: "false", "aria-label": opts.label || "Your answer", placeholder: opts.placeholder || "Type your answer, e.g. 1.5×10^-3 mol", value: opts.value || "" });
+  const prev = h("div", { class: "ce-preview", id: id + "-preview", "aria-live": "polite" });
+  const show = () => { prev.innerHTML = input.value ? "Preview: <span class=\"ce-pv\">" + chemFormat(input.value) + "</span>" : ""; };
+  input.addEventListener("input", show);
+  input.addEventListener("keydown", e => { if (e.key === "Enter" && opts.onEnter) { e.preventDefault(); opts.onEnter(input.value); } });
+  const insert = (t) => {
+    const a = input.selectionStart ?? input.value.length, b = input.selectionEnd ?? input.value.length;
+    input.value = input.value.slice(0, a) + t + input.value.slice(b); const p = a + t.length;
+    input.focus(); try { input.setSelectionRange(p, p); } catch (e) {} show(); input.dispatchEvent(new Event("input"));
+  };
+  let tab = "123";
+  const keys = h("div", { class: "ce-keys", id: id + "-keys", role: "group", "aria-label": "Chemistry keyboard" });
+  const tabs = h("div", { class: "seg ce-tabs" });
+  const drawKeys = () => { keys.innerHTML = ""; CE_KEYS[tab].forEach(k => keys.appendChild(h("button", { type: "button", class: "ce-key", "aria-label": "Insert " + k, onmousedown: e => e.preventDefault(), onclick: () => insert(k === "×10^" ? "×10^" : k) }, k === "×10^" ? "×10ⁿ" : k)));
+    keys.appendChild(h("button", { type: "button", class: "ce-key ce-wide", "aria-label": "Delete", onmousedown: e => e.preventDefault(), onclick: () => { const a = input.selectionStart ?? input.value.length; if (a > 0) { input.value = input.value.slice(0, a - 1) + input.value.slice(a); input.focus(); try { input.setSelectionRange(a - 1, a - 1); } catch (e) {} show(); } } }, "⌫"));
+    [...tabs.children].forEach(b => b.className = b.dataset.t === tab ? "on" : ""); };
+  Object.keys(CE_KEYS).forEach(t => tabs.appendChild(h("button", { type: "button", "data-t": t, id: id + "-tab-" + t, onclick: () => { tab = t; drawKeys(); } }, t)));
+  const pad = h("div", { class: "ce-pad", id: id + "-pad", hidden: "hidden" }, tabs, keys);
+  const toggle = h("button", { type: "button", class: "btn ghost small", id: id + "-kbd", "aria-expanded": "false", onclick: () => { const open = pad.hasAttribute("hidden"); if (open) pad.removeAttribute("hidden"); else pad.setAttribute("hidden", "hidden"); toggle.setAttribute("aria-expanded", String(open)); } }, "⌨️ Chemistry keyboard");
+  drawKeys(); show();
+  const el = h("div", { class: "ce", id }, h("div", { style: "display:flex;gap:6px;align-items:center" }, input, toggle), prev, pad,
+    h("div", { class: "muted ce-hint" }, "Tip: type ^ for superscripts (SO4^2−), digits after a symbol become subscripts (H2O), ×10^-3 for powers of ten."));
+  return { el, input, get: () => input.value, set: v => { input.value = v; show(); }, focus: () => input.focus() };
+}
+
+/* ---------- molecular structure: chemistry helpers ---------- */
+const SE_VAL = { C: [4], N: [3], O: [2], S: [2, 4, 6], P: [3, 5], B: [3], F: [1], Cl: [1], Br: [1], I: [1], H: [1], Si: [4] };
+const SE_MASS = { C: 12.011, H: 1.008, N: 14.007, O: 15.999, S: 32.06, P: 30.974, B: 10.81, F: 18.998, Cl: 35.45, Br: 79.904, I: 126.904, Si: 28.085 };
+const SE_ORGANIC = new Set(["B", "C", "N", "O", "P", "S", "F", "Cl", "Br", "I"]);
+// mol = { atoms: [{el, x, y, chg, h?}], bonds: [{a, b, o}] } — h is an explicit H count from SMILES brackets
+function seBondSum(mol, i) { return mol.bonds.reduce((s, b) => s + (b.a === i || b.b === i ? (b.o === 1.5 ? 1.5 : b.o) : 0), 0); }
+function seImplicitH(mol, i) {
+  const a = mol.atoms[i]; if (a.h != null) return a.h; if (a.el === "H") return 0;
+  let vals = SE_VAL[a.el] || [0]; const c = a.chg || 0;
+  if (c) { if (["N", "P"].includes(a.el)) vals = [3 + c]; else if (["O", "S"].includes(a.el)) vals = [2 + c]; else if (a.el === "C") vals = [4 - Math.abs(c)]; else if (a.el === "B") vals = [3 - c]; else vals = [Math.max(0, (vals[0] || 0) - Math.abs(c))]; }
+  const s = Math.ceil(seBondSum(mol, i) - 1e-9); const v = vals.find(x => x >= s) ?? vals[vals.length - 1];
+  return Math.max(0, v - s);
+}
+function seCounts(mol) {
+  const n = {};
+  mol.atoms.forEach((a, i) => { n[a.el] = (n[a.el] || 0) + 1; const hh = seImplicitH(mol, i); if (hh) n.H = (n.H || 0) + hh; });
+  return n;
+}
+function seFormula(mol) {   // Hill order
+  const n = seCounts(mol), keys = Object.keys(n);
+  const order = n.C ? ["C", "H", ...keys.filter(k => k !== "C" && k !== "H").sort()] : keys.sort();
+  let f = order.filter(k => n[k]).map(k => k + (n[k] > 1 ? n[k] : "")).join("");
+  const q = mol.atoms.reduce((s, a) => s + (a.chg || 0), 0);
+  if (q) f += "^" + (Math.abs(q) > 1 ? Math.abs(q) : "") + (q > 0 ? "+" : "−");
+  return f;
+}
+function seMass(mol) { const n = seCounts(mol); return Object.entries(n).reduce((s, [k, v]) => s + (SE_MASS[k] || 0) * v, 0); }
+// Order-independent identity: Weisfeiler-Lehman refinement over heavy atoms labelled (element, charge, H count).
+// Same key = same constitution (stereo is not considered). Kekulé and aromatic benzene give the same key.
+function seKey(mol) {
+  const heavy = mol.atoms.map((a, i) => i).filter(i => mol.atoms[i].el !== "H");
+  const hAdd = {}; mol.bonds.forEach(b => { const A = mol.atoms[b.a], B = mol.atoms[b.b]; if (A.el === "H" && B.el !== "H") hAdd[b.b] = (hAdd[b.b] || 0) + 1; if (B.el === "H" && A.el !== "H") hAdd[b.a] = (hAdd[b.a] || 0) + 1; });
+  const nb = {}; heavy.forEach(i => nb[i] = []); mol.bonds.forEach(b => { if (nb[b.a] && nb[b.b]) { nb[b.a].push(b.b); nb[b.b].push(b.a); } });
+  let lab = {}; heavy.forEach(i => { const a = mol.atoms[i]; lab[i] = a.el + "|" + (a.chg || 0) + "|" + (seImplicitH(mol, i) + (hAdd[i] || 0)); });
+  for (let r = 0; r < Math.max(3, heavy.length); r++) { const nl = {}; heavy.forEach(i => nl[i] = lab[i] + "(" + nb[i].map(j => lab[j]).sort().join(",") + ")"); const uniq = [...new Set(Object.values(nl))].sort(); const idx = {}; uniq.forEach((u, k) => idx[u] = "a" + k + ":" + u.split("(")[0]); heavy.forEach(i => nl[i] = idx[nl[i]]); lab = nl; }
+  const looseH = mol.atoms.filter((a, i) => a.el === "H" && !mol.bonds.some(b => b.a === i || b.b === i)).length;
+  return seFormula(mol) + "#" + Object.values(lab).map(x => x.split(":")[1]).sort().join(";") + "#" + Object.values(lab).sort().join(";").length + "#" + looseH;
+}
+function seSame(m1, m2) { return seKey(m1) === seKey(m2); }
+// SMILES writer (non-canonical, readable): organic subset, = and # bonds, branches, ring closures, brackets for charges/odd H.
+function seSmiles(mol) {
+  const N = mol.atoms.length, adj = Array.from({ length: N }, () => []);
+  mol.bonds.forEach(b => { adj[b.a].push([b.b, b.o]); adj[b.b].push([b.a, b.o]); });
+  const seen = new Array(N).fill(false), parts = [];
+  const sym = i => { const a = mol.atoms[i], hh = seImplicitH(mol, i), c = a.chg || 0;
+    if (a.arom) { const def = Math.max(0, Math.floor((SE_VAL[a.el] || [0])[0] - seBondSum(mol, i) + 1e-9)); if (!c && hh === def && SE_ORGANIC.has(a.el)) return a.el.toLowerCase(); return "[" + a.el.toLowerCase() + (hh ? "H" + (hh > 1 ? hh : "") : "") + (c ? (c > 0 ? "+" : "-") + (Math.abs(c) > 1 ? Math.abs(c) : "") : "") + "]"; }
+    if (!c && SE_ORGANIC.has(a.el) && a.h == null) return a.el;
+    return "[" + a.el + (hh ? "H" + (hh > 1 ? hh : "") : "") + (c ? (c > 0 ? "+" : "-") + (Math.abs(c) > 1 ? Math.abs(c) : "") : "") + "]"; };
+  const bs = o => (o === 2 ? "=" : o === 3 ? "#" : "");
+  for (let s = 0; s < N; s++) {
+    if (seen[s]) continue;
+    // find ring-closure bonds with a first DFS, then write
+    const order = [], parent = {}, ringBonds = []; const vis = new Array(N).fill(false);
+    const dfs = (u, p) => { vis[u] = true; order.push(u); adj[u].forEach(([v, o]) => { if (v === p) return; if (vis[v]) { if (!ringBonds.some(r => (r[0] === v && r[1] === u))) ringBonds.push([u, v, o]); } else { parent[v] = u; dfs(v, u); } }); };
+    dfs(s, -1);
+    const ringAt = {}; let num = 1; ringBonds.forEach(([u, v, o]) => { const k = num++; (ringAt[u] = ringAt[u] || []).push([k, o]); (ringAt[v] = ringAt[v] || []).push([k, 0]); });
+    const isRing = (u, v) => ringBonds.some(r => (r[0] === u && r[1] === v) || (r[0] === v && r[1] === u));
+    const write = (u, p) => { seen[u] = true; let out = sym(u) + (ringAt[u] || []).map(([k, o]) => bs(o) + (k > 9 ? "%" + k : k)).join("");
+      const kids = adj[u].filter(([v]) => v !== p && !seen[v] && !isRing(u, v) && parent[v] === u);
+      kids.forEach(([v, o], i) => { const sub = bs(o) + write(v, u); out += i < kids.length - 1 ? "(" + sub + ")" : sub; });
+      return out; };
+    parts.push(write(s, -1));
+  }
+  return parts.join(".");
+}
+// SMILES reader for answer keys: organic subset incl. aromatic lowercase, brackets with H and charge, branches, rings, '.'.
+function seParseSmiles(smi) {
+  const mol = { atoms: [], bonds: [] }; let i = 0, prev = -1, bond = 1; const stack = [], rings = {};
+  const add = (el, arom, hh, chg) => { const k = mol.atoms.length; mol.atoms.push({ el, chg: chg || 0, ...(hh != null ? { h: hh } : {}), arom }); if (prev >= 0) mol.bonds.push({ a: prev, b: k, o: arom && mol.atoms[prev].arom && bond === 1 ? 1.5 : bond }); prev = k; bond = 1; };
+  while (i < smi.length) {
+    const c = smi[i];
+    if (c === "(") { stack.push(prev); i++; continue; }
+    if (c === ")") { prev = stack.pop(); i++; continue; }
+    if (c === "." ) { prev = -1; i++; continue; }
+    if (c === "=") { bond = 2; i++; continue; } if (c === "#") { bond = 3; i++; continue; } if (c === "-") { bond = 1; i++; continue; }
+    if (/\d|%/.test(c)) { let k; if (c === "%") { k = smi.slice(i + 1, i + 3); i += 3; } else { k = c; i++; }
+      if (rings[k]) { const [a, o] = rings[k]; const ar = mol.atoms[a].arom && mol.atoms[prev].arom; mol.bonds.push({ a, b: prev, o: Math.max(o, bond) === 1 && ar ? 1.5 : Math.max(o, bond) }); delete rings[k]; bond = 1; } else { rings[k] = [prev, bond]; bond = 1; } continue; }
+    if (c === "[") { const j = smi.indexOf("]", i); const m = /^([A-Z][a-z]?|[a-z])(H(\d*))?([+-]+|[+-]\d+)?$/.exec(smi.slice(i + 1, j)); if (!m) throw new Error("Unsupported SMILES: " + smi);
+      let el = m[1], arom = /^[a-z]/.test(el); if (arom) el = el.toUpperCase();
+      const hh = m[2] ? (m[3] ? +m[3] : 1) : 0; let chg = 0; if (m[4]) chg = /\d/.test(m[4]) ? (m[4][0] === "+" ? 1 : -1) * +m[4].slice(1) : (m[4][0] === "+" ? 1 : -1) * m[4].length;
+      add(el, arom, hh, chg); i = j + 1; continue; }
+    const two = smi.slice(i, i + 2);
+    if (two === "Cl" || two === "Br") { add(two, false); i += 2; continue; }
+    if (/[BCNOPSFI]/.test(c)) { add(c, false); i++; continue; }
+    if (/[cnops]/.test(c)) { add(c.toUpperCase(), true); i++; continue; }
+    throw new Error("Unsupported SMILES character '" + c + "' in " + smi);
+  }
+  // aromatic atoms: one H fewer than the saturated count (treat 1.5 bonds as contributing 1.5)
+  mol.atoms.forEach((a, k) => { if (a.arom && a.h == null) a.h = Math.max(0, Math.floor((SE_VAL[a.el] || [0])[0] + (a.el === "N" ? a.chg || 0 : 0) - seBondSum(mol, k) + 1e-9)); });
+  return mol;
+}
+
+/* ---------- molecular structure editor (SVG) ---------- */
+// opts: { id, value(mol), onChange(mol) } -> { el, get(), set(mol) }
+function structEditor(opts) {
+  opts = opts || {};
+  const id = opts.id || "se", W = 360, H = 240, GRID = 20;
+  let mol = opts.value ? JSON.parse(JSON.stringify(opts.value)) : { atoms: [], bonds: [] };
+  const hist = []; let el = "C", order = 1, tool = "draw", sel = -1;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg"); svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("class", "se-canvas"); svg.setAttribute("id", id + "-canvas"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Structure drawing area");
+  const info = h("div", { class: "se-info", id: id + "-info", "aria-live": "polite" });
+  const push = () => { hist.push(JSON.stringify(mol)); if (hist.length > 60) hist.shift(); };
+  const changed = () => { draw(); if (opts.onChange) opts.onChange(mol); };
+  const atomAt = (x, y) => mol.atoms.findIndex(a => Math.hypot(a.x - x, a.y - y) < 11);
+  const bondAt = (x, y) => mol.bonds.findIndex(b => { const A = mol.atoms[b.a], B = mol.atoms[b.b]; const L = Math.hypot(B.x - A.x, B.y - A.y) || 1; const t = Math.max(0, Math.min(1, ((x - A.x) * (B.x - A.x) + (y - A.y) * (B.y - A.y)) / (L * L))); return Math.hypot(A.x + t * (B.x - A.x) - x, A.y + t * (B.y - A.y) - y) < 6; });
+  const svgEl = (tag, at) => { const e = document.createElementNS(svgNS, tag); Object.entries(at).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+  function draw() {
+    svg.innerHTML = "";
+    for (let x = GRID; x < W; x += GRID) for (let y = GRID; y < H; y += GRID) svg.appendChild(svgEl("circle", { cx: x, cy: y, r: 0.8, fill: "var(--hair,#ccd)" }));
+    mol.bonds.forEach((b, k) => { const A = mol.atoms[b.a], B = mol.atoms[b.b]; const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1, ox = -dy / L * 3.5, oy = dx / L * 3.5;
+      const offs = b.o === 1 ? [0] : b.o === 2 ? [-1, 1] : [-1.6, 0, 1.6];
+      offs.forEach(f => svg.appendChild(svgEl("line", { x1: A.x + ox * f, y1: A.y + oy * f, x2: B.x + ox * f, y2: B.y + oy * f, stroke: "var(--ink,#1A1A1A)", "stroke-width": 2, "stroke-linecap": "round", "data-bond": k }))); });
+    mol.atoms.forEach((a, i) => { const hh = seImplicitH(mol, i), showLabel = a.el !== "C" || a.chg || !mol.bonds.some(b => b.a === i || b.b === i);
+      if (showLabel) { svg.appendChild(svgEl("circle", { cx: a.x, cy: a.y, r: 10, fill: "var(--card,#fff)" }));
+        const t = svgEl("text", { x: a.x, y: a.y + 5, "text-anchor": "middle", "font-size": 14, "font-weight": 700, fill: a.el === "O" ? "#c0392b" : a.el === "N" ? "#1f5fbf" : "var(--ink,#1A1A1A)", "font-family": "inherit" });
+        t.textContent = a.el + (hh ? "H" + (hh > 1 ? subN(hh) : "") : "") + (a.chg ? (Math.abs(a.chg) > 1 ? Math.abs(a.chg) : "") + (a.chg > 0 ? "+" : "−") : ""); svg.appendChild(t); }
+      else svg.appendChild(svgEl("circle", { cx: a.x, cy: a.y, r: 3, fill: "var(--ink,#1A1A1A)" }));
+      if (i === sel) svg.appendChild(svgEl("circle", { cx: a.x, cy: a.y, r: 13, fill: "none", stroke: "var(--teal,#156082)", "stroke-width": 2, "stroke-dasharray": "3 2" })); });
+    if (!mol.atoms.length) { const t = svgEl("text", { x: W / 2, y: H / 2, "text-anchor": "middle", "font-size": 13, fill: "var(--grey,#5B6B75)" }); t.textContent = "Tap to place an atom, then tap another to bond"; svg.appendChild(t); }
+    info.innerHTML = mol.atoms.length ? "<b>" + chemFormat(seFormula(mol)) + "</b> · " + seMass(mol).toFixed(2) + " g/mol · SMILES <code id=\"" + id + "-smiles\">" + CE_ESC(seSmiles(mol)) + "</code>" : "";
+  }
+  const subN = n => String(n).split("").map(d => "₀₁₂₃₄₅₆₇₈₉"[+d]).join("");
+  svg.addEventListener("click", e => {
+    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * W / r.width, y = (e.clientY - r.top) * H / r.height;
+    const ai = atomAt(x, y), bi = ai < 0 ? bondAt(x, y) : -1;
+    if (tool === "erase") { if (ai >= 0) { push(); mol.bonds = mol.bonds.filter(b => b.a !== ai && b.b !== ai).map(b => ({ a: b.a > ai ? b.a - 1 : b.a, b: b.b > ai ? b.b - 1 : b.b, o: b.o })); mol.atoms.splice(ai, 1); sel = -1; changed(); } else if (bi >= 0) { push(); mol.bonds.splice(bi, 1); changed(); } return; }
+    if (tool === "charge") { if (ai >= 0) { push(); const a = mol.atoms[ai]; a.chg = a.chg === 0 || !a.chg ? 1 : a.chg === 1 ? -1 : 0; changed(); } return; }
+    if (bi >= 0 && ai < 0) { push(); const b = mol.bonds[bi]; b.o = b.o >= 3 ? 1 : b.o + 1; changed(); return; }
+    if (ai >= 0) {
+      if (sel < 0) { sel = ai; draw(); return; }
+      if (sel === ai) { if (mol.atoms[ai].el !== el) { push(); mol.atoms[ai].el = el; changed(); } else { sel = -1; draw(); } return; }   // tap the selected atom again: change it to the chosen element
+      push(); const ex = mol.bonds.find(b => (b.a === sel && b.b === ai) || (b.b === sel && b.a === ai));
+      if (ex) ex.o = ex.o >= 3 ? 1 : ex.o + 1; else mol.bonds.push({ a: sel, b: ai, o: order });
+      sel = ai; changed(); return;
+    }
+    push(); const nx = Math.round(x / GRID) * GRID, ny = Math.round(y / GRID) * GRID;
+    mol.atoms.push({ el, x: Math.min(W - GRID, Math.max(GRID, nx)), y: Math.min(H - GRID, Math.max(GRID, ny)), chg: 0 });
+    const k = mol.atoms.length - 1; if (sel >= 0) mol.bonds.push({ a: sel, b: k, o: order }); sel = k; changed();
+  });
+  const palette = h("div", { class: "se-tools", role: "toolbar", "aria-label": "Structure tools" });
+  const btn = (label, idp, on, fn, aria) => h("button", { type: "button", class: "ce-key" + (on ? " on" : ""), id: id + "-" + idp, "aria-pressed": on ? "true" : "false", "aria-label": aria || label, onclick: fn }, label);
+  const tools = () => { palette.innerHTML = "";
+    ["C", "H", "N", "O", "S", "P", "F", "Cl", "Br", "I"].forEach(x => palette.appendChild(btn(x, "el-" + x, tool === "draw" && el === x, () => { el = x; tool = "draw"; tools(); }, "Element " + x)));
+    [[1, "—", "Single bond"], [2, "═", "Double bond"], [3, "≡", "Triple bond"]].forEach(([o, t, a]) => palette.appendChild(btn(t, "bond-" + o, order === o, () => { order = o; tool = "draw"; tools(); }, a)));
+    palette.appendChild(btn("±", "charge", tool === "charge", () => { tool = tool === "charge" ? "draw" : "charge"; sel = -1; tools(); draw(); }, "Charge tool: tap an atom for +, −, none"));
+    palette.appendChild(btn("🧽", "erase", tool === "erase", () => { tool = tool === "erase" ? "draw" : "erase"; sel = -1; tools(); draw(); }, "Eraser: tap an atom or bond"));
+    palette.appendChild(btn("↶", "undo", false, () => { if (hist.length) { mol = JSON.parse(hist.pop()); sel = -1; changed(); } }, "Undo"));
+    palette.appendChild(btn("✖", "clear", false, () => { if (!mol.atoms.length) return; push(); mol = { atoms: [], bonds: [] }; sel = -1; changed(); }, "Clear all"));
+    palette.appendChild(btn("⊙", "deselect", false, () => { sel = -1; draw(); }, "Start a new branch (deselect)"));
+  };
+  tools(); draw();
+  const root = h("div", { class: "se", id }, palette, h("div", { class: "se-wrap" }, svg), info,
+    h("div", { class: "muted ce-hint" }, "Pick an element, then tap empty space to add it (it bonds to the selected atom). Tap two atoms to bond them; tap a bond for single/double/triple; tap a selected atom again to change it to the chosen element. Hydrogens are added automatically."));
+  return { el: root, get: () => JSON.parse(JSON.stringify(mol)), set: m => { mol = JSON.parse(JSON.stringify(m)); sel = -1; draw(); } };
+}
+// Small static picture of a saved drawing (for thumbnails).
+function structSvg(mol, w, hgt) {
+  if (!mol || !mol.atoms.length) return "";
+  const xs = mol.atoms.map(a => a.x), ys = mol.atoms.map(a => a.y), x0 = Math.min(...xs) - 14, y0 = Math.min(...ys) - 14, ww = Math.max(...xs) - x0 + 14, hh = Math.max(...ys) - y0 + 14;
+  let s = `<svg viewBox="${x0} ${y0} ${ww} ${hh}" width="${w || 80}" height="${hgt || 60}" xmlns="http://www.w3.org/2000/svg">`;
+  mol.bonds.forEach(b => { const A = mol.atoms[b.a], B = mol.atoms[b.b]; s += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#1A1A1A" stroke-width="${b.o * 1.6}"/>`; });
+  mol.atoms.forEach(a => { if (a.el !== "C") s += `<text x="${a.x}" y="${a.y + 5}" text-anchor="middle" font-size="14" font-weight="700">${a.el}</text>`; });
+  return s + "</svg>";
+}
+// Sheet with the editor; saves the drawing with a question (S.draw[qid]) or as a scratch structure.
+function structSheet(qid, onSave) {
+  S.draw = S.draw || {};
+  sheet("struct-sheet", "✏️ Draw a structure", (box, close) => {
+    const ed = structEditor({ id: "se", value: qid && S.draw[qid] });
+    box.appendChild(ed.el);
+    box.appendChild(h("div", { class: "btnrow" },
+      h("button", { class: "btn", id: "se-save", onclick: () => { const m = ed.get(); if (qid) { if (m.atoms.length) S.draw[qid] = m; else delete S.draw[qid]; save(); } if (onSave) onSave(m); toast(m.atoms.length ? "✏️ Saved: " + seFormula(m).replace("^", "") : "Drawing removed"); close(); } }, qid ? "💾 Save with this question" : "Done"),
+      h("button", { class: "btn ghost", onclick: close }, "Cancel")));
+  });
+}
+VIEWS.draw = function () {
+  document.getElementById("title").textContent = "Structure editor";
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "✏️ Tools"), h("h2", {}, "Draw a molecule"), h("div", { class: "muted" }, "ChemFlip works out the molecular formula, molar mass and SMILES as you draw.")));
+  const card = h("div", { class: "card" }); const ed = structEditor({ id: "se", value: S.drawScratch, onChange: m => { S.drawScratch = m; save(); } });
+  card.appendChild(ed.el); app.appendChild(card);
+  const cmp = h("div", { class: "card" }, h("b", {}, "Compare with a SMILES"), h("p", { class: "muted", style: "font-size:13px" }, "Type a SMILES (e.g. CCO for ethanol) to check whether your drawing is the same compound. Stereochemistry isn't compared."));
+  const inp = h("input", { class: "field", id: "se-cmp", placeholder: "e.g. c1ccccc1O", autocomplete: "off", spellcheck: "false" }), out = h("div", { id: "se-cmp-out", "aria-live": "polite", style: "margin-top:6px" });
+  cmp.appendChild(inp); cmp.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "se-cmp-go", onclick: () => { try { const t = seParseSmiles(inp.value.trim()); const same = seSame(ed.get(), t); out.innerHTML = (same ? "✅ Same compound" : "❌ Different: yours is " + chemFormat(seFormula(ed.get())) + ", the SMILES is " + chemFormat(seFormula(t))); } catch (e) { out.textContent = "⚠️ " + e.message; } } }, "Compare")));
+  cmp.appendChild(out); app.appendChild(cmp);
+};
 
 function courseSheet() {
   document.querySelectorAll(".refsheet,.refdim").forEach(e => e.remove());
@@ -3097,7 +3539,7 @@ VIEWS.drill = function () {
 const TOUR = [
   [null, "👋 Welcome!", "Let's take a 1-minute tour of the app. You can replay it anytime from 🧭 App tour on the home screen."],
   ["#ch-" + "FIRST", "📖 Chapters", "Start here. Each chapter has about 50 questions that go from 🟢 easy to 🔴 hard. The ring shows how much you've done."],
-  ["#exam-btn", "🎯 Build an exam", "Before a quiz or test, pick just the topics it covers, choose a timer, and practice under exam conditions."],
+  ["#exam-btn", "🎯 Practice test", "Before a quiz or test, pick just the topics it covers and a mode: Learning, Exam simulation, Mistake review or Adaptive."],
   ["#review-all", "🔁 Review mistakes", "Every question you miss is saved here. Redo them until the list is empty."],
   ["#bm-btn", "⭐ Bookmarks", "Tap ☆ on any question to save it here for later."],
   ["#class-btn", "👥 My class", "Join your class with a code from your instructor: compete on the leaderboard, take class and team tests, and win 🥇🥈🥉."],
@@ -3603,7 +4045,7 @@ VIEWS.about = function () {
   card("📱 How to get the most from the app", [
     "📈 Go through each chapter in order: questions start 🟢 easy and build to 🔴 hard.",
     "📊 After a chapter, open your results. Topics under 70% appear under 'Work more on these' — tap 'Practice weak topics'.",
-    "🎯 Before a quiz or exam, use Build an exam: choose only the topics your test covers, add a timer, and practice under exam conditions.",
+    "🎯 Before a quiz or exam, open Practice test: choose only the topics your test covers, pick Exam simulation, and add a timer.",
     "⭐ Bookmark questions you want to see again, and use 🔁 Review mistakes until the list is empty.",
     isOrg() ? "🖊️ In Mechanisms, draw every arrow yourself before you peek. Use ✏️ Pen to sketch lone pairs and charges first." : "📚 Keep the Reference tab open while you study — constants, the periodic table, ions and key equations are all there.",
     "📤 Share your results with your instructor or study group to stay accountable.",
@@ -3614,7 +4056,7 @@ VIEWS.about = function () {
     "3️⃣ When you finish (or tap 📊 End & see results), check your score by difficulty and by topic.",
     "4️⃣ Tap 🎯 Practice weak topics to drill anything under 70%. Save a 📄 mistake review file to study later.",
     "5️⃣ Use 🔁 Review mistakes and ⭐ Bookmarks until your mistake list is empty.",
-    "6️⃣ Before a test, open 🎯 Build an exam, pick the topics, turn on the timer, and simulate the real thing.",
+    "6️⃣ Before a test, open 🎯 Practice test, pick the topics and Exam simulation, and turn on the timer.",
     "7️⃣ " + (isOrg() ? "Practice 🖊️ Mechanisms: draw every arrow, check, and only then peek at the answer." : "Do 🧮 Drills to get fast and accurate at calculations."),
     "8️⃣ Join 👥 My class with your instructor's code to compete on the leaderboard and take class and team tests.",
     "9️⃣ Share results by ✉️ email, 📤 share, or 👥 Share with my class."]);
@@ -3931,13 +4373,15 @@ async function asgAutosave(force) {
 }
 function asgSaveChip() { const Z = QUIZ, el = document.getElementById("asg-save"); if (!el || !Z || !Z.asg) return; el.textContent = Z.asg.err ? "⚠️ Not saved — retrying" : Z.asg.savedAt ? "✓ Saved " + new Date(Z.asg.savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Not saved yet"; el.className = "chip " + (Z.asg.err ? "warn" : "ok"); }
 async function asgFinish() {
-  const Z = QUIZ; if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
+  const Z = QUIZ; if (!Z || Z.submitting) return; Z.submitting = true;   // never two submissions at once
+  if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
   if (Z.picked != null && Z.list[Z.i]) Z.ans[Z.list[Z.i].id] = Z.picked;
   const box = h("div", { class: "card", id: "asg-submitting" }, "⏳ Submitting…"); app.innerHTML = ""; app.appendChild(box);
   for (let k = 0; k < 4; k++) {
     try { const r = await asgCall({ action: "submit", attempt_id: Z.asg.attempt, answers: Z.ans }); QUIZ = null; stack.pop(); go("asgdone", Object.assign({ title: Z.label, tz: Z.asg.tz }, r)); return; }
     catch (e) { if (e.status === 409) { QUIZ = null; stack.pop(); go("asgdone", { title: Z.label, tz: Z.asg.tz, already: true }); return; } box.textContent = "⚠️ Couldn't reach ChemFlip (" + e.message + "). Retrying…"; await new Promise(r => setTimeout(r, 2500)); }
   }
+  Z.submitting = false;
   box.innerHTML = ""; box.appendChild(h("b", {}, "Your answers are saved on the server, but the submission didn't go through."));
   box.appendChild(h("p", { class: "muted" }, "Check your internet and press Submit again before the time runs out. If time runs out, ChemFlip grades the answers it saved."));
   box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "asg-resubmit", onclick: asgFinish }, "Submit again")));
