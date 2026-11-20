@@ -2008,14 +2008,16 @@ function ltiLicensed(cid) {
 async function ltiCall(action, body) {
   if (!LTI) throw new Error("ChemFlip's online service isn't connected in this version.");
   const b = Object.assign({ action }, body || {}); const tok = await acctToken(); if (tok && !b.sb_token) b.sb_token = tok;
-  const r = await fetch(LTI + "/api", { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, S.lti && S.lti.token ? { Authorization: "Bearer " + S.lti.token } : {}), body: JSON.stringify(b) });
+  // the device's own key proves which ChemFlip device is asking (same as the cf service); never a Canvas secret
+  const dh = DB && DB.live ? { "x-cf-sid": sid(), "x-cf-key": devKey() } : {};
+  const r = await fetch(LTI + "/api", { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, dh, S.lti && S.lti.token ? { Authorization: "Bearer " + S.lti.token } : {}), body: JSON.stringify(b) });
   const j = await r.json().catch(() => ({}));
   if (r.status === 409 && j.conflict) return Object.assign({ status: 409 }, j);
-  if (!r.ok) { const e = new Error(j.error || ("error " + r.status)); e.status = r.status; throw e; }
+  if (!r.ok) { const e = new Error(j.error || ("error " + r.status)); e.status = r.status; e.needLink = !!j.need_link; throw e; }
   return j;
 }
 function ltiApply(j) {
-  S.lti = { token: j.token || (S.lti && S.lti.token), role: j.role, institution: j.institution, klass: j.klass, at: Date.now(), exp: Date.now() + 11.5 * 36e5 };
+  S.lti = { token: j.token || (S.lti && S.lti.token), role: j.role, institution: j.institution, klass: j.klass, link: j.link || null, dl: !!j.deep_link, me: j.me || (S.lti && S.lti.me) || null, at: Date.now(), exp: Date.now() + 11.5 * 36e5 };
   S.ltiPreview = false; S.ltiAll = false;
   const cfg = ltiCfg();
   if (S.profile && cfg && cfg.courses && cfg.courses.length && !cfg.courses.includes(S.profile.course)) S.profile.course = cfg.default && cfg.courses.includes(cfg.default) ? cfg.default : cfg.courses[0];
@@ -2023,10 +2025,16 @@ function ltiApply(j) {
 }
 async function ltiBoot(code) {
   try {
+    if (DB && DB.live && DB.call) await DB.call({ op: "me" }).catch(() => {});   // registers this device's key before Canvas links it
     const j = await ltiCall("exchange", { code });
     ltiApply(j); sfx("ok");
+    if (j.me && j.me.name && S.profile && (!S.profile.name || S.profile.name === "Student")) S.profile.name = j.me.name;
+    if (j.instructor && j.instructor.status === "verified" && j.instructor.email) { eduApply(j.instructor.email, { status: "verified", email: j.instructor.email }); S.profile.role = "instructor"; save(); }
+    else if (j.instructor && j.instructor.status === "no_email") toast("ℹ️ Canvas didn't share your e-mail, so ChemFlip couldn't confirm you as an instructor. Verify your school e-mail in ChemFlip instead.");
     toast("✅ Signed in from Canvas" + (j.klass && (j.klass.label || j.klass.title) ? ": " + (j.klass.label || j.klass.title) : ""));
     if (S.acct && S.acct.at) ltiCall("link_account", {}).then(() => syncNow(true)).catch(() => {}); else syncNow(true);
+    if (j.deep_link) { stack = [{ view: "home" }, { view: "canvasPick" }]; render(); return; }
+    if (j.link && j.link.assignment_id && j.role === "learner") { await ltiOpenAssignment(j.link); return; }
   } catch (e) { sheetMsg("Canvas sign-in", "❌ " + e.message); }
   render();
 }
@@ -2066,6 +2074,16 @@ function canvasCard() {
   if (!live) row.appendChild(h("span", { class: "muted" }, "Session expired: open ChemFlip from Canvas again to change settings."));
   if (live && (role === "instructor" || role === "admin") && !S.ltiPreview) row.appendChild(h("button", { class: "btn small", id: "cv-setup", onclick: () => go("canvasSetup") }, "⚙️ Choose content"));
   if (live && role === "admin" && !S.ltiPreview) row.appendChild(h("button", { class: "btn sec2 small", id: "cv-admin", onclick: () => go("canvasAdmin") }, "🏫 School settings"));
+  if (live && (role === "instructor" || role === "admin") && !S.ltiPreview && k) {
+    if (S.lti.dl) row.appendChild(h("button", { class: "btn small", id: "cv-pick", onclick: () => go("canvasPick") }, "📎 Add to Canvas"));
+    row.appendChild(h("button", { class: "btn sec2 small", id: "cv-link", onclick: () => go("canvasLink") }, k.cf_class ? "🔗 Linked: " + k.cf_class : "🔗 Link a ChemFlip class"));
+    if (k.cf_class) {
+      row.appendChild(h("button", { class: "btn ghost small", id: "cv-roster", onclick: () => go("canvasRoster") }, "👥 Canvas roster"));
+      row.appendChild(h("button", { class: "btn ghost small", id: "cv-grades", onclick: () => go("canvasGrades") }, "📤 Grade sync"));
+      row.appendChild(h("button", { class: "btn ghost small", id: "cv-dates", onclick: () => go("canvasDates") }, "📅 Canvas dates"));
+    }
+  }
+  if (live && role === "learner" && S.lti.link && S.lti.link.assignment_id) row.appendChild(h("button", { class: "btn small", id: "cv-open-asg", onclick: () => ltiOpenAssignment(S.lti.link) }, "📝 Open " + (S.lti.link.title || "this assignment")));
   if ((role === "instructor" || role === "admin")) row.appendChild(h("button", { class: "btn ghost small", id: "cv-preview", onclick: () => { S.ltiPreview = !S.ltiPreview; save(); render(); } }, S.ltiPreview ? "✕ End preview" : "👀 Preview as student"));
   if (ltiStudentView() && cfg && cfg.courses && cfg.courses.length && isPremium()) row.appendChild(h("button", { class: "btn ghost small", id: "cv-all", onclick: () => { S.ltiAll = !S.ltiAll; save(); render(); } }, S.ltiAll ? "📌 Assigned only" : "📚 Show everything"));
   if (live && !window.chemflipApp && /Windows/.test(navigator.userAgent)) row.appendChild(h("button", { class: "btn ghost small", id: "cv-win", onclick: openInWindowsApp }, "🖥️ Open in Windows app"));
@@ -2073,6 +2091,134 @@ function canvasCard() {
   card.appendChild(row);
   return card;
 }
+/* ---------- Canvas LTI Advantage (5.0 Phase F) ---------- */
+// Student opened a Canvas assignment: join the linked ChemFlip class with the Canvas name, then show the assignment.
+async function ltiOpenAssignment(link) {
+  if (!DB || !DB.live) { render(); return; }
+  try {
+    if (!S.cls || S.cls.code !== link.cf_class) {
+      const r = await DB.get("classes", "code=eq." + link.cf_class);
+      if (!r || !r.length) { sheetMsg("Canvas", "❌ The ChemFlip class for this Canvas assignment no longer exists. Tell your instructor."); render(); return; }
+      const nm = (S.lti.me && S.lti.me.name) || S.profile.name || "Student";
+      await DB.ups("members", { class_code: link.cf_class, sid: sid(), name: nm, avatar: myAv(), school: S.profile.school, stu_id: (S.profile.sid || "").trim() }, "class_code,sid");
+      if (S.cls && S.cls.code !== link.cf_class) toast("📚 Switched to " + r[0].name + " for this Canvas assignment");
+      S.cls = { code: link.cf_class, name: r[0].name, role: "student" }; S.cs = { answered: 0, correct: 0, ms: 0 }; save();
+    }
+    GM.asgFocus = link.assignment_id; stack = [{ view: "home" }, { view: "myasg" }]; render();
+  } catch (e) { sheetMsg("Canvas", "❌ Couldn't open the assignment: " + e.message); render(); }
+}
+function cvHead(title, sub) {
+  document.getElementById("title").textContent = title;
+  const k = S.lti && S.lti.klass;
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "🎓 Canvas · " + (k ? k.label || k.title || "course" : "course")), h("h2", {}, title), sub ? h("div", { class: "muted" }, sub) : null));
+  if (!ltiOn()) { app.appendChild(h("div", { class: "card" }, "Your Canvas session has expired. Open ChemFlip from Canvas again.")); return false; }
+  return true;
+}
+function cvErr(box, e) {
+  box.innerHTML = "";
+  const c = h("div", { class: "card", style: "border-left:5px solid var(--bad,#c0392b)" }, h("b", {}, "❌ " + e.message));
+  if (e.needLink) c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", onclick: () => go("canvasLink") }, "🔗 Link a ChemFlip class")));
+  box.appendChild(c);
+}
+VIEWS.canvasLink = function () {
+  if (!cvHead("Link to a ChemFlip class", "Students who open ChemFlip from this Canvas course join this ChemFlip class. Canvas assignments, grades, roster and dates use it.")) return;
+  const k = S.lti.klass || {}, list = S.tclasses || [];
+  const box = h("div", { class: "card", id: "cvl-box" });
+  if (k.cf_class) box.appendChild(h("p", {}, "Linked now: ", h("b", {}, k.cf_class)));
+  if (!list.length) { box.appendChild(h("p", { class: "muted" }, "You don't have a ChemFlip class on this device yet. Create one first; it takes a few seconds.")); box.appendChild(h("button", { class: "btn", id: "cvl-new", onclick: () => go("teach") }, "Create a ChemFlip class")); app.appendChild(box); return; }
+  const sel = h("select", { class: "field", id: "cvl-sel" }, ...list.map(c => h("option", { value: c.code, selected: c.code === k.cf_class ? "selected" : null }, c.name + " (" + c.code + ")")));
+  const msg = h("div", { class: "muted", style: "margin-top:6px", id: "cvl-msg" });
+  box.appendChild(sel); box.appendChild(msg);
+  box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "cvl-save", onclick: async () => {
+    msg.textContent = "⏳ Linking…";
+    try { const j = await ltiCall("link_class", { class_code: sel.value }); S.lti.klass = j.klass; save(); sfx("win"); toast("🔗 Linked to " + sel.value); back(); }
+    catch (e) { msg.textContent = "❌ " + e.message; } } }, "Link this class")));
+  app.appendChild(box);
+};
+VIEWS.canvasPick = function () {
+  if (!cvHead("Add a ChemFlip assignment to Canvas", "Canvas creates an assignment with a grade column for each one you choose. Scores are sent to that column automatically.")) return;
+  const box = h("div", { id: "cvp-box" }, h("div", { class: "card muted" }, "⏳ Loading your assignments…")); app.appendChild(box);
+  ltiCall("dl_items", {}).then(j => {
+    box.innerHTML = "";
+    if (!j.items.length) { box.appendChild(h("div", { class: "card" }, h("p", {}, "This class has no graded ChemFlip assignments yet."), h("button", { class: "btn", id: "cvp-make", onclick: () => { S.cls = { code: j.class_code, name: j.class_code, role: "teacher" }; CLSTAB = 5; save(); go("cls", j.class_code); } }, "Create one"))); return; }
+    const picks = new Set();
+    const card = h("div", { class: "card" });
+    j.items.forEach(x => { const cb = h("input", { type: "checkbox", id: "cvp-" + x.id.slice(0, 8), onchange: () => { cb.checked ? picks.add(x.id) : picks.delete(x.id); go1.disabled = !picks.size; } });
+      card.appendChild(h("label", { class: "row", style: "display:flex;gap:10px;align-items:flex-start;padding:6px 0;cursor:pointer" }, cb, h("span", {}, h("b", {}, x.title), h("div", { class: "muted", style: "font-size:13px" }, [x.kind, x.questions + " questions", x.points + " points", "due " + fmtTz(x.due_at, localTz()), x.published ? "" : "not published yet"].filter(Boolean).join(" · ")))));
+    });
+    const go1 = h("button", { class: "btn", id: "cvp-add", disabled: "disabled", onclick: async () => {
+      go1.disabled = true; go1.textContent = "⏳ Sending to Canvas…";
+      try { const r = await ltiCall("dl_return", { ids: [...picks] });
+        const f = h("form", { method: "POST", action: r.return_url, id: "cvp-form" }, h("input", { type: "hidden", name: "JWT", value: r.jwt }));
+        document.body.appendChild(f); S.lti.dl = false; save(); f.submit();
+      } catch (e) { go1.disabled = false; go1.textContent = "Add to Canvas"; toast("❌ " + e.message); } } }, "Add to Canvas");
+    card.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Canvas copies the title and points. Check the due date in Canvas: ChemFlip sends it, but your Canvas settings decide whether it's used. ChemFlip still enforces its own dates and extensions."));
+    card.appendChild(h("div", { class: "btnrow" }, go1, h("button", { class: "btn ghost", onclick: async () => { try { const r = await ltiCall("dl_return", { ids: [] }); const f = h("form", { method: "POST", action: r.return_url }, h("input", { type: "hidden", name: "JWT", value: r.jwt })); document.body.appendChild(f); S.lti.dl = false; save(); f.submit(); } catch (e) { back(); } } }, "Cancel")));
+    box.appendChild(card);
+  }).catch(e => cvErr(box, e));
+};
+VIEWS.canvasRoster = function () {
+  if (!cvHead("Canvas roster", "Read from Canvas (Names and Role Provisioning). ChemFlip can't add students to Canvas or change enrolments.")) return;
+  const box = h("div", { id: "cvr-box" }, h("div", { class: "card muted" }, "⏳ Reading the roster from Canvas…")); app.appendChild(box);
+  ltiCall("roster", {}).then(j => {
+    box.innerHTML = ""; const st = j.members.filter(m => m.role === "learner");
+    const opened = st.filter(m => m.opened).length, inCls = st.filter(m => m.in_class).length;
+    box.appendChild(h("div", { class: "card", id: "cvr-sum" }, h("b", {}, st.length + " students in Canvas"), h("div", { class: "muted" }, inCls + " joined ChemFlip class " + j.class_code + " · " + (st.length - opened) + " haven't opened ChemFlip from Canvas yet · synced " + fmtTz(j.synced_at, localTz()))));
+    const tbl = h("table", { class: "tbl", id: "cvr-tbl", style: "width:100%;border-collapse:collapse" }, h("tr", {}, h("th", { style: "text-align:left" }, "Name"), h("th", { style: "text-align:left" }, "Role"), h("th", { style: "text-align:left" }, "ChemFlip")));
+    j.members.forEach(m => tbl.appendChild(h("tr", {}, h("td", {}, (m.name || "—") + (m.email ? " " : ""), m.email ? h("span", { class: "muted", style: "font-size:12px" }, m.email) : null),
+      h("td", {}, m.role === "learner" ? "Student" : m.role === "admin" ? "Admin" : "Instructor", m.status && m.status !== "Active" ? h("span", { class: "chip" }, m.status) : null),
+      h("td", {}, m.in_class ? "✅ In class" : m.opened ? "🟡 Opened, not in class" : "⚪ Not yet"))));
+    box.appendChild(h("div", { class: "card", style: "overflow-x:auto" }, tbl));
+    box.appendChild(h("button", { class: "btn ghost", id: "cvr-again", onclick: () => render() }, "🔄 Sync again"));
+  }).catch(e => cvErr(box, e));
+};
+VIEWS.canvasGrades = function () {
+  if (!cvHead("Grade sync to Canvas", "ChemFlip sends each student's best score for a Canvas-linked assignment to its Canvas grade column. Only scores are sent: not answers, files, attempts or extensions.")) return;
+  const box = h("div", { id: "cvg-box" }, h("div", { class: "card muted" }, "⏳ Checking with Canvas…")); app.appendChild(box);
+  const draw = (j) => {
+    box.innerHTML = "";
+    const graded = j.links.filter(l => l.assignment_id);
+    if (!graded.length) { box.appendChild(h("div", { class: "card muted" }, "No Canvas assignments use ChemFlip yet. In Canvas, create an assignment, choose External Tool → ChemFlip, and pick a ChemFlip assignment.")); return; }
+    graded.forEach(l => {
+      const c = h("div", { class: "card", id: "cvg-" + l.id.slice(0, 8) }, h("b", {}, l.title || l.assignment_title), h("div", { class: "muted", style: "font-size:13px" }, "ChemFlip: " + (l.assignment_title || "—")));
+      if (!l.graded) c.appendChild(h("div", { class: "muted" }, "This Canvas item has no grade column, so nothing is sent."));
+      else {
+        c.appendChild(h("div", { class: "cvg-counts" }, "✅ " + l.sent + " sent", l.pending ? " · ⏳ " + l.pending + " waiting" : "", l.held ? " · 🔒 " + l.held + " held until grades are released " + fmtTz(l.grade_release_at, localTz()) : "", l.errors ? " · ⚠️ " + l.errors + " not sent" : "", l.last_sent ? " · last sent " + fmtTz(l.last_sent, localTz()) : ""));
+        const errs = l.rows.filter(r => r.status === "error");
+        if (errs.length) c.appendChild(h("div", { class: "cvg-errs", style: "margin-top:6px" }, ...errs.map(r => h("div", { style: "font-size:13px" }, "⚠️ " + (r.name || "Student") + ": " + (r.error || "Not sent") + (r.retry_at ? " (retries " + fmtTz(r.retry_at, localTz()) + ")" : "")))));
+        c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn small sec2", id: "cvg-push-" + l.id.slice(0, 8), onclick: async (ev) => { ev.target.disabled = true; ev.target.textContent = "⏳ Sending…"; try { draw(await ltiCall("grades_push", { link_id: l.id })); toast("📤 Sent to Canvas"); } catch (e) { toast("❌ " + e.message); ev.target.disabled = false; } } }, "📤 Send all again")));
+      }
+      box.appendChild(c);
+    });
+  };
+  ltiCall("grades", {}).then(draw).catch(e => cvErr(box, e));
+};
+VIEWS.canvasDates = function () {
+  if (!cvHead("Canvas dates", "Canvas tells ChemFlip each assignment's due and lock dates, including a student's Canvas override, when that student opens it. ChemFlip enforces its own dates: apply a difference here as a ChemFlip extension if you want them to match.")) return;
+  const box = h("div", { id: "cvd-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  const tz = localTz();
+  ltiCall("dates", {}).then(j => {
+    box.innerHTML = "";
+    if (!j.links.length) { box.appendChild(h("div", { class: "card muted" }, "No Canvas assignments use ChemFlip yet.")); return; }
+    j.links.forEach(l => {
+      const c = h("div", { class: "card", id: "cvd-" + l.link_id.slice(0, 8) }, h("b", {}, l.title || l.assignment_title));
+      c.appendChild(h("div", { style: "font-size:14px" }, "ChemFlip due " + fmtTz(l.chemflip_due_at, tz) + (l.canvas_due_at ? " · Canvas due " + fmtTz(l.canvas_due_at, tz) : " · Canvas due date not reported yet (open the assignment from Canvas as instructor)")));
+      if (l.canvas_due_at && Math.abs(Date.parse(l.canvas_due_at) - Date.parse(l.chemflip_due_at)) > 60e3) c.appendChild(h("div", { class: "muted" }, "⚠️ The course-wide dates differ. Edit the ChemFlip assignment if you want them to match."));
+      if (!l.students.length) c.appendChild(h("div", { class: "muted" }, "✅ No student has different Canvas dates."));
+      l.students.forEach(s => {
+        const row = h("div", { class: "cvd-stu", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line,#ddd)" },
+          h("span", { style: "flex:1;min-width:200px" }, h("b", {}, s.name), h("div", { class: "muted", style: "font-size:13px" }, "Canvas: due " + fmtTz(s.canvas_due_at || s.chemflip_due_at, tz) + (s.canvas_lock_at ? ", locks " + fmtTz(s.canvas_lock_at, tz) : "") + " · ChemFlip: due " + fmtTz(s.chemflip_due_at, tz))));
+        if (s.sid) row.appendChild(h("button", { class: "btn small", onclick: async (ev) => {
+          ev.target.disabled = true;
+          try { await asgCall({ action: "override", assignment_id: l.assignment_id, scope: "student", target: s.sid, due_at: s.canvas_due_at || null, lock_at: s.canvas_lock_at || s.canvas_due_at || null, note: "Matched to Canvas" }); toast("✅ Extension added for " + s.name); render(); }
+          catch (e) { toast("❌ " + e.message); ev.target.disabled = false; } } }, "Apply as ChemFlip extension"));
+        else row.appendChild(h("span", { class: "muted", style: "font-size:13px" }, "Not in the ChemFlip class yet"));
+        c.appendChild(row);
+      });
+      box.appendChild(c);
+    });
+  }).catch(e => cvErr(box, e));
+};
 /* content filtering for students launched from Canvas */
 function ltiFilterOn() { const cfg = ltiCfg(); return ltiStudentView() && !S.ltiAll && cfg && cfg.courses && cfg.courses.length; }
 function ltiChapterOk(n) { if (!ltiFilterOn()) return true; const cfg = ltiCfg(), list = cfg.chapters && cfg.chapters[course().id]; return !list || !list.length || list.includes(n); }
@@ -3754,7 +3900,9 @@ VIEWS.myasg = function () {
       if (a.in_progress) btns.appendChild(h("button", { class: "btn", id: "ma-resume-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, "Resume (" + left(Date.parse(a.in_progress.ends_at) - srvNow()) + " left)"));
       else if ((a.state === "open" || a.state === "late") && !usedUp) btns.appendChild(h("button", { class: "btn", id: "ma-start-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, a.attempts_used ? "Start another attempt" : "Start"));
       if (a.submitted) btns.appendChild(h("button", { class: "btn sec2", id: "ma-review-" + a.id.slice(0, 8), onclick: () => asgReview(a, tz) }, "Review"));
-      card.appendChild(btns); box.appendChild(card); });
+      card.appendChild(btns); box.appendChild(card);
+      if (S.lti && S.lti.link && S.lti.link.assignment_id === a.id) { card.style.outline = "3px solid #E66000"; card.insertBefore(h("div", { class: "chip", style: "margin-bottom:6px" }, "🎓 Opened from Canvas"), card.firstChild);
+        if (GM.asgFocus === a.id) { GM.asgFocus = null; setTimeout(() => card.scrollIntoView({ block: "center" }), 50); } } });
     const tickCd = () => { if (!document.getElementById("ma-box")) return; document.querySelectorAll(".cd").forEach(el => { const d = Date.parse(el.dataset.due) - srvNow(), l = Date.parse(el.dataset.lock) - srvNow(); el.textContent = d > 0 ? "· " + left(d) + " left" : l > 0 ? "· late, locks in " + left(l) : ""; }); setTimeout(tickCd, 1000); };
     tickCd();
   }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
