@@ -4969,6 +4969,8 @@ async function asgStart(a, tz) {
       if (list.length < r.qids.length) toast("Some questions need the latest ChemFlip update — reload the page.");
       QUIZ = Object.assign({ list, i: 0, label: a.title, ans: Object.assign({}, r.answers || {}), exam: true, picked: null, run: 0, bestRun: 0, started: Date.now() },
         { asg: { id: a.id, attempt: r.attempt_id, endsAt: Date.parse(r.ends_at), tz, saved: JSON.stringify(r.answers || {}), savedAt: r.resumed ? Date.now() : 0, kind: a.kind }, deadline: Date.parse(r.ends_at) - ASG.off });
+      const dr = (S.asgDraft || {})[r.attempt_id];
+      if (dr && r.resumed) { const merged = Object.assign({}, r.answers || {}, dr.a); if (JSON.stringify(merged) !== JSON.stringify(r.answers || {})) { QUIZ.ans = merged; QUIZ.asg.saved = ""; setTimeout(() => asgAutosave(true), 300); } }
       QUIZ.picked = QUIZ.ans[list[0] && list[0].id] ?? null;
       go("quiz"); if (r.resumed) toast("↩️ Resumed — your saved answers are back");
     } catch (e) { toast("❌ " + e.message); render(); } };
@@ -4978,23 +4980,30 @@ async function asgStart(a, tz) {
 async function asgAutosave(force) {
   const Z = QUIZ; if (!Z || !Z.asg || Z.asg.busy) return;
   const ans = Object.assign({}, Z.ans); if (Z.picked != null && Z.list[Z.i]) ans[Z.list[Z.i].id] = Z.picked;
-  const js = JSON.stringify(ans); if (!force && (js === Z.asg.saved || Date.now() - (Z.asg.try || 0) < 5000)) return;
+  const js = JSON.stringify(ans);
+  if (js !== (Z.asg.local || "")) { Z.asg.local = js; S.asgDraft = S.asgDraft || {}; S.asgDraft[Z.asg.attempt] = { a: ans, t: Date.now() }; save(); }   // scalability: local draft first
+  if (!force && (js === Z.asg.saved || Date.now() - (Z.asg.try || 0) < (Z.asg.wait || 5000))) return;
   Z.asg.busy = true; Z.asg.try = Date.now(); const el = document.getElementById("asg-save");
-  try { await asgCall({ action: "autosave", attempt_id: Z.asg.attempt, answers: ans }); Z.asg.saved = js; Z.asg.savedAt = Date.now(); Z.asg.err = null; }
-  catch (e) { Z.asg.err = e.message; }
+  try { await asgCall({ action: "autosave", attempt_id: Z.asg.attempt, answers: ans }); Z.asg.saved = js; Z.asg.savedAt = Date.now(); Z.asg.err = null; Z.asg.wait = 5000; }
+  catch (e) { Z.asg.err = e.message; Z.asg.wait = Math.min(60000, (Z.asg.wait || 5000) * 2) * (0.75 + Math.random() * 0.5); }   // back off while the server is busy
   Z.asg.busy = false; asgSaveChip();
 }
-function asgSaveChip() { const Z = QUIZ, el = document.getElementById("asg-save"); if (!el || !Z || !Z.asg) return; el.textContent = Z.asg.err ? "⚠️ Not saved — retrying" : Z.asg.savedAt ? "✓ Saved " + new Date(Z.asg.savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Not saved yet"; el.className = "chip " + (Z.asg.err ? "warn" : "ok"); }
+function asgSaveChip() { const Z = QUIZ, el = document.getElementById("asg-save"); if (!el || !Z || !Z.asg) return; el.textContent = Z.asg.err ? "⚠️ Saved on this device — sending when the server answers" : Z.asg.savedAt ? "✓ Saved " + new Date(Z.asg.savedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Not saved yet"; el.className = "chip " + (Z.asg.err ? "warn" : "ok"); }
 async function asgFinish() {
   const Z = QUIZ; if (!Z || Z.submitting) return; Z.submitting = true;   // never two submissions at once
   if (Z.timer) { clearInterval(Z.timer); Z.timer = null; }
   if (Z.picked != null && Z.list[Z.i]) Z.ans[Z.list[Z.i].id] = Z.picked;
   const box = h("div", { class: "card", id: "asg-submitting" }, "⏳ Submitting…"); app.innerHTML = ""; app.appendChild(box);
-  for (let k = 0; k < 4; k++) {
-    try { const r = await asgCall({ action: "submit", attempt_id: Z.asg.attempt, answers: Z.ans }); QUIZ = null; stack.pop();
+  S.asgDraft = S.asgDraft || {}; S.asgDraft[Z.asg.attempt] = { a: Z.ans, t: Date.now() }; save();
+  const endT = Number.isFinite(Z.asg.endsAt) ? Z.asg.endsAt - (ASG.off || 0) + 55e3 : Date.now() + 600e3;   // untimed work (no end) → keep trying for 10 min
+  const until = Math.max(endT, Date.now() + 60e3);
+  for (let k = 0, wait = 1500; k < 12 && Date.now() < until; k++, wait = Math.min(30e3, wait * 2)) {
+    try { const r = await asgCall({ action: "submit", attempt_id: Z.asg.attempt, answers: Z.ans }); if (S.asgDraft) { delete S.asgDraft[Z.asg.attempt]; save(); } QUIZ = null; stack.pop();
       const nAns = Z.list.filter(q => { const v = Z.ans[q.id]; return v !== undefined && v !== null && v !== ""; }).length;
       go("asgdone", Object.assign({ title: Z.label, tz: Z.asg.tz, attempt_id: Z.asg.attempt, asg_id: Z.asg.id, n_ans: nAns, n_q: Z.list.length }, r)); return; }
-    catch (e) { if (e.status === 409) { QUIZ = null; stack.pop(); go("asgdone", { title: Z.label, tz: Z.asg.tz, already: true }); return; } box.textContent = "⚠️ Couldn't reach ChemFlip (" + e.message + "). Retrying…"; await new Promise(r => setTimeout(r, 2500)); }
+    catch (e) { if (e.status === 409) { if (S.asgDraft) { delete S.asgDraft[Z.asg.attempt]; save(); } QUIZ = null; stack.pop(); go("asgdone", { title: Z.label, tz: Z.asg.tz, already: true }); return; }
+      if (e.status && e.status < 500 && e.status !== 429) break;   // a real refusal (e.g. closed): don't keep retrying
+      const w = wait * (0.75 + Math.random() * 0.5); box.textContent = "⚠️ ChemFlip is busy or unreachable (" + e.message + "). Your answers are safe on this device. Trying again in " + Math.round(w / 1000) + " s…"; await new Promise(r => setTimeout(r, w)); }
   }
   Z.submitting = false;
   box.innerHTML = ""; box.appendChild(h("b", {}, "Your answers are saved on the server, but the submission didn't go through."));
@@ -5152,6 +5161,7 @@ async function checkContent() {
 loadRemote(); setTimeout(checkContent, 1500); setTimeout(() => eduRefresh(true), 1200); setTimeout(() => syncSchool(), 3000); setTimeout(() => { if (S.cls && S.cls.role !== "teacher") { syncScore(); loadClassInfo().then(() => { if (cur() && cur().view === "home") render(); }); } }, 2500);
 stack = [{ view: S.profile ? "home" : "onboard" }];
 setTimeout(() => { if (S.profile) remStart(); }, 4000);   // Phase J: deadline reminders
+if (S.asgDraft) { const cut = Date.now() - 30 * 864e5; Object.keys(S.asgDraft).forEach(k => { if (!S.asgDraft[k] || S.asgDraft[k].t < cut) delete S.asgDraft[k]; }); }   // device copies of graded answers older than 30 days
 if (window.matchMedia) try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") applyTheme(); }); } catch (e) {}
 render();
 </script>
