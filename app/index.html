@@ -544,7 +544,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 function render() {
   applyTheme(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
@@ -890,11 +890,12 @@ VIEWS.quiz = function () {
   if (Z.shownId !== q.id) { Z.shownId = q.id; Z.shownAt = Date.now(); }
   const star = h("button", { class: "star" + (S.b.includes(q.id) ? " on" : ""), id: "star", "aria-label": "Bookmark", onclick: () => { const i = S.b.indexOf(q.id); if (i >= 0) S.b.splice(i, 1); else S.b.push(q.id); save(); sfx("tap"); star.className = "star" + (S.b.includes(q.id) ? " on" : ""); star.textContent = S.b.includes(q.id) ? "★" : "☆"; } }, S.b.includes(q.id) ? "★" : "☆");
   const card = h("div", { class: "card" }, h("div", { class: "qhead" }, h("span", { class: "diff L" + q.L, id: "diff" }, LV[q.L]), h("span", { class: "chip" }, "🧩 " + q.tp), q.nw ? h("span", { class: "chip nw", title: "New question: answer computed and checked automatically. Spot a problem? Use Report." }, "New") : null, star),
-    h("div", { class: "muted", style: "margin:-4px 0 6px;font-size:12.5px" }, "📖 " + CHBYN[q.ch].title));
+    h("div", { class: "muted", style: "margin:-4px 0 6px;font-size:12.5px" }, q.custom ? "📝 Question from your instructor · " + q.custom.points + " point" + (q.custom.points === 1 ? "" : "s") : "📖 " + CHBYN[q.ch].title));
   if (q.im && FIGS[q.im]) card.appendChild(h("div", { class: "fig", html: FIGS[q.im] }));
   card.appendChild(h("div", { class: "qtext", id: "qtext" }, q.q));
   const showFeedback = !Z.exam && answered != null;
-  if (q.mk && MBYID[q.mk]) {
+  if (q.custom && q.custom.type !== "mc") customAnswerUI(card, Z, q);
+  else if (q.mk && MBYID[q.mk]) {
     const mm = MBYID[q.mk];
     if (MP_SAVED && (!MP || MP.coach)) MP = MP_SAVED; MP_SAVED = null;
     if (!S.mtut && answered == null && !Z.exam) { S.mtut = true; save(); MP_SAVED = MP && MP.qid === q.id ? MP : null; MP = null; setTimeout(() => go("mechtut", 0), 0); return; }
@@ -942,7 +943,7 @@ VIEWS.quiz = function () {
     card.appendChild(h("div", { class: "sol " + (ok ? "ok" : "no") }, h("b", {}, ok ? praise[(Z.i + q.id.length) % praise.length] : "❌ Not quite — the answer is " + "ABCD"[q.a]), q.s, workedSolution(q)));
     card.appendChild(h("button", { class: "qrep", id: "qrep", onclick: () => reportQuestion(q) }, "Report a problem with this question"));
   }
-  const qc = q.mk ? null : qCoach(card, answered); if (qc) app.appendChild(qc);
+  const qc = q.mk || q.custom ? null : qCoach(card, answered); if (qc) app.appendChild(qc);
   if (typedAllowed(Z, q) && (Z.exam || answered == null)) card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "type-toggle", "aria-pressed": S.typeMode ? "true" : "false", onclick: () => { S.typeMode = !S.typeMode; save(); render(); } }, S.typeMode ? "🔘 Choose from options instead" : "⌨️ Type my answer instead")));
   if (!q.mk && typeof workPanel === "function") card.appendChild(workPanel(q));
   app.appendChild(card);
@@ -950,7 +951,7 @@ VIEWS.quiz = function () {
   const last = Z.i === n - 1;
   if (Z.exam) {
     bottom([h("button", { class: "btn ghost", id: "prev", disabled: Z.i === 0, onclick: () => { Z.i--; Z.picked = Z.ans[Z.list[Z.i].id] ?? null; render(); } }, "‹ Prev"),
-      h("button", { class: "btn", id: "next", disabled: Z.picked == null, onclick: () => { Z.ans[q.id] = Z.picked; if (last) finish(); else { Z.i++; Z.picked = Z.ans[Z.list[Z.i].id] ?? null; render(); window.scrollTo(0, 0); } } }, last ? "🏁 Finish exam" : "Next ›")]);
+      h("button", { class: "btn", id: "next", disabled: Z.picked == null && !q.custom, onclick: () => { Z.ans[q.id] = Z.picked; if (last) finish(); else { Z.i++; Z.picked = Z.ans[Z.list[Z.i].id] ?? null; render(); window.scrollTo(0, 0); } } }, last ? "🏁 Finish exam" : "Next ›")]);
   } else {
     bottom([h("button", { class: "btn ghost", id: "end", onclick: finish }, "📊 End & see results"),
       h("button", { class: "btn", id: "next", disabled: answered == null, onclick: () => { if (last) { finish(); return; }
@@ -2507,7 +2508,7 @@ function acctSheet() {
     [em, send, code, verify, msg].forEach(x => box.appendChild(x));
   });
 }
-const SYNC_KEYS = ["a", "w", "b", "days", "mech", "best", "hist", "cs", "quest", "arc", "mtut", "qtut", "featSeen", "theme", "music", "sfx", "myc", "qz", "pt", "ex", "draw", "typeMode"];
+const SYNC_KEYS = ["a", "w", "b", "days", "mech", "best", "hist", "cs", "quest", "arc", "mtut", "qtut", "featSeen", "theme", "music", "sfx", "myc", "qz", "pt", "ex", "draw", "typeMode", "asgTpl"];
 function syncPayload() { const o = { _t: Date.now() }; SYNC_KEYS.forEach(k => { if (S[k] !== undefined) o[k] = S[k]; }); if (S.profile) { const p = Object.assign({}, S.profile); delete p.photo; delete p.photoS; o.profile = p; } return o; }
 function mergeState(L, R) {
   if (!R) return L; if (!L) return R;
@@ -2968,7 +2969,8 @@ function parseNumAnswer(text) {
   if (!m) return null;
   const v = parseFloat(m[1]) * Math.pow(10, +(m[2] || m[3] || 0));
   if (!Number.isFinite(v)) return null;
-  const sig = (m[1].replace(/^[+-]/, "").replace(/^0*\.?0*/, "").replace(".", "").length) || 1;
+  // significant figures: leading zeros never count; trailing zeros only with a decimal point (same rule as the server)
+  let dg = m[1].replace(/^[+-]/, ""); const pt = dg.includes("."); dg = dg.replace(".", "").replace(/^0+/, ""); if (!pt) dg = dg.replace(/0+$/, "") || "0"; const sig = Math.max(1, dg.length);
   return { value: v, unit: m[4].trim(), sig, raw: s };
 }
 function unitNorm(u) { return String(u || "").toLowerCase().replace(/\s+/g, "").replace(/·|\*/g, "").replace(/°/g, "deg").replace(/^m$/, "mol/l").replace(/mol\/l|moll\^-1|moll-1/g, "mol/l"); }
@@ -4207,53 +4209,176 @@ function teacherAsg(c, done) {
 }
 
 /* ----- instructor: create / edit ----- */
+const AE_STEPS = ["Basics", "Bank questions", "Your questions", "Points", "Versions", "Dates", "Attempts & release", "Review"];
+function aeForm(a, code) {
+  const tz = ASG.tz || localTz(), wk = new Date(srvNow() + 7 * 864e5);
+  return { key: a.id || code, step: 1, all: false, title: a.title || "", kind: a.kind || "assignment", chs: [], n: 10, L: 0,
+    qids: a.qids ? a.qids.slice() : [], points: Object.assign({}, a.points || {}), items: JSON.parse(JSON.stringify(a.items || [])),
+    pool_draw: a.pool_draw || "", shuffle: !!a.shuffle,
+    open: isoToZoned(a.open_at, tz), due: a.due_at ? isoToZoned(a.due_at, tz) : isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59", lock: isoToZoned(a.lock_at, tz),
+    limit: a.time_limit_min || "", att: a.max_attempts || "", late: (a.late_policy || {}).mode || "accept", pen: (a.late_policy || {}).pct_per_day || 10, penmax: (a.late_policy || {}).max_pct || 50,
+    grade: isoToZoned(a.grade_release_at, tz), sol: isoToZoned(a.solution_release_at, tz) };
+}
+function aeNewItem(type, n) { const b = { id: "x" + n, type, points: 1, stem: "", solution: "" };
+  if (type === "num") Object.assign(b, { value: "", unit: "", units: [], tol_pct: 1, tol_abs: "", sig: "", sig_pen: 10, unit_pen: 25, partial_tol_pct: "", partial_pct: 50 });
+  if (type === "struct") Object.assign(b, { smiles: "", formula_pct: 0 });
+  if (type === "short") b.rubric = "";
+  if (type === "mc") Object.assign(b, { options: ["", "", "", ""], answer: 0 });
+  return b; }
+function aeNextId(F) { let k = 1; const used = new Set(F.items.map(i => i.id)); while (used.has("x" + k)) k++; return k; }
+// Templates: settings and questions without the actual dates (dates are kept as "days from today" and time of day).
+function aeTemplate(F, name) { const tz = ASG.tz || localTz(), day = t => { if (!t) return null; const d = Date.parse(zonedToIso(t, tz)); return { d: Math.round((d - srvNow()) / 864e5), t: t.slice(11, 16) }; };
+  return { name, t: Date.now(), kind: F.kind, title: F.title, qids: F.qids, points: F.points, items: F.items, pool_draw: F.pool_draw, shuffle: F.shuffle, limit: F.limit, att: F.att, late: F.late, pen: F.pen, penmax: F.penmax,
+    dates: { open: day(F.open), due: day(F.due), lock: day(F.lock), grade: day(F.grade), sol: day(F.sol) } }; }
+function aeApplyTemplate(F, T) { const tz = ASG.tz || localTz(), back = x => { if (!x) return ""; const d = new Date(srvNow() + Math.max(0, x.d) * 864e5); return isoToZoned(d.toISOString(), tz).slice(0, 10) + "T" + (x.t || "23:59"); };
+  Object.assign(F, { kind: T.kind, title: T.title, qids: (T.qids || []).slice(), points: Object.assign({}, T.points || {}), items: JSON.parse(JSON.stringify(T.items || [])), pool_draw: T.pool_draw || "", shuffle: !!T.shuffle,
+    limit: T.limit || "", att: T.att || "", late: T.late || "accept", pen: T.pen || 10, penmax: T.penmax || 50 });
+  const D = T.dates || {}; F.open = back(D.open); F.due = back(D.due) || F.due; F.lock = back(D.lock); F.grade = back(D.grade); F.sol = back(D.sol); }
+function aeTotal(F) { return F.qids.reduce((t, q) => t + (Number(F.points[q]) > 0 ? Number(F.points[q]) : 1), 0) + F.items.reduce((t, it) => t + (Number(it.points) > 0 ? Number(it.points) : 1), 0); }
+function aeCheck(F, step) {
+  if (step === 1 && !F.title.trim()) return "Give the assignment a title.";
+  if (step === 3) for (let i = 0; i < F.items.length; i++) { const it = F.items[i], n = "Question " + (i + 1) + ": ";
+    if (!String(it.stem).trim()) return n + "write the question.";
+    if (it.type === "num" && !Number.isFinite(parseFloat(it.value))) return n + "enter the correct value.";
+    if (it.type === "struct") { try { seParseSmiles(String(it.smiles).trim() || "?"); } catch (e) { return n + "enter or draw the correct structure."; } }
+    if (it.type === "mc" && it.options.filter(o => String(o).trim()).length < 2) return n + "give at least two options."; }
+  if (step >= 4 && F.qids.length + F.items.length === 0) return "Add at least one question (step 2 or 3).";
+  if (step === 5 && F.pool_draw && +F.pool_draw > F.qids.length + F.items.length) return "Students can't get more questions than the assignment has (" + (F.qids.length + F.items.length) + ").";
+  if (step === 6 && !F.due) return "Set a due date.";
+  return "";
+}
 VIEWS.asgedit = function (arg) {
   if (!isTeacher()) { back(); return; }
-  document.getElementById("title").textContent = arg.a ? "Edit " + arg.a.title : "New assignment";
-  const a = arg.a || {}, tz = ASG.tz || localTz(), F = VIEWS.asgedit.f = (VIEWS.asgedit.f && VIEWS.asgedit.f.key === (a.id || arg.code)) ? VIEWS.asgedit.f : { key: a.id || arg.code, chs: new Set(), n: 10, L: 0, qids: a.qids ? a.qids.slice() : null };
-  const card = h("div", { class: "card", id: "asg-form" });
-  const inp = (id, lab, type, val, extra) => { const i = h("input", Object.assign({ class: "field", id, type: type || "text" }, extra || {})); if (val != null) i.value = val; card.appendChild(h("label", { class: "f", for: id }, lab)); card.appendChild(i); return i; };
-  const title = inp("ae-title", "Title", "text", a.title || "", { placeholder: "e.g. Homework 3: Stoichiometry" });
-  const kind = h("select", { class: "field", id: "ae-kind" }, Object.entries(KIND).map(([k, t]) => h("option", { value: k, selected: (a.kind || "assignment") === k ? "" : null }, t)));
-  card.appendChild(h("label", { class: "f", for: "ae-kind" }, "Type")); card.appendChild(kind);
-  card.appendChild(h("b", { style: "display:block;margin-top:14px" }, "Questions"));
-  const qc = h("div", { class: "muted", id: "ae-qcount" }); card.appendChild(qc);
-  const chBox = h("div", { style: "max-height:180px;overflow:auto;border:1px solid var(--hair);border-radius:8px;padding:6px;margin:6px 0" });
-  CH().forEach(ch => { const id = "ae-ch-" + ch.n, cb = h("input", { type: "checkbox", id, onchange: e => { e.target.checked ? F.chs.add(ch.n) : F.chs.delete(ch.n); } }); cb.checked = F.chs.has(ch.n); chBox.appendChild(h("label", { class: "check", for: id }, cb, h("span", {}, ch.title))); });
-  card.appendChild(chBox);
-  const nIn = h("input", { class: "field", id: "ae-n", type: "number", min: "1", max: "100", value: F.n, style: "max-width:120px" });
-  const lvl = h("select", { class: "field", id: "ae-level", style: "max-width:180px" }, [[0, "Mixed difficulty"]].concat(course().levels.map(L => [L, LV[L]])).map(([v, t]) => h("option", { value: v, selected: v === F.L ? "" : null }, t)));
-  card.appendChild(h("div", { style: "display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" }, h("div", {}, h("label", { class: "f", for: "ae-n" }, "How many"), nIn), h("div", {}, h("label", { class: "f", for: "ae-level" }, "Difficulty"), lvl),
-    h("button", { class: "btn sec2", id: "ae-pick", onclick: () => { F.n = Math.max(1, Math.min(100, +nIn.value || 10)); F.L = +lvl.value; const pool = []; CH().filter(ch => F.chs.has(ch.n)).forEach(ch => cqs(ch).forEach(q => { if (!q.mk && (!F.L || q.L === F.L)) pool.push(q.id); }));
-      if (!pool.length) { toast("Choose at least one chapter."); return; } F.qids = shuffle(pool).slice(0, F.n); showQ(); } }, "Pick questions")));
-  const showQ = () => { qc.textContent = F.qids && F.qids.length ? F.qids.length + " questions selected (random from the chosen chapters). Press Pick questions again for a different set." : "Choose chapters, how many questions and difficulty, then press Pick questions."; };
-  showQ();
-  card.appendChild(h("b", { style: "display:block;margin-top:14px" }, "Dates (" + tz.replace(/_/g, " ") + ")"));
-  const now = new Date(srvNow()), wk = new Date(srvNow() + 7 * 864e5);
-  const openI = inp("ae-open", "Opens (optional)", "datetime-local", isoToZoned(a.open_at, tz));
-  const dueI = inp("ae-due", "Due", "datetime-local", a.due_at ? isoToZoned(a.due_at, tz) : isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59");
-  const lockI = inp("ae-lock", "Locks — no submissions after this (optional; defaults to the due date)", "datetime-local", isoToZoned(a.lock_at, tz));
-  const limI = inp("ae-limit", "Time limit in minutes (optional)", "number", a.time_limit_min || "", { min: "1", max: "600" });
-  const attI = inp("ae-att", "Maximum attempts (optional)", "number", a.max_attempts || "", { min: "1", max: "50" });
-  const lp = a.late_policy || { mode: "accept" };
-  const lateS = h("select", { class: "field", id: "ae-late" }, [["accept", "Accept late work until the lock date (marked late)"], ["penalty", "Accept late work with a penalty"], ["reject", "No late work (closes at the due date)"]].map(([v, t]) => h("option", { value: v, selected: lp.mode === v ? "" : null }, t)));
-  card.appendChild(h("label", { class: "f", for: "ae-late" }, "Late submissions")); card.appendChild(lateS);
-  const penI = h("input", { class: "field", id: "ae-pen", type: "number", min: "1", max: "100", value: lp.pct_per_day || 10, style: "max-width:120px" }), maxI = h("input", { class: "field", id: "ae-penmax", type: "number", min: "1", max: "100", value: lp.max_pct || 50, style: "max-width:120px" });
-  const penRow = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, h("div", {}, h("label", { class: "f", for: "ae-pen" }, "% off per day late"), penI), h("div", {}, h("label", { class: "f", for: "ae-penmax" }, "Maximum % off"), maxI));
-  card.appendChild(penRow); const showPen = () => penRow.style.display = lateS.value === "penalty" ? "" : "none"; lateS.onchange = showPen; showPen();
-  const grI = inp("ae-grade", "Release grades on (optional; default: right after submitting)", "datetime-local", isoToZoned(a.grade_release_at, tz));
-  const soI = inp("ae-sol", "Release answers and solutions on (optional; default: at the lock date)", "datetime-local", isoToZoned(a.solution_release_at, tz));
+  const a = arg.a || {}, tz = ASG.tz || localTz();
+  if (!VIEWS.asgedit.f || VIEWS.asgedit.f.key !== (a.id || arg.code)) VIEWS.asgedit.f = aeForm(a, arg.code);
+  const F = VIEWS.asgedit.f;
+  document.getElementById("title").textContent = a.id ? "Edit " + (a.title || "assignment") : "New assignment";
+  const nav = h("div", { class: "seg ae-steps", id: "ae-steps", role: "tablist", style: "flex-wrap:wrap" });
+  AE_STEPS.forEach((t, i) => nav.appendChild(h("button", { class: F.step === i + 1 && !F.all ? "on" : "", id: "ae-step-" + (i + 1), role: "tab", "aria-selected": F.step === i + 1 ? "true" : "false", onclick: () => { F.step = i + 1; F.all = false; render(); } }, (i + 1) + ". " + t)));
+  app.appendChild(h("div", { class: "card" }, nav, h("label", { class: "check", for: "ae-onepage", style: "margin-top:6px" }, (() => { const c = h("input", { type: "checkbox", id: "ae-onepage", onchange: e => { F.all = e.target.checked; render(); } }); c.checked = F.all; return c; })(), h("span", {}, "Show all steps on one page"))));
+  const field = (box, id, lab, type, key, extra) => { const i = h("input", Object.assign({ class: "field", id, type: type || "text" }, extra || {})); i.value = F[key] ?? ""; i.addEventListener("input", () => { F[key] = i.value; }); box.appendChild(h("label", { class: "f", for: id }, lab)); box.appendChild(i); return i; };
+  const sec = (n, title, fill) => { if (!F.all && F.step !== n) return; const c = h("div", { class: "card", id: "ae-s" + n }, h("b", {}, n + ". " + title)); fill(c); app.appendChild(c); };
+  sec(1, "Basics", c => {
+    const tpls = S.asgTpl || [];
+    if (tpls.length && !a.id) { const sel = h("select", { class: "field", id: "ae-tpl" }, h("option", { value: "" }, "Start from a template…"), ...tpls.map((t, i) => h("option", { value: String(i) }, t.name)));
+      c.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center;margin:6px 0" }, sel, h("button", { class: "btn sec2 small", id: "ae-tpl-use", onclick: () => { if (sel.value === "") return; aeApplyTemplate(F, tpls[+sel.value]); toast("📋 Template applied — check the dates"); render(); } }, "Use"),
+        h("button", { class: "btn ghost small", id: "ae-tpl-del", onclick: () => { if (sel.value === "") return; confirmBox("Delete template " + tpls[+sel.value].name + "?", "Assignments made from it aren't affected.", () => { S.asgTpl.splice(+sel.value, 1); save(); render(); }, "Delete"); } }, "Delete"))); }
+    field(c, "ae-title", "Title", "text", "title", { placeholder: "e.g. Homework 3: Stoichiometry" });
+    const kind = h("select", { class: "field", id: "ae-kind", onchange: e => F.kind = e.target.value }, Object.entries(KIND).map(([k, t]) => h("option", { value: k, selected: F.kind === k ? "" : null }, t)));
+    c.appendChild(h("label", { class: "f", for: "ae-kind" }, "Type")); c.appendChild(kind);
+  });
+  sec(2, "Questions from the ChemFlip bank", c => {
+    const qc = h("div", { class: "muted", id: "ae-qcount" }); c.appendChild(qc);
+    const chBox = h("div", { style: "max-height:180px;overflow:auto;border:1px solid var(--hair);border-radius:8px;padding:6px;margin:6px 0" });
+    CH().forEach(ch => { const id = "ae-ch-" + ch.n, cb = h("input", { type: "checkbox", id, onchange: e => { e.target.checked ? F.chs.push(ch.n) : (F.chs = F.chs.filter(x => x !== ch.n)); } }); cb.checked = F.chs.includes(ch.n); chBox.appendChild(h("label", { class: "check", for: id }, cb, h("span", {}, ch.title))); });
+    c.appendChild(chBox);
+    const nIn = h("input", { class: "field", id: "ae-n", type: "number", min: "1", max: "100", value: F.n, style: "max-width:120px" });
+    const lvl = h("select", { class: "field", id: "ae-level", style: "max-width:180px" }, [[0, "Mixed difficulty"]].concat(course().levels.map(L => [L, LV[L]])).map(([v, t]) => h("option", { value: v, selected: v === F.L ? "" : null }, t)));
+    const pick = add => { F.n = Math.max(1, Math.min(100, +nIn.value || 10)); F.L = +lvl.value; const pool = []; CH().filter(ch => F.chs.includes(ch.n)).forEach(ch => cqs(ch).forEach(q => { if (!q.mk && (!F.L || q.L === F.L) && !(add && F.qids.includes(q.id))) pool.push(q.id); }));
+      if (!pool.length) { toast("Choose at least one chapter."); return; } const got = shuffle(pool).slice(0, F.n); F.qids = add ? F.qids.concat(got) : got; render(); };
+    c.appendChild(h("div", { style: "display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap" }, h("div", {}, h("label", { class: "f", for: "ae-n" }, "How many"), nIn), h("div", {}, h("label", { class: "f", for: "ae-level" }, "Difficulty"), lvl),
+      h("button", { class: "btn sec2", id: "ae-pick", onclick: () => pick(false) }, "Pick questions"), h("button", { class: "btn ghost", id: "ae-pick-add", onclick: () => pick(true) }, "Add more")));
+    qc.textContent = F.qids.length ? F.qids.length + " questions selected (random from the chosen chapters). Press Pick questions again for a different set." : "Choose chapters, how many questions and difficulty, then press Pick questions. You can also skip this and only use your own questions.";
+    if (F.qids.length) { const ul = h("div", { id: "ae-qlist", style: "max-height:220px;overflow:auto;margin-top:6px" });
+      F.qids.forEach((id, i) => { const q = QBYID[id]; ul.appendChild(h("div", { style: "display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-top:1px solid var(--hair)" }, h("span", { style: "flex:1;font-size:13.5px" }, (i + 1) + ". " + (q ? q.q.slice(0, 110) + (q.q.length > 110 ? "…" : "") : id)),
+        h("button", { class: "btn ghost small", "aria-label": "Remove question " + (i + 1), onclick: () => { F.qids.splice(i, 1); delete F.points[id]; render(); } }, "✕"))); });
+      c.appendChild(ul); }
+  });
+  sec(3, "Your own questions", c => {
+    c.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Write questions ChemFlip doesn't have. Numeric answers are graded with units, significant figures and a margin you choose; structures are compared with the correct compound; short answers wait for you to grade them."));
+    F.items.forEach((it, i) => {
+      const box = h("div", { class: "ae-item", id: "ae-it-" + i, style: "border:1px solid var(--hair);border-radius:10px;padding:8px;margin:8px 0" },
+        h("div", { style: "display:flex;justify-content:space-between;gap:6px" }, h("b", {}, (i + 1) + ". " + ITYPE[it.type]), h("button", { class: "btn ghost small", id: "ae-it-" + i + "-del", onclick: () => { F.items.splice(i, 1); render(); } }, "Remove")));
+      const fi = (key, lab, type, ex, wide) => { const el = type === "textarea" ? h("textarea", Object.assign({ class: "field", id: "ae-it-" + i + "-" + key, rows: "3", style: "width:100%;font:inherit" }, ex || {})) : h("input", Object.assign({ class: "field", id: "ae-it-" + i + "-" + key, type: type || "text" }, ex || {}));
+        el.value = it[key] ?? ""; el.addEventListener("input", () => { it[key] = el.value; }); const w = h("div", { style: wide ? "flex:1 1 100%" : "flex:1 1 140px" }, h("label", { class: "f", for: el.id }, lab), el); return w; };
+      box.appendChild(fi("stem", "Question", "textarea", {}, true));
+      const row = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }); box.appendChild(row);
+      if (it.type === "num") {
+        row.appendChild(fi("value", "Correct value", "text", { inputmode: "decimal", placeholder: "e.g. 0.250 or 6.02e23" })); row.appendChild(fi("unit", "Unit", "text", { placeholder: "e.g. L, kJ/mol" }));
+        const ou = fi("units", "Other accepted units (comma-separated)", "text", { placeholder: "e.g. dm3" }); ou.querySelector("input").value = (it.units || []).join(", "); ou.querySelector("input").oninput = e => it.units = e.target.value.split(",").map(x => x.trim()).filter(Boolean); row.appendChild(ou);
+        const r2 = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }); box.appendChild(r2);
+        r2.appendChild(fi("tol_pct", "Full credit within ± %", "number", { min: "0", max: "100", step: "any" })); r2.appendChild(fi("tol_abs", "…or within ± (absolute)", "number", { step: "any", placeholder: "optional" }));
+        r2.appendChild(fi("partial_tol_pct", "Partial credit within ± %", "number", { min: "0", max: "100", step: "any", placeholder: "optional" })); r2.appendChild(fi("partial_pct", "Partial credit %", "number", { min: "0", max: "100" }));
+        const r3 = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }); box.appendChild(r3);
+        r3.appendChild(fi("sig", "Significant figures expected", "number", { min: "1", max: "10", placeholder: "not checked" })); r3.appendChild(fi("sig_pen", "% off for other sig figs", "number", { min: "0", max: "100" })); r3.appendChild(fi("unit_pen", "% off for missing/wrong unit", "number", { min: "0", max: "100" }));
+        box.appendChild(h("div", { class: "muted", style: "font-size:12.5px" }, "Units with SI prefixes are converted automatically (mL ↔ L, kJ ↔ J, mg ↔ g, kPa ↔ Pa, °C ↔ K)."));
+      } else if (it.type === "struct") {
+        const sm = fi("smiles", "Correct structure (SMILES)", "text", { placeholder: "e.g. CCO", spellcheck: "false" }); row.appendChild(sm);
+        const pv = h("div", { class: "muted", id: "ae-it-" + i + "-pv", style: "flex:1 1 100%" });
+        const show = () => { try { const m = seParseSmiles(String(it.smiles || "").trim()); pv.innerHTML = it.smiles ? "→ " + chemFormat(seFormula(m)) + " · " + seMass(m).toFixed(2) + " g/mol" : ""; } catch (e) { pv.textContent = "⚠️ " + e.message; } };
+        sm.querySelector("input").addEventListener("input", show); show();
+        row.appendChild(h("div", { style: "align-self:flex-end" }, h("button", { class: "btn sec2 small", id: "ae-it-" + i + "-draw", onclick: () => structSheet(null, m => { if (m.atoms.length) { it.smiles = seSmiles(m); render(); } }) }, "✏️ Draw it")));
+        row.appendChild(fi("formula_pct", "Partial credit % for the right formula (an isomer)", "number", { min: "0", max: "100" })); row.appendChild(pv);
+      } else if (it.type === "short") box.appendChild(fi("rubric", "Rubric / what a full answer includes (only you see this)", "textarea", {}, true));
+      else if (it.type === "mc") {
+        it.options.forEach((o, k) => { const rd = h("input", { type: "radio", name: "ae-it-" + i + "-ans", id: "ae-it-" + i + "-ans-" + k, onchange: () => it.answer = k }); rd.checked = it.answer === k;
+          const inp = h("input", { class: "field", id: "ae-it-" + i + "-opt-" + k, placeholder: "Option " + "ABCDEF"[k], style: "flex:1" }); inp.value = o; inp.oninput = () => it.options[k] = inp.value;
+          box.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center;margin-top:4px" }, rd, h("label", { for: rd.id, class: "muted", style: "font-size:12px" }, "correct"), inp)); });
+        if (it.options.length < 6) box.appendChild(h("button", { class: "btn ghost small", onclick: () => { it.options.push(""); render(); } }, "+ option"));
+      }
+      box.appendChild(fi("solution", "Worked solution (students see it after the solution date)", "textarea", {}, true));
+      c.appendChild(box);
+    });
+    c.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap" }, ...Object.entries(ITYPE).map(([t, lab]) => h("button", { class: "btn sec2 small", id: "ae-add-" + t, onclick: () => { F.items.push(aeNewItem(t, aeNextId(F))); render(); } }, "+ " + lab))));
+  });
+  sec(4, "Points and partial credit", c => {
+    const tb = h("table", { class: "t", id: "ae-points" });
+    F.qids.forEach((id, i) => { const q = QBYID[id], inp = h("input", { class: "field", id: "ae-pt-" + id, type: "number", min: "0.5", max: "100", step: "0.5", value: F.points[id] || 1, style: "max-width:90px", oninput: e => { F.points[id] = +e.target.value || 1; tot.textContent = "Total: " + aeTotal(F) + " points"; } });
+      tb.appendChild(h("tr", {}, h("td", {}, (i + 1) + ". " + (q ? q.q.slice(0, 70) + "…" : id)), h("td", { class: "n" }, inp))); });
+    F.items.forEach((it, i) => { const inp = h("input", { class: "field", id: "ae-ipt-" + i, type: "number", min: "0.5", max: "100", step: "0.5", value: it.points || 1, style: "max-width:90px", oninput: e => { it.points = +e.target.value || 1; tot.textContent = "Total: " + aeTotal(F) + " points"; } });
+      tb.appendChild(h("tr", {}, h("td", {}, ITYPE[it.type] + ": " + (String(it.stem).slice(0, 60) || "(no text yet)")), h("td", { class: "n" }, inp))); });
+    const tot = h("div", { id: "ae-total", style: "margin-top:6px;font-weight:700" }, "Total: " + aeTotal(F) + " points");
+    c.appendChild(tb); c.appendChild(tot);
+    c.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Partial-credit rules for numeric and structure questions are set with each question in step 3. You can also adjust any student's points by hand after they submit."));
+  });
+  sec(5, "Versions", c => {
+    const n = F.qids.length + F.items.length;
+    c.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Give each student a different version: they get a random set from all " + n + " questions, and/or their own question order. Each student's version stays the same if they reload."));
+    field(c, "ae-draw", "Questions per student (leave empty for all " + n + ")", "number", "pool_draw", { min: "1", max: String(Math.max(1, n)) });
+    const sh = h("input", { type: "checkbox", id: "ae-shuffle", onchange: e => F.shuffle = e.target.checked }); sh.checked = F.shuffle;
+    c.appendChild(h("label", { class: "check", for: "ae-shuffle" }, sh, h("span", {}, "Shuffle the question order for each student")));
+  });
+  sec(6, "Dates (" + tz.replace(/_/g, " ") + ")", c => {
+    field(c, "ae-open", "Opens (optional)", "datetime-local", "open"); field(c, "ae-due", "Due", "datetime-local", "due");
+    field(c, "ae-lock", "Locks — no submissions after this (optional; defaults to the due date)", "datetime-local", "lock");
+  });
+  sec(7, "Attempts, time limit, late work and release", c => {
+    field(c, "ae-limit", "Time limit in minutes (optional)", "number", "limit", { min: "1", max: "600" }); field(c, "ae-att", "Maximum attempts (optional)", "number", "att", { min: "1", max: "50" });
+    const lateS = h("select", { class: "field", id: "ae-late" }, [["accept", "Accept late work until the lock date (marked late)"], ["penalty", "Accept late work with a penalty"], ["reject", "No late work (closes at the due date)"]].map(([v, t]) => h("option", { value: v, selected: F.late === v ? "" : null }, t)));
+    c.appendChild(h("label", { class: "f", for: "ae-late" }, "Late submissions")); c.appendChild(lateS);
+    const penRow = h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }); c.appendChild(penRow);
+    const pb = h("div", {}), pm = h("div", {}); penRow.appendChild(pb); penRow.appendChild(pm); field(pb, "ae-pen", "% off per day late", "number", "pen", { min: "1", max: "100", style: "max-width:120px" }); field(pm, "ae-penmax", "Maximum % off", "number", "penmax", { min: "1", max: "100", style: "max-width:120px" });
+    const showPen = () => penRow.style.display = lateS.value === "penalty" ? "" : "none"; lateS.onchange = () => { F.late = lateS.value; showPen(); }; showPen();
+    field(c, "ae-grade", "Release grades on (optional; default: right after submitting)", "datetime-local", "grade");
+    field(c, "ae-sol", "Release answers and solutions on (optional; default: at the lock date)", "datetime-local", "sol");
+  });
+  sec(8, "Review and publish", c => {
+    const n = F.qids.length + F.items.length, per = F.pool_draw ? Math.min(+F.pool_draw, n) : n;
+    c.appendChild(h("ul", { id: "ae-summary", style: "margin:6px 0 8px;padding-left:20px" },
+      h("li", {}, (KIND[F.kind] || F.kind) + ": " + (F.title || "(no title)")),
+      h("li", {}, F.qids.length + " bank question" + (F.qids.length === 1 ? "" : "s") + ", " + F.items.length + " of your own" + (F.items.length ? " (" + Object.entries(F.items.reduce((m, it) => (m[it.type] = (m[it.type] || 0) + 1, m), {})).map(([t, k]) => k + " " + ITYPE[t].split(" ").slice(1).join(" ").toLowerCase()).join(", ") + ")" : "")),
+      h("li", {}, (per < n ? "Each student gets " + per + " of " + n : "All " + n + " questions") + (F.shuffle ? ", shuffled per student" : "") + " · " + aeTotal(F) + " points in total"),
+      h("li", {}, "Due " + (F.due ? fmtTz(zonedToIso(F.due, tz), tz) : "—") + (F.lock ? " · locks " + fmtTz(zonedToIso(F.lock, tz), tz) : "")),
+      h("li", {}, (F.limit ? F.limit + " min · " : "") + (F.att ? F.att + " attempt(s)" : "unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", penalty: "−" + F.pen + "%/day, max " + F.penmax + "%", reject: "not accepted" })[F.late])));
+    const tn = h("input", { class: "field", id: "ae-tplname", placeholder: "Template name, e.g. Weekly homework", style: "flex:1" });
+    c.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center" }, tn, h("button", { class: "btn ghost small", id: "ae-savetpl", onclick: () => { const nm = tn.value.trim() || F.title.trim(); if (!nm) { toast("Name the template."); return; } S.asgTpl = (S.asgTpl || []).filter(t => t.name !== nm).concat([aeTemplate(F, nm)]).slice(-30); save(); toast("📋 Saved as template: " + nm); } }, "Save as template")));
+  });
   const msg = h("div", { class: "muted", id: "ae-msg", role: "status" });
-  card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ae-save", onclick: async () => {
-    if (!F.qids || !F.qids.length) { msg.textContent = "Pick the questions first."; return; }
+  const doSave = async () => {
+    for (const st of [1, 3, 4, 5, 6]) { const e = aeCheck(F, st); if (e) { msg.textContent = "❌ " + e; F.step = st; if (!F.all) { render(); setTimeout(() => { const m = document.getElementById("ae-msg"); if (m) m.textContent = "❌ " + e; }, 0); } return; } }
     const key = {}; F.qids.forEach(id => { if (QBYID[id]) key[id] = QBYID[id].a; });
-    const body = { action: "save", id: a.id, class_code: arg.code, kind: kind.value, title: title.value.trim(), qids: F.qids, answer_key: key, open_at: zonedToIso(openI.value, tz), due_at: zonedToIso(dueI.value, tz), lock_at: zonedToIso(lockI.value, tz),
-      time_limit_min: limI.value ? +limI.value : null, max_attempts: attI.value ? +attI.value : null, late_policy: lateS.value === "penalty" ? { mode: "penalty", pct_per_day: +penI.value, max_pct: +maxI.value } : { mode: lateS.value },
-      grade_release_at: zonedToIso(grI.value, tz), solution_release_at: zonedToIso(soI.value, tz), tz };
+    const points = {}; F.qids.forEach(id => { if (Number(F.points[id]) > 0 && Number(F.points[id]) !== 1) points[id] = Number(F.points[id]); });
+    const items = F.items.map(it => { const o = Object.assign({}, it); if (o.type === "num") { o.value = parseFloat(o.value); ["tol_pct", "tol_abs", "partial_tol_pct", "partial_pct", "sig", "sig_pen", "unit_pen"].forEach(k => { if (o[k] === "" || o[k] == null) delete o[k]; else o[k] = +o[k]; }); }
+      if (o.type === "mc") { const keep = o.options.map((x, k) => [x, k]).filter(([x]) => String(x).trim()); o.answer = Math.max(0, keep.findIndex(([, k]) => k === o.answer)); o.options = keep.map(([x]) => x); } return o; });
+    const body = { action: "save", id: a.id, class_code: arg.code, kind: F.kind, title: F.title.trim(), qids: F.qids, answer_key: key, points, items, pool_draw: F.pool_draw ? +F.pool_draw : null, shuffle: F.shuffle,
+      open_at: zonedToIso(F.open, tz), due_at: zonedToIso(F.due, tz), lock_at: zonedToIso(F.lock, tz), time_limit_min: F.limit ? +F.limit : null, max_attempts: F.att ? +F.att : null,
+      late_policy: F.late === "penalty" ? { mode: "penalty", pct_per_day: +F.pen, max_pct: +F.penmax } : { mode: F.late }, grade_release_at: zonedToIso(F.grade, tz), solution_release_at: zonedToIso(F.sol, tz), tz };
     msg.textContent = "Saving…";
     try { const r = await asgCall(body); VIEWS.asgedit.f = null; toast("✅ " + KIND[r.assignment.kind] + " saved — students see it now"); stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
-    catch (e) { msg.textContent = "❌ " + e.message; } } }, a.id ? "Save changes" : "Create and publish")));
-  card.appendChild(msg); app.appendChild(card);
+    catch (e) { msg.textContent = "❌ " + e.message; } };
+  const backB = h("button", { class: "btn ghost", id: "ae-back", disabled: F.all || F.step === 1 ? "disabled" : null, onclick: () => { F.step = Math.max(1, F.step - 1); render(); } }, "‹ Back");
+  const nextB = h("button", { class: "btn" + (F.all || F.step === 8 ? " ghost" : ""), id: "ae-next", disabled: F.all || F.step === 8 ? "disabled" : null, onclick: () => { const e = aeCheck(F, F.step); if (e) { msg.textContent = "❌ " + e; return; } F.step++; render(); window.scrollTo(0, 0); } }, "Next ›");
+  app.appendChild(h("div", { class: "card" }, h("div", { class: "btnrow" }, backB, nextB, h("button", { class: "btn" + (F.all || F.step === 8 ? "" : " sec2"), id: "ae-save", onclick: doSave }, a.id ? "Save changes" : "Create and publish")), msg));
 };
 
 /* ----- instructor: one assignment — roster, effective dates, extensions, groups, history ----- */
@@ -4263,7 +4388,7 @@ VIEWS.asgdetail = function (arg) {
   asgCall({ action: "detail", id: arg.id }).then(j => {
     const a = j.assignment, tz = a.tz; box.innerHTML = ""; document.getElementById("title").textContent = a.title;
     box.appendChild(h("div", { class: "card", id: "ad-head" }, h("b", {}, KIND[a.kind] + ": " + a.title),
-      h("div", { class: "muted" }, a.qids.length + " questions" + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "") + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode])),
+      h("div", { class: "muted" }, (a.qids.length + (a.items || []).length) + " questions" + (a.pool_draw ? " (" + a.pool_draw + " per student)" : "") + (a.shuffle ? " · shuffled" : "") + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "") + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode])),
       h("div", { style: "margin-top:6px" }, (a.open_at ? "Opens " + fmtTz(a.open_at, tz) + " · " : "") + "Due " + fmtTz(a.due_at, tz) + " · Locks " + fmtTz(a.lock_at || a.due_at, tz)),
       h("div", { class: "muted", style: "font-size:13px" }, "Grades: " + (a.grade_release_at ? fmtTz(a.grade_release_at, tz) : "right after submitting") + " · Solutions: " + (a.solution_release_at ? fmtTz(a.solution_release_at, tz) : "after the lock date")),
       h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go("asgedit", { code: arg.code, a }) }, "Edit"),
@@ -4279,8 +4404,20 @@ VIEWS.asgdetail = function (arg) {
       j.roster.filter(r => !onlyAcc.checked || r.effective.accommodation).forEach(r => { const done = r.attempts.filter(x => x.status !== "in_progress"), best = done.length ? done.reduce((m, x) => x.score > m.score ? x : m) : null, e = r.effective;
         tb.appendChild(h("tr", { id: "ad-r-" + r.sid }, h("td", {}, avi(r.avatar), " " + r.name, e.source !== "base" ? h("span", { class: "chip " + (e.source === "student" ? "new" : ""), title: "Effective dates come from a " + e.source + " extension" }, e.source === "student" ? "Extension" : e.source === "group" ? "Group ext." : "Class ext.") : null, e.accommodation ? h("span", { class: "chip ok" }, "Accommodation") : null),
           h("td", {}, fmtTz(e.due_at, tz, false)), h("td", {}, fmtTz(e.lock_at, tz, false)), h("td", { class: "n" }, best ? best.score + "/" + best.total + (best.late ? " (late" + (best.penalty_pct ? ", −" + best.penalty_pct + "%" : "") + ")" : "") : r.attempts.some(x => x.status === "in_progress") ? "in progress" : "–"),
-          h("td", {}, h("button", { class: "btn sec2 small", id: "ad-ext-" + r.sid, onclick: () => extSheet(a, "student", r.sid, r.name, live.find(o => o.scope === "student" && o.target === r.sid), j) }, "Extend / reopen")))); }); };
-    onlyAcc.onchange = draw; draw(); box.appendChild(rc);
+          h("td", {}, h("button", { class: "btn sec2 small", id: "ad-ext-" + r.sid, onclick: () => extSheet(a, "student", r.sid, r.name, live.find(o => o.scope === "student" && o.target === r.sid), j) }, "Extend / reopen"),
+            done.length ? h("button", { class: "btn small" + (done.some(x => x.pending > 0) ? "" : " ghost"), id: "ad-grade-" + r.sid, style: "margin-left:4px", onclick: () => go("asggrade", { attempt_id: done[done.length - 1].id, code: arg.code, aid: a.id }) }, done.some(x => x.pending > 0) ? "Grade (" + done[done.length - 1].pending + ")" : "Grade") : null))); }); };
+    onlyAcc.onchange = draw; draw();
+    if (j.needs_grading) { const firstP = j.roster.flatMap(r => r.attempts).find(x => x.pending > 0 && x.status !== "in_progress");
+      box.appendChild(h("div", { class: "card", id: "ad-needs", style: "border-left:5px solid var(--med,#e6a700)" }, h("b", {}, "📝 " + j.needs_grading + " submission" + (j.needs_grading > 1 ? "s" : "") + " need grading"),
+        h("div", { class: "muted" }, "Short written answers wait for you. Scores sent to Canvas show as pending until you grade them."),
+        firstP ? h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ad-grade-next", onclick: () => go("asggrade", { attempt_id: firstP.id, code: arg.code, aid: a.id }) }, "Start grading")) : null)); }
+    box.appendChild(rc);
+    const allItems = a.qids.map(id => ({ id, label: (QBYID[id] ? QBYID[id].q.slice(0, 60) : id) })).concat((a.items || []).map(it => ({ id: it.id, label: ITYPE[it.type] + ": " + String(it.stem).slice(0, 50) })));
+    if (allItems.length) { const sel = h("select", { class: "field", id: "ad-bulk-q" }, ...allItems.map((x, i) => h("option", { value: x.id }, (i + 1) + ". " + x.label)));
+      box.appendChild(h("details", { class: "card", id: "ad-bulk" }, h("summary", {}, h("b", {}, "Adjust grades for everyone")),
+        h("p", { class: "muted", style: "font-size:13px" }, "Give every submission full credit for one question (e.g. a flawed question), or recompute all grades after you edit the answer key or tolerance."), sel,
+        h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-bulk-go", onclick: () => confirmBox("Give everyone full credit?", "All submitted attempts get full points for this question. It's recorded in the history.", async () => { try { const r = await asgCall({ action: "bulk_credit", assignment_id: a.id, item_id: sel.value }); toast("✅ Updated " + r.attempts + " submissions"); render(); } catch (e) { toast("❌ " + e.message); } }, "Give credit") }, "Full credit for everyone"),
+          h("button", { class: "btn ghost small", id: "ad-regrade", onclick: async () => { try { const r = await asgCall({ action: "regrade", assignment_id: a.id }); toast("🔄 Regraded " + r.attempts + " submissions"); render(); } catch (e) { toast("❌ " + e.message); } } }, "Regrade all")))); }
     const ec = h("div", { class: "card", id: "ad-exts" }, h("b", {}, "Active extensions (" + live.length + ")"));
     if (!live.length) ec.appendChild(h("p", { class: "muted" }, "None. Every student has the dates above."));
     live.forEach(o => { const who = o.scope === "class" ? "Whole class" : o.scope === "group" ? "Group " + o.target : ((j.roster.find(r => r.sid === o.target) || {}).name || "Student");
@@ -4290,6 +4427,43 @@ VIEWS.asgdetail = function (arg) {
     const hc = h("details", { class: "card", id: "ad-history" }, h("summary", {}, h("b", {}, "History of changes (" + j.audit.length + ")")));
     j.audit.forEach(x => hc.appendChild(h("div", { class: "muted", style: "font-size:13px;padding:3px 0;border-top:1px solid var(--hair)" }, fmtTz(x.at, tz, false) + " — " + x.action.replace(/_/g, " ") + (x.details && x.details.target ? " for " + ((j.roster.find(r => r.sid === x.details.target) || {}).name || x.details.target) : "") + (x.details && x.details.due_at ? " · due " + fmtTz(x.details.due_at, tz, false) : "") + (x.details && x.details.lock_at ? " · lock " + fmtTz(x.details.lock_at, tz, false) : ""))));
     box.appendChild(hc);
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+VIEWS.asggrade = function (arg) {
+  if (!isTeacher()) { back(); return; }
+  document.getElementById("title").textContent = "Grade";
+  const box = h("div", { id: "gr-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  asgCall({ action: "attempt", attempt_id: arg.attempt_id }).then(j => {
+    box.innerHTML = ""; const at = j.attempt, tz = j.assignment.tz, edits = {};
+    box.appendChild(h("div", { class: "card", id: "gr-head" }, h("b", {}, (j.student ? j.student.name : "Student") + " · " + j.assignment.title),
+      h("div", { class: "muted" }, "Attempt " + at.n + " · submitted " + (at.submitted_at ? fmtTz(at.submitted_at, tz) : "—") + (at.late ? " · late" + (at.penalty_pct ? " (−" + at.penalty_pct + "%)" : "") : "")),
+      h("div", { id: "gr-score", style: "margin-top:4px;font-size:18px" }, h("b", {}, at.score + " / " + at.total), at.pending ? h("span", { class: "chip", style: "margin-left:6px" }, at.pending + " to grade") : h("span", { class: "chip ok", style: "margin-left:6px" }, "fully graded"))));
+    j.items.forEach((it, i) => {
+      const q = it.type === "mc" && !it.options ? QBYID[it.id] : null, res = j.results[it.id] || {}, ov = at.overrides[it.id], ans = at.answers[it.id];
+      const c = h("div", { class: "card gr-item" + (res.status === "pending" ? " gr-pending" : ""), id: "gr-it-" + it.id, style: res.status === "pending" ? "border-left:5px solid var(--med,#e6a700)" : "" },
+        h("div", { class: "muted", style: "font-size:12.5px" }, (i + 1) + ". " + (q ? "Bank question" : ITYPE[it.type]) + " · " + res.max + " pt"), h("div", { style: "margin:4px 0" }, q ? q.q : it.stem));
+      const v = q ? h("b", {}, ans != null ? "ABCD"[ans] + ". " + q.o[ans] : "no answer") : asgAnswerView(it, ans);
+      c.appendChild(h("div", {}, "Answer: ", v));
+      if (q) c.appendChild(h("div", { class: "muted" }, "Correct: " + "ABCD"[it.answer] + ". " + q.o[it.answer]));
+      if (it.type === "num") c.appendChild(h("div", { class: "muted" }, "Key: ", h("span", { html: chemFormat(it.value + (it.unit ? " " + it.unit : "")) }), " · ±" + (it.tol_abs != null ? it.tol_abs : (it.tol_pct ?? 1) + "%") + (it.sig ? " · " + it.sig + " s.f." : "")));
+      if (it.type === "struct") { try { c.appendChild(h("div", { class: "muted" }, "Key: ", h("span", { html: chemFormat(seFormula(seParseSmiles(it.smiles))) }), " (" + it.smiles + ")")); } catch (e) {} }
+      if (it.type === "mc" && it.options) c.appendChild(h("div", { class: "muted" }, "Correct: " + it.options[it.answer]));
+      if (it.rubric) c.appendChild(h("div", { class: "muted", style: "white-space:pre-wrap;margin-top:4px" }, "Rubric: " + it.rubric));
+      c.appendChild(h("div", { style: "margin-top:4px" }, res.status === "pending" ? h("b", {}, "⏳ Needs your grade") : h("span", {}, (ov ? "Your grade: " : "Auto: ") + res.pts + " / " + res.max), res.notes && res.notes.length && !ov ? h("span", { class: "muted" }, " · " + res.notes.join("; ")) : null));
+      const pin = h("input", { class: "field", id: "gr-pts-" + it.id, type: "number", min: "0", max: String(res.max), step: "0.25", placeholder: res.status === "pending" ? "points" : "auto " + res.pts, style: "max-width:110px", "aria-label": "Points for question " + (i + 1) });
+      if (ov) pin.value = ov.pts;
+      const cm = h("input", { class: "field", id: "gr-cm-" + it.id, placeholder: "Comment for the student (optional)", style: "flex:1", "aria-label": "Comment for question " + (i + 1) }); if (ov && ov.comment) cm.value = ov.comment;
+      const mark = () => { edits[it.id] = pin.value === "" ? null : { pts: +pin.value, comment: cm.value }; };
+      pin.addEventListener("input", mark); cm.addEventListener("input", () => { if (pin.value === "" && !ov) { pin.value = res.pts ?? ""; } mark(); });
+      const full = h("button", { class: "btn ghost small", onclick: () => { pin.value = res.max; mark(); } }, "Full"), zero = h("button", { class: "btn ghost small", onclick: () => { pin.value = 0; mark(); } }, "0");
+      c.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px" }, pin, full, zero, cm, ov ? h("button", { class: "btn ghost small", id: "gr-clear-" + it.id, onclick: () => { pin.value = ""; cm.value = ""; edits[it.id] = null; } }, "Use auto score") : null));
+      box.appendChild(c);
+    });
+    const msg = h("div", { class: "muted", id: "gr-msg", role: "status" });
+    bottom([h("button", { class: "btn ghost", onclick: () => back() }, "‹ Back"), h("button", { class: "btn", id: "gr-save", onclick: async () => {
+      if (!Object.keys(edits).length) { toast("No changes."); return; }
+      try { const r = await asgCall({ action: "grade", attempt_id: at.id, grades: edits }); toast("✅ Saved: " + r.score + "/" + r.total + (r.pending ? " · " + r.pending + " still to grade" : "")); render(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Save grades")]);
+    box.appendChild(msg);
   }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
 };
 function extSheet(a, scope, target, who, cur, j) {
@@ -4336,7 +4510,7 @@ VIEWS.myasg = function () {
       const cd = h("span", { class: "cd", "data-due": e.due_at, "data-lock": e.lock_at });
       const card = h("div", { class: "card asgc", id: "ma-" + a.id.slice(0, 8) }, h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, KIND[a.kind] + ": " + a.title), h("span", { class: "chip " + st[1] }, st[0])),
         h("div", {}, "Due " + fmtTz(e.due_at, tz) + (e.source !== "base" ? " (your extension)" : ""), " ", cd),
-        h("div", { class: "muted", style: "font-size:13px" }, [e.open_at && a.state === "not_open" ? "Opens " + fmtTz(e.open_at, tz) : "", e.lock_at !== e.due_at ? "Late work until " + fmtTz(e.lock_at, tz, false) : "", e.time_limit_min ? e.time_limit_min + " min time limit" : "", e.max_attempts ? a.attempts_used + " of " + e.max_attempts + " attempts used" : a.attempts_used + " attempt(s) so far", a.qids.length + " questions"].filter(Boolean).join(" · ")),
+        h("div", { class: "muted", style: "font-size:13px" }, [e.open_at && a.state === "not_open" ? "Opens " + fmtTz(e.open_at, tz) : "", e.lock_at !== e.due_at ? "Late work until " + fmtTz(e.lock_at, tz, false) : "", e.time_limit_min ? e.time_limit_min + " min time limit" : "", e.max_attempts ? a.attempts_used + " of " + e.max_attempts + " attempts used" : a.attempts_used + " attempt(s) so far", (a.questions || a.qids.length) + " questions"].filter(Boolean).join(" · ")),
         a.grade ? h("div", { style: "margin-top:4px" }, h("b", {}, "Score: " + a.grade.score + "/" + a.grade.total), a.grade.late ? " (late" + (a.grade.penalty_pct ? ", −" + a.grade.penalty_pct + "%" : "") + ")" : "") : a.submitted && !a.grade_released ? h("div", { class: "muted" }, "Submitted. Your grade is released " + fmtTz(a.grade_release_at, tz) + ".") : null);
       const btns = h("div", { class: "btnrow" });
       if (a.in_progress) btns.appendChild(h("button", { class: "btn", id: "ma-resume-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, "Resume (" + left(Date.parse(a.in_progress.ends_at) - srvNow()) + " left)"));
@@ -4352,7 +4526,8 @@ VIEWS.myasg = function () {
 async function asgStart(a, tz) {
   const go1 = async () => {
     try { const r = await asgCall({ action: "start", assignment_id: a.id });
-      const list = r.qids.map(id => QBYID[id]).filter(Boolean);
+      const own = {}; (r.items || []).forEach(it => own[it.id] = it);
+      const list = r.qids.map(id => QBYID[id] || (own[id] ? asgPseudo(own[id]) : null)).filter(Boolean);
       if (list.length < r.qids.length) toast("Some questions need the latest ChemFlip update — reload the page.");
       QUIZ = Object.assign({ list, i: 0, label: a.title, ans: Object.assign({}, r.answers || {}), exam: true, picked: null, run: 0, bestRun: 0, started: Date.now() },
         { asg: { id: a.id, attempt: r.attempt_id, endsAt: Date.parse(r.ends_at), tz, saved: JSON.stringify(r.answers || {}), savedAt: r.resumed ? Date.now() : 0, kind: a.kind }, deadline: Date.parse(r.ends_at) - ASG.off });
@@ -4401,18 +4576,54 @@ VIEWS.asgdone = function (r) {
 async function asgReview(a, tz) {
   try { const r = await asgCall({ action: "review", assignment_id: a.id });
     sheet("asg-review", "Review: " + a.title, (box) => {
-      if (!r.solutions_released) box.appendChild(h("p", { class: "muted" }, "Answers and solutions are released " + fmtTz(r.solution_release_at, tz) + ". Until then you can see your own answers."));
+      if (!r.solutions_released) box.appendChild(h("p", { class: "muted" }, "Answers and solutions are released " + fmtTz(r.solution_release_at, tz) + ". Until then you can see your own answers" + (r.grade_released ? " and scores." : ".")));
       const last = r.attempts[r.attempts.length - 1] || { answers: {} };
-      if (r.grade_released && last.score != null) box.appendChild(h("p", {}, h("b", {}, "Attempt " + last.n + ": " + last.score + "/" + last.total)));
-      r.qids.forEach((id, i) => { const q = QBYID[id]; if (!q) return; const mine = last.answers[id], key = r.answer_key ? r.answer_key[id] : null;
-        const d = h("div", { style: "padding:8px 0;border-top:1px solid var(--hair)" }, h("div", {}, h("b", {}, (i + 1) + ". "), q.q));
-        q.o.forEach((o, k) => d.appendChild(h("div", { class: "qbo" + (key === k ? " ok" : "") + (mine === k && key != null && key !== k ? " bad" : "") }, "ABCD"[k] + ". " + o + (mine === k ? "  ← your answer" : "") + (key === k ? "  ✓" : ""))));
-        if (key != null && q.s) d.appendChild(h("div", { class: "muted", style: "white-space:pre-wrap;margin-top:4px" }, q.s));
+      if (r.grade_released && last.score != null) box.appendChild(h("p", { id: "rv-score" }, h("b", {}, "Attempt " + last.n + ": " + last.score + "/" + last.total), last.pending ? h("span", { class: "chip", style: "margin-left:6px" }, "⏳ " + last.pending + " answer" + (last.pending > 1 ? "s" : "") + " waiting for your instructor") : null));
+      const own = {}; (r.items || []).forEach(it => own[it.id] = it);
+      const ids = (last.qids && last.qids.length) ? last.qids : r.qids.concat((r.items || []).map(it => it.id));
+      ids.forEach((id, i) => { const q = QBYID[id], it = own[id], mine = last.answers[id], res = last.item_scores && last.item_scores[id], cm = last.comments && last.comments[id];
+        if (!q && !it) return;
+        const d = h("div", { class: "rv-item", id: "rv-" + id, style: "padding:8px 0;border-top:1px solid var(--hair)" }, h("div", {}, h("b", {}, (i + 1) + ". "), q ? q.q : it.stem));
+        if (q || it.type === "mc") { const key = q ? (r.answer_key ? r.answer_key[id] : null) : (it.answer != null ? it.answer : null), opts = q ? q.o : it.options;
+          opts.forEach((o, k) => d.appendChild(h("div", { class: "qbo" + (key === k ? " ok" : "") + (mine === k && key != null && key !== k ? " bad" : "") }, "ABCD"[k] + ". " + o + (mine === k ? "  ← your answer" : "") + (key === k ? "  ✓" : "")))); }
+        else d.appendChild(h("div", { class: "muted" }, "Your answer: ", asgAnswerView(it, mine)));
+        if (it && it.type === "num" && it.value != null) d.appendChild(h("div", {}, "Correct: ", h("b", { html: chemFormat(String(it.value) + (it.unit ? " " + it.unit : "")) })));
+        if (it && it.type === "struct" && it.smiles) { try { d.appendChild(h("div", {}, "Correct: ", h("b", { html: chemFormat(seFormula(seParseSmiles(it.smiles))) }), " (SMILES " + it.smiles + ")")); } catch (e) {} }
+        if (res && res.pts != null) d.appendChild(h("div", { class: "rv-pts" }, h("b", {}, res.pts + "/" + res.max + " pts"), res.notes && res.notes.length ? " · " + res.notes.join("; ") : ""));
+        else if (res && res.status === "pending") d.appendChild(h("div", { class: "muted" }, "⏳ Waiting for your instructor"));
+        if (cm) d.appendChild(h("div", { class: "rv-comment", style: "margin-top:4px;padding:6px 8px;background:var(--chip);border-radius:8px" }, "💬 " + cm));
+        if (r.solutions_released) { const sol = q ? q.s : it.solution; if (sol) d.appendChild(h("div", { class: "muted", style: "white-space:pre-wrap;margin-top:4px" }, sol)); }
         box.appendChild(d); });
     });
   } catch (e) { toast("❌ " + e.message); }
 }
-
+/* ---------- Phase I: instructor questions in the graded quiz ---------- */
+const ITYPE = { num: "🔢 Numeric answer", struct: "✏️ Draw a structure", short: "📝 Short written answer", mc: "🔘 Multiple choice" };
+function asgPseudo(it) { return { id: it.id, custom: it, q: it.stem, o: it.type === "mc" ? it.options : [], a: -1, L: 2, tp: ITYPE[it.type] || "Question", ch: null, s: "" }; }
+function asgAnswerView(it, v) {
+  if (v == null || v === "") return h("i", {}, "no answer");
+  if (it.type === "num") return h("b", { html: chemFormat(String(v)) });
+  if (it.type === "struct") { const sp = h("span", { html: structSvg(v, 90, 64) }); try { sp.appendChild(h("b", { html: " " + chemFormat(seFormula(v)) })); } catch (e) {} return sp; }
+  if (it.type === "mc") return h("b", {}, (it.options || [])[v] || "—");
+  return h("span", { style: "white-space:pre-wrap" }, String(v));
+}
+function customAnswerUI(card, Z, q) {
+  const it = q.custom, cur = Z.picked != null ? Z.picked : Z.ans[q.id];
+  const set = v => { Z.picked = v; const nx = document.getElementById("next"); if (nx) nx.disabled = false; };
+  if (it.type === "num") {
+    const ci = chemInput({ id: "ga", value: cur || "", label: "Your numeric answer" }); card.appendChild(ci.el);
+    ci.input.addEventListener("input", () => set(ci.get()));
+    card.appendChild(h("div", { class: "muted", id: "ga-hint", style: "font-size:13px" }, [it.unit_hint ? "Include the unit." : "", it.sig ? "Give " + it.sig + " significant figures." : ""].filter(Boolean).join(" ")));
+  } else if (it.type === "short") {
+    const ta = h("textarea", { class: "field", id: "ga-text", rows: "6", maxlength: "4000", "aria-label": "Your answer", style: "width:100%;font:inherit" }); ta.value = cur || "";
+    const cnt = h("div", { class: "muted", style: "font-size:12px;text-align:right" }, (ta.value.length) + " / 4000");
+    ta.addEventListener("input", () => { set(ta.value); cnt.textContent = ta.value.length + " / 4000"; });
+    card.appendChild(ta); card.appendChild(cnt); card.appendChild(h("div", { class: "muted", style: "font-size:13px" }, "Your instructor grades this answer."));
+  } else if (it.type === "struct") {
+    const ed = structEditor({ id: "ga-se", value: cur && cur.atoms ? cur : null, onChange: m => set(m.atoms.length ? m : null) });
+    card.appendChild(ed.el);
+  }
+}
 /* ---------- administrator: instructor approvals (5.0) ---------- */
 const ADMIN_EMAILS = ["chemflipp@gmail.com"];
 function adminHint() { return !!(S.acct && S.acct.email && ADMIN_EMAILS.includes(S.acct.email.toLowerCase())) || !!S.isAdmin; }
