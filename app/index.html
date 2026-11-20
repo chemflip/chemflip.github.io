@@ -173,7 +173,15 @@ header .tourhl{background:rgba(255,255,255,.25)}
 textarea.field{font:inherit}
 .refdim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50}
 .refsheet{position:fixed;left:0;right:0;bottom:0;max-height:78vh;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom));z-index:51;box-shadow:0 -8px 30px rgba(0,0,0,.3);max-width:900px;margin:0 auto}
+.linkbtn{background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:var(--hair)}
+.pg-bars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:92px;margin-top:8px}.pg-b{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}.pg-b i{width:70%;border-radius:3px 3px 0 0;display:block}.pg-b span{font-size:11px;color:var(--grey)}
+.cal-nav{display:flex;gap:6px;align-items:center;margin-bottom:8px}.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.cal-h{font-size:12px;font-weight:600;text-align:center;color:var(--grey);padding:2px 0}
+.cal-d{min-height:78px;border:1px solid var(--hair);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:2px;min-width:0}.cal-d.out{border:0}.cal-d.today{outline:2px solid var(--teal,#156082)}
+.cal-d .n{font-size:12px;display:flex;justify-content:space-between;align-items:center}.cal-st{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block}
+.cal-e{font-size:11px;line-height:1.25;text-align:left;border:0;border-radius:4px;padding:2px 4px;background:var(--chip);color:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--bad)}.cal-e.locks{border-left-color:var(--med)}.cal-e.opens{border-left-color:var(--teal,#156082)}.cal-e.done{opacity:.6;text-decoration:line-through}
+@media (max-width:560px){.cal-d{min-height:54px}.cal-e{font-size:10px;padding:1px 2px}}
 .updbar{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(94vw,520px);background:var(--navy,#0E2841);color:#fff;border-radius:14px;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:45;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+body.has-rem{padding-bottom:120px}.updbar.rembar{top:auto;bottom:calc(18px + env(safe-area-inset-bottom));background:var(--teal,#156082)}@media (min-width:900px){.updbar.rembar{left:auto;right:20px;transform:none;width:380px}}.rembar span{display:inline-flex;gap:6px;align-items:flex-start}
 .avimg{width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle}.avimg.big{width:56px;height:56px;border:3px solid var(--card)}
 .avbtn{background:none;border:0;padding:0;cursor:pointer}
 .coursebtn{background:var(--chip);color:var(--teal);border:1px solid var(--hair);border-radius:999px;padding:4px 10px;font:inherit;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -505,6 +513,7 @@ function markDay() { const t = today(); if (S.days[S.days.length - 1] !== t) { S
 function streak() { let n = 0; const d = new Date(); for (;;) { const k = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); if (S.days.includes(k)) { n++; d.setDate(d.getDate() - 1); } else if (n === 0 && k === today()) { d.setDate(d.getDate() - 1); } else break; } return n; }
 function record(q, correct, ms) {
   const r = S.a[q.id] || { n: 0, c: 0 }; r.n++; if (correct) r.c++; r.r = correct; r.t = Date.now(); S.a[q.id] = r;
+  { S.daily = S.daily || {}; const d = S.daily[today()] = S.daily[today()] || { n: 0, ok: 0 }; d.n++; if (correct) d.ok++; }   // Phase J: answers per day
   ms = Math.max(1000, Math.min(ms || 30000, 180000));
   S.cs = S.cs || { answered: 0, correct: 0, ms: 0 }; S.cs.answered++; if (correct) S.cs.correct++; S.cs.ms += ms;
   const wi = S.w.indexOf(q.id); if (!correct && wi < 0) S.w.push(q.id); if (correct && wi >= 0) S.w.splice(wi, 1);
@@ -582,7 +591,10 @@ const ICO = {
   teach: '<rect x="3" y="3" width="14" height="10"/><path d="M7 17l3-4 3 4M6 7h8M6 10h5"/>',
   chev: '<path d="M5 8l5 5 5-5"/>',
   lock: '<rect x="5" y="9" width="10" height="8" rx="1"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/>',
-  canvas: '<path d="M3 10h14M10 3v14"/><circle cx="10" cy="10" r="7"/>'
+  canvas: '<path d="M3 10h14M10 3v14"/><circle cx="10" cy="10" r="7"/>',
+  cal: '<rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3M6.5 11h2M11.5 11h2M6.5 14h2"/>',
+  bell: '<path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13zM8.5 17.5a1.6 1.6 0 0 0 3 0"/>',
+  chart: '<path d="M3 17h14M5 14V9M9 14V5M13 14v-3M17 14V7"/>'
 };
 function ico(name, size) { const s = size || 18; const span = document.createElement("span"); span.style.display = "inline-flex"; span.setAttribute("aria-hidden", "true");
   span.innerHTML = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (ICO[name] || "") + '</svg>'; return span; }
@@ -615,6 +627,7 @@ function renderSide() {
     g1.appendChild(navItem("home", "home", "Dashboard", reset("home"), { on: v === "home" }));
     g1.appendChild(navItem("teach", "teach", "My classes", reset("teach"), { on: ["teach", "cls", "newtest", "ctest", "student"].includes(v) }));
     g1.appendChild(navItem("qbank", "book", "Question bank", reset("qbank"), { on: v === "qbank" }));
+    g1.appendChild(navItem("calendar", "cal", "Calendar", reset("calendar"), { on: v === "calendar" }));
     g1.appendChild(navItem("canvas", "canvas", "Canvas", reset("canvasSetup"), { on: v === "canvasSetup" }));
     g1.appendChild(navItem("games", "game", "Class games", reset("games"), { on: PLAY_VIEWS.has(v) && v !== "features" && v !== "onboard" }));
     g1.appendChild(navItem("ref", "calc", "Reference tables", reset("ref"), { on: v === "ref" }));
@@ -627,6 +640,8 @@ function renderSide() {
   } else {
   g1.appendChild(navItem("home", "home", "Home", reset("home"), { on: v === "home" }));
   g1.appendChild(navItem("exam", "exam", "Practice exam", reset("exam"), { on: v === "exam" }));
+  g1.appendChild(navItem("progress", "chart", "My progress", reset("progress"), { on: v === "progress" }));
+  g1.appendChild(navItem("calendar", "cal", "Calendar", reset("calendar"), { on: v === "calendar" }));
   g1.appendChild(navItem("wrong", "redo", "Review mistakes", () => { stack = [{ view: "home" }]; startList("wrong"); }, { count: S.w.length || "" }));
   g1.appendChild(navItem("bm", "mark", "Bookmarks", () => { stack = [{ view: "home" }]; startList("bm"); }, { count: S.b.length || "" }));
   if (isOrg()) g1.appendChild(navItem("mechs", "pen", "Mechanisms", reset("mechs"), { on: v === "mechs" || v === "mech" }));
@@ -753,6 +768,7 @@ VIEWS.home = function () {
     h("div", { class: "muted" }, "All " + total + " questions in " + course().name + ", with worked solutions.")), h("button", { class: "btn gold", id: "go-premium", onclick: () => go("premium") }, (S.trial && !storeFlavor()) ? "See Premium" : "Start free trial")));
   { const cvc = typeof canvasCard === "function" ? canvasCard() : null; if (cvc) app.appendChild(cvc); }
   { const rc = pqResumeCard(); if (rc) app.appendChild(rc); }
+  { const cu = comingUpCard(); if (cu) app.appendChild(cu); }
   if (S.profile.role === "instructor" && !eduOk()) app.appendChild(h("div", { class: "card", id: "edu-card" }, h("b", {}, "Verify your instructor account"),
     h("p", { class: "muted" }, "Confirm your .edu email to use classes, student progress and class codes."), h("div", { class: "btnrow" }, h("button", { class: "btn", id: "edu-open", onclick: eduSheet }, "Verify with my .edu email"))));
   if (CFG.notice) app.appendChild(h("div", { class: "card", id: "global-notice" }, h("b", {}, "From ChemFlip"), h("div", { style: "white-space:pre-wrap;margin-top:4px" }, CFG.notice)));
@@ -2508,7 +2524,7 @@ function acctSheet() {
     [em, send, code, verify, msg].forEach(x => box.appendChild(x));
   });
 }
-const SYNC_KEYS = ["a", "w", "b", "days", "mech", "best", "hist", "cs", "quest", "arc", "mtut", "qtut", "featSeen", "theme", "music", "sfx", "myc", "qz", "pt", "ex", "draw", "typeMode", "asgTpl"];
+const SYNC_KEYS = ["a", "w", "b", "days", "mech", "best", "hist", "cs", "quest", "arc", "mtut", "qtut", "featSeen", "theme", "music", "sfx", "myc", "qz", "pt", "ex", "draw", "typeMode", "asgTpl", "daily", "remSent", "remP"];
 function syncPayload() { const o = { _t: Date.now() }; SYNC_KEYS.forEach(k => { if (S[k] !== undefined) o[k] = S[k]; }); if (S.profile) { const p = Object.assign({}, S.profile); delete p.photo; delete p.photoS; o.profile = p; } return o; }
 function mergeState(L, R) {
   if (!R) return L; if (!L) return R;
@@ -2524,6 +2540,8 @@ function mergeState(L, R) {
   if (L.qz || R.qz) M.qz = ((L.qz && L.qz.t) || 0) >= ((R.qz && R.qz.t) || 0) ? L.qz : R.qz;   // newest unfinished practice test wins
   if (L.pt || R.pt) { const seen = new Set(); M.pt = [].concat(R.pt || [], L.pt || []).filter(x => { const k = x.t + "|" + x.mode; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a.t - b.t).slice(-50); }
   M.draw = Object.assign({}, R.draw || {}, L.draw || {});
+  if (L.daily || R.daily) { M.daily = {}; uni(Object.keys(L.daily || {}), Object.keys(R.daily || {})).forEach(d => { const x = (L.daily || {})[d] || {}, y = (R.daily || {})[d] || {}; M.daily[d] = { n: Math.max(x.n || 0, y.n || 0), ok: Math.max(x.ok || 0, y.ok || 0) }; }); }
+  if (L.remSent || R.remSent) { M.remSent = Object.assign({}, R.remSent || {}, L.remSent || {}); }   // a reminder shown on one device isn't shown again on another
   if (L.quest || R.quest) {
     const q1 = L.quest || {}, q2 = R.quest || {}, newer = (q1._t || 0) >= (q2._t || 0) ? q1 : q2;
     const Q = Object.assign({}, q2, q1);
@@ -2642,7 +2660,7 @@ VIEWS.premium = function () {
     card.appendChild(h("p", { class: "muted", style: "font-size:12px" }, "Payment is charged to your " + (CFG.flavor === "play" ? "Google Play" : CFG.flavor === "msstore" ? "Microsoft" : "Apple ID") + " account. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period (or of the free trial), and can be managed or cancelled anytime in your " + (CFG.flavor === "play" ? "Google Play" : CFG.flavor === "msstore" ? "Microsoft" : "App Store") + " account settings. ", h("a", { href: "#", onclick: e => { e.preventDefault(); go("privacy"); } }, "Privacy policy"), " · ", h("a", { href: CFG.flavor === "msstore" ? "https://www.microsoft.com/en-us/storedocs/terms-of-sale" : "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/", target: "_blank" }, "Terms of use")));
   }
   if (!(S.prem && S.prem.src === "code")) {
-    const inp = h("input", { class: "field code", id: "code", placeholder: CFG.app + "-XXXX-YYMM-XXXXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
+    const inp = h("input", { class: "field code", id: "code", placeholder: CFG.app + "-XX-YYMM-XXXXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
     const msg = h("div", { class: "muted", id: "code-msg", style: "margin-top:6px" }, "🎓 Have an access code, a 50%-off code, or the invite code of the friend who invited you? Enter it here.");
     card.appendChild(h("div", { style: "margin-top:16px;border-top:1px solid var(--hair);padding-top:14px" }, h("b", {}, "🔑 Access code"), inp, msg,
       h("div", { class: "btnrow" }, h("button", { class: "btn", id: "redeem", onclick: () => redeemCode(inp.value, msg) }, "Unlock"))));
@@ -3739,7 +3757,7 @@ function teacherAssign(c, done) {
     const pc = h("div", { class: "card", id: "class-premium", style: "border-left:5px solid var(--gold)" }, h("b", {}, "💎 Premium for this class"));
     const pc0 = row.premium_code ? row.premium_code.split("-") : null, cur0 = pc0 ? { ok: codeStillOk({ code: row.premium_code }), exp: pc0[2] || "" } : null;
     pc.appendChild(h("p", { class: "muted" }, cur0 && cur0.ok ? "✅ Active: every student in " + c.name + " has Premium" + (cur0.exp === "9999" ? "." : " until " + cur0.exp.slice(2) + "/20" + cur0.exp.slice(0, 2) + ".") : "Enter one access code and every student who joins this class gets Premium automatically. No need to send codes one by one."));
-    const pin = h("input", { class: "field code", id: "class-code-in", placeholder: CFG.app + "-XXXX-YYMM-XXXXXX" }); if (row.premium_code) pin.value = row.premium_code;
+    const pin = h("input", { class: "field code", id: "class-code-in", placeholder: CFG.app + "-XX-YYMM-XXXXXX" }); if (row.premium_code) pin.value = row.premium_code;
     const pm = h("div", { class: "muted", style: "margin-top:6px" });
     pc.appendChild(pin); pc.appendChild(pm);
     pc.appendChild(h("div", { class: "btnrow" },
@@ -4101,6 +4119,7 @@ VIEWS.ihome = function () {
   const g = h("div", { class: "dash", id: "inst-dash", role: "list" });
   [dashCard("assign", "pen", "Create assignment", "Graded work with open, due and lock dates", () => pickClass(toTab("graded"))),
    dashCard("deadlines", "exam", "Deadlines & extensions", "Extend for a student, a group or the class", () => pickClass(toTab("graded"))),
+   dashCard("calendar", "cal", "Calendar", "Every class's due, lock and opening dates", () => go("calendar")),
    dashCard("chapters", "book", "Assign chapters", "Practice chapters and a due note", () => pickClass(toTab("assign"))),
    dashCard("test", "exam", "Create test", "Class or team test from chosen chapters", () => pickClass(toTab("tests"))),
    dashCard("progress", "users", "Student progress", "Accuracy, weak topics, test results, CSV", () => pickClass(toTab("students"))),
@@ -4153,23 +4172,252 @@ function studentDash(T) {
   [dashCard("assign", "pen", "My assignments", S.cls ? "Graded work, deadlines and scores" + (nA ? " · " + nA + " practice chapter" + (nA > 1 ? "s" : "") : "") : "Join your class with its code", () => go(S.cls ? "myasg" : "classes"), S.asgCount || null),
    tests,
    dashCard("practice", "exam", "Practice tests", "Build a test from any chapters and topics", () => go("exam")),
-   dashCard("progress", "user", "My progress", "Chapters, accuracy, badges", () => go("profile")),
-   dashCard("recs", "compass", "Study recommendations", weak.length ? "Start with: " + weak[0][0] : "Answer a few questions to get suggestions", () => go("recs"), weak.length || null),
+   dashCard("progress", "chart", "My progress", "Activity, chapters, topics, test history", () => go("progress")),
+   dashCard("calendar", "cal", "Calendar", S.cls ? "Due dates, lock dates and reminders" : "Join your class to see its deadlines", () => go("calendar")),
+   (() => { const ri = recItems(); return dashCard("recs", "compass", "Study recommendations", ri.length ? "Start with: " + ri[0].t : "Answer a few questions to get suggestions", () => go("recs"), ri.length || null); })(),
    dashCard("games", "game", "Chemistry games", "Arcade, duels and class games", () => go("games")),
    dashCard("settings", "gear", "Settings", "Sync, sound, theme, privacy", () => go("settings"))].forEach(x => g.appendChild(x));
   return h("div", {}, h("h3", { class: "dh" }, "My dashboard"), g);
 }
+/* ---------- 5.0 Phase J: progress, recommendations, calendar and reminders ----------
+   Everything here comes from the student's own answers, practice tests and the server's assignment list; nothing is estimated. */
+const REM_STEPS = [[3 * 864e5, "3 days"], [864e5, "1 day"], [2 * 36e5, "2 hours"]];
+function remPrefs() { S.remP = Object.assign({ on: true, sys: false, canvas: false }, S.remP || {}); return S.remP; }
+function dayKey(d) { return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }   // same form as today()
+// Graded work with dates, cached on the device so the calendar and reminders also work offline.
+async function loadDeadlines(force) {
+  const c = S.dlCache;
+  if (!force && c && Date.now() - c.at < 10 * 60e3) return c;
+  if (!DB || !DB.live || !DB.call || (typeof navigator !== "undefined" && navigator.onLine === false)) return c || null;
+  const out = { at: Date.now(), items: [], tz: null, who: isTeacher() ? "t" : "s" };
+  try {
+    if (isTeacher()) {
+      for (const k of (S.tclasses || []).slice(0, 20)) { const j = await asgCall({ action: "list", class_code: k.code }); out.tz = out.tz || j.tz;
+        j.assignments.forEach(a => out.items.push({ id: a.id, cls: k.name, code: k.code, kind: a.kind, title: a.title, open: a.open_at, due: a.due_at, lock: a.lock_at || a.due_at, tz: j.tz || localTz(), teacher: true, submitted: a.submitted, published: a.published })); }
+    } else if (S.cls && S.cls.role !== "teacher") {
+      const j = await asgCall({ action: "mine", class_code: S.cls.code }); out.tz = j.tz;
+      j.assignments.forEach(a => out.items.push({ id: a.id, cls: S.cls.name, code: S.cls.code, kind: a.kind, title: a.title, open: a.effective.open_at, due: a.effective.due_at, lock: a.effective.lock_at, tz: j.tz || localTz(),
+        ext: a.effective.source !== "base", state: a.state, done: a.submitted > 0 && !a.in_progress, inprog: !!a.in_progress, canvas: !!a.canvas_linked, grade: a.grade_released ? a.grade : null }));
+    }
+    S.dlCache = out; save(); return out;
+  } catch (e) { return c || null; }
+}
+// The most specific reminder whose time has come for one assignment, or null.
+function remDue(it, now) {
+  if (it.teacher || it.done || !it.due || it.state === "closed") return null;
+  const due = Date.parse(it.due); if (!(due > now)) return null;
+  let hit = null; REM_STEPS.forEach(s => { if (now >= due - s[0]) hit = s; }); return hit;
+}
+function remCheck() {
+  const P = remPrefs(), c = S.dlCache; if (!P.on || !c || c.who !== "s" || isTeacher()) return [];
+  const now = srvNow(), fired = []; S.remSent = S.remSent || {};
+  c.items.forEach(it => {
+    if (it.canvas && !P.canvas) return;                                // Canvas already reminds students about work placed in Canvas
+    const r = remDue(it, now); if (!r) return;
+    const key = ms => it.id + "|" + it.due + "|" + ms;                 // a new due date (extension) gets its own reminders
+    if (S.remSent[key(r[0])]) return;
+    REM_STEPS.forEach(s => { if (s[0] >= r[0]) S.remSent[key(s[0])] = Date.now(); });   // an earlier reminder that was missed isn't sent late
+    fired.push([it, r[1]]);
+  });
+  if (fired.length) { const cut = Date.now() - 60 * 864e5; Object.keys(S.remSent).forEach(k => { if (S.remSent[k] < cut) delete S.remSent[k]; }); save(); fired.forEach(f => remNotify(f[0], f[1])); }
+  return fired;
+}
+function remText(it) { return KIND[it.kind] + " “" + it.title + "” is due " + fmtTz(it.due, it.tz) + (it.inprog ? ". You have an attempt in progress." : "."); }
+function remNotify(it, lab) {
+  const P = remPrefs();
+  document.querySelectorAll(".rembar").forEach(x => x.remove());
+  const done = () => { bar.remove(); if (!document.querySelector(".rembar")) document.body.classList.remove("has-rem"); };
+  const bar = h("div", { class: "updbar rembar", id: "rem-bar", role: "status" }, h("span", {}, ico("bell", 16), " Due in about " + lab + ": " + remText(it)),
+    h("button", { class: "btn small", id: "rem-open", onclick: () => { done(); stack = [{ view: "home" }]; go("myasg"); } }, "Open"),
+    h("button", { class: "btn ghost small", id: "rem-close", "aria-label": "Dismiss reminder", onclick: done }, "✕"));
+  document.body.appendChild(bar); document.body.classList.add("has-rem");   // the page leaves room so the banner never covers a button
+  setTimeout(() => { if (bar.isConnected) done(); }, 60e3);
+  if (P.sys && typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try { const n = new Notification("ChemFlip: due in about " + lab, { body: remText(it), tag: "cf-" + it.id + "-" + lab }); n.onclick = () => { window.focus(); stack = [{ view: "home" }]; go("myasg"); }; } catch (e) {}
+  }
+}
+let REM_T = null;
+function remStart() {
+  if (REM_T) return; let n = 0;
+  const tick = async () => { n++; if (n === 1 || n % 10 === 0) await loadDeadlines(n > 1); remCheck(); };
+  REM_T = setInterval(tick, 60e3); tick();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") remCheck(); });
+}
+// Calendar file with the same reminders as alarms, so the phone's or computer's calendar reminds even when ChemFlip is closed.
+function icsFor(items) {
+  const P = remPrefs(), z = iso => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const esc = s => String(s || "").replace(/[\\;,]/g, m => "\\" + m).replace(/\n/g, "\\n");
+  const L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ChemFlip//Deadlines//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  items.filter(it => it.due).forEach(it => {
+    L.push("BEGIN:VEVENT", "UID:" + it.id + "-due@chemflip.org", "DTSTAMP:" + z(new Date().toISOString()), "DTSTART:" + z(it.due), "DTEND:" + z(it.due),
+      "SUMMARY:" + esc((it.teacher ? "" : "Due: ") + KIND[it.kind] + " — " + it.title), "DESCRIPTION:" + esc(it.cls + (it.lock && it.lock !== it.due ? "\nLate work accepted until " + fmtTz(it.lock, it.tz) : "") + "\nOpen ChemFlip to start or review."));
+    if (!it.teacher && !it.done && (!it.canvas || P.canvas)) [["P3D", "3 days"], ["P1D", "1 day"], ["PT2H", "2 hours"]].forEach(a => L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + esc("Due in " + a[1] + ": " + it.title), "TRIGGER:-" + a[0], "END:VALARM"));
+    L.push("END:VEVENT");
+  });
+  L.push("END:VCALENDAR"); return L.join("\r\n") + "\r\n";
+}
+function downloadIcs(items) {
+  const blob = new Blob([icsFor(items)], { type: "text/calendar" }), a = h("a", { href: URL.createObjectURL(blob), download: "ChemFlip-deadlines.ics" });
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast("Calendar file saved. Open it to add the deadlines to your calendar.");
+}
+function upcoming(c, n) { const now = srvNow(); return ((c && c.items) || []).filter(it => it.due && Date.parse(it.lock || it.due) > now && !(it.teacher && it.published === false)).sort((a, b) => Date.parse(a.due) - Date.parse(b.due)).slice(0, n || 99); }
+function remLine(it) {
+  const P = remPrefs();
+  if (it.teacher) return it.submitted + " submitted";
+  if (it.done) return "Submitted" + (it.grade ? " · " + it.grade.score + "/" + it.grade.total : "");
+  if (it.canvas && !P.canvas) return "Canvas sends the reminders for this one";
+  return P.on ? "Reminders 3 days, 1 day and 2 hours before" : "Reminders are off";
+}
+function comingUpCard() {
+  if (isTeacher() || !S.cls) return null;
+  const list = upcoming(S.dlCache, 3); if (!list.length) return null;
+  const c = h("div", { class: "card", id: "coming-up" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px" }, h("b", {}, "Coming up"), h("button", { class: "btn ghost small", id: "cu-cal", onclick: () => go("calendar") }, "Calendar")));
+  list.forEach(it => { const d = Date.parse(it.due) - srvNow();
+    c.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "cu-" + it.id.slice(0, 8), onclick: () => go("myasg") }, h("div", { style: "flex:1" }, h("div", { class: "t" }, KIND[it.kind] + ": " + it.title),
+      h("div", { class: "meta" }, (d > 0 ? "Due " + fmtTz(it.due, it.tz) + " · " + left(d) + " left" : "Late — locks " + fmtTz(it.lock, it.tz, false)) + " · " + remLine(it)))))); });
+  return c;
+}
+
+/* ----- recommendations: each one says what it is based on ----- */
+function recItems() {
+  const out = [], all = CH(), st = myStats(), now = srvNow();
+  // 1. graded work that is due soon and not submitted
+  upcoming(S.dlCache).forEach(it => { if (it.teacher || it.done) return; const d = Date.parse(it.due) - now;
+    if (it.inprog) out.push({ id: "resume-" + it.id.slice(0, 8), pri: 0, t: "Finish " + it.title, why: "You started this attempt but haven't submitted it. Due " + fmtTz(it.due, it.tz) + ".", go: "Resume", fn: () => go("myasg") });
+    else if (d < 3 * 864e5) out.push({ id: "due-" + it.id.slice(0, 8), pri: d < 0 ? 0 : 1, t: (d < 0 ? "Late: " : "Due soon: ") + it.title, why: d < 0 ? "The due date has passed, but late work is still accepted until " + fmtTz(it.lock, it.tz) + "." : "Due in " + left(d) + " (" + fmtTz(it.due, it.tz) + ") and not submitted yet.", go: "Open", fn: () => go("myasg") }); });
+  // 2. chapters the instructor assigned that are less than half done
+  const CI = (S.cls && S.clsInfo && S.clsInfo.code === S.cls.code) ? S.clsInfo : null;
+  (CI && CI.assigned || []).forEach(n => { const c = CHBYN[n]; if (!c) return; const s = chStats(c); if (s.done < s.total / 2) out.push({ id: "asgch-" + n, pri: 2, t: "Assigned chapter: " + c.title, why: "Your instructor assigned it" + (CI.due ? " (due " + CI.due + ")" : "") + ". You've answered " + s.done + " of " + s.total + ".", go: "Practise", fn: () => go("chapter", n) }); });
+  // 3. weak topics: at least 3 answered and under 60 % right
+  st.weak.forEach(([tp, ok, n], i) => { const qs = []; all.forEach(ch => usable(ch).forEach(q => { if (q.tp === tp) qs.push(q); }));
+    out.push({ id: String(i), pri: 3, t: tp, why: ok + " of " + n + " correct (" + pct(ok, n) + "%) · " + qs.length + " questions to practise", go: "Practise",
+      fn: () => startQuiz(qs.sort((a, b) => ((S.a[a.id] && S.a[a.id].r) ? 1 : 0) - ((S.a[b.id] && S.a[b.id].r) ? 1 : 0) || a.L - b.L).slice(0, 15), tp, {}) }); });
+  // 4. slipping: right before, wrong on the latest try
+  const slip = {}; Object.entries(S.a).forEach(([id, r]) => { const q = QBYID[id]; if (q && r.c > 0 && !r.r) (slip[q.tp] = slip[q.tp] || []).push(q); });
+  Object.entries(slip).filter(([, qs]) => qs.length >= 2).sort((a, b) => b[1].length - a[1].length).slice(0, 3).forEach(([tp, qs], i) => { if (st.weak.some(w => w[0] === tp)) return;
+    out.push({ id: "slip-" + i, pri: 4, t: "Refresh: " + tp, why: qs.length + " questions you got right before but missed on your latest try.", go: "Review", fn: () => startQuiz(qs.slice(0, 15), "Refresh: " + tp, {}) }); });
+  // 5. a long mistake list
+  if (S.w.length >= 5) out.push({ id: "mistakes", pri: 5, t: "Review your mistakes", why: S.w.length + " questions are waiting in your mistake list.", go: "Review", fn: () => startList("wrong") });
+  // 6. practice-test results trending down in this course
+  const pts = (S.pt || []).filter(x => x.course === course().id && x.n);
+  if (pts.length >= 3) { const last = pts.slice(-3), a = last.reduce((s, x) => s + x.ok, 0) / last.reduce((s, x) => s + x.n, 0);
+    if (a < 0.6) out.push({ id: "pt", pri: 6, t: "Try Mistake Review mode", why: "Your last 3 practice tests averaged " + Math.round(a * 100) + "%.", go: "Practice test", fn: () => go("exam") }); }
+  return out.sort((a, b) => a.pri - b.pri);
+}
 VIEWS.recs = function () {
   document.getElementById("title").textContent = "Study recommendations";
-  const st = myStats(), all = CH();
-  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "Based on your answers"), h("h2", {}, "What to study next"), h("div", { class: "muted" }, "Topics where you've answered at least 3 questions and got fewer than 60% right, weakest first.")));
-  const c = h("div", { class: "card", id: "recs-list" });
-  if (!st.weak.length) c.appendChild(h("p", { class: "muted" }, "No weak topics yet. Keep practising — suggestions appear once you've answered at least 3 questions in a topic."));
-  st.weak.forEach(([tp, ok, n], i) => { const qs = []; all.forEach(ch => usable(ch).forEach(q => { if (q.tp === tp) qs.push(q); }));
-    c.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "rec-" + i, onclick: () => startQuiz(qs.sort((a, b) => ((S.a[a.id] && S.a[a.id].r) ? 1 : 0) - ((S.a[b.id] && S.a[b.id].r) ? 1 : 0) || a.L - b.L).slice(0, 15), tp, {}) },
-      h("div", { style: "flex:1" }, h("div", { class: "t" }, tp), h("div", { class: "meta" }, ok + " of " + n + " correct · " + qs.length + " questions to practise")), h("span", { class: "btn small" }, "Practise")))); });
+  loadDeadlines().then(c => { if (c && cur().view === "recs" && !GM.recsLoaded) { GM.recsLoaded = true; render(); } });
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "Based on your work"), h("h2", {}, "What to study next"),
+    h("div", { class: "muted" }, "Every suggestion comes from your own answers, practice tests and deadlines, and says what it's based on. Topics count as weak after at least 3 answers with fewer than 60% right.")));
+  const c = h("div", { class: "card", id: "recs-list" }), items = recItems();
+  if (!items.length) c.appendChild(h("p", { class: "muted", id: "recs-empty" }, "No suggestions yet. They appear once you've answered at least 3 questions in a topic, or when graded work is coming up."));
+  items.forEach(r => c.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "rec-" + r.id, onclick: r.fn },
+    h("div", { style: "flex:1" }, h("div", { class: "t" }, r.t), h("div", { class: "meta" }, r.why)), h("span", { class: "btn small" }, r.go)))));
   app.appendChild(c);
 };
+
+/* ----- progress dashboard ----- */
+VIEWS.progress = function () {
+  document.getElementById("title").textContent = "My progress";
+  loadDeadlines();
+  const chs = CH(); let done = 0, ok = 0, total = 0, mastered = 0;
+  const rows = chs.map(c => { const s = chStats(c); done += s.done; ok += s.ok; total += s.total; if (s.done >= s.total * .8 && pct(s.ok, s.done) >= 80) mastered++; return [c, s]; });
+  const d30 = (() => { let n = 0; const d = new Date(); for (let i = 0; i < 30; i++) { if (S.days.includes(dayKey(d))) n++; d.setDate(d.getDate() - 1); } return n; })();
+  app.appendChild(h("section", { class: "h5", id: "pg-sum", "aria-label": "Summary" }, h("div", {}, h("h2", {}, course().name), h("div", { class: "sub" }, h("span", {}, mastered + " of " + chs.length + " chapters mastered"))),
+    h("dl", {}, h("div", { class: "stat" }, h("dt", {}, "Answered"), h("dd", { id: "pg-done" }, done + " / " + total)), h("div", { class: "stat" }, h("dt", {}, "Accuracy"), h("dd", { id: "pg-acc" }, pct(ok, done) + "%")),
+      h("div", { class: "stat" }, h("dt", {}, "Day streak"), h("dd", {}, String(streak()))), h("div", { class: "stat" }, h("dt", {}, "Days studied, last 30"), h("dd", { id: "pg-d30" }, String(d30))))));
+  // activity, last 14 days
+  const act = h("div", { class: "card", id: "pg-act" }, h("b", {}, "Last 14 days"));
+  const days = []; { const d = new Date(); d.setDate(d.getDate() - 13); for (let i = 0; i < 14; i++) { days.push(new Date(d)); d.setDate(d.getDate() + 1); } }
+  const D = S.daily || {}, mx = Math.max(1, ...days.map(x => (D[dayKey(x)] || {}).n || 0));
+  const grid = h("div", { class: "pg-bars", role: "img", "aria-label": "Questions answered per day, last 14 days" });
+  days.forEach(x => { const r = D[dayKey(x)], n = r ? r.n : 0, studied = S.days.includes(dayKey(x));
+    grid.appendChild(h("div", { class: "pg-b", title: x.toLocaleDateString([], { month: "short", day: "numeric" }) + ": " + (r ? n + " answered, " + pct(r.ok, n) + "% right" : studied ? "studied" : "no study") },
+      h("i", { style: "height:" + (n ? Math.max(6, Math.round(64 * n / mx)) : studied ? 4 : 0) + "px;background:" + (r ? (r.ok / n >= .7 ? "var(--ok)" : r.ok / n >= .5 ? "var(--med)" : "var(--bad)") : "var(--hair)") }),
+      h("span", {}, x.toLocaleDateString([], { weekday: "narrow" })))); });
+  act.appendChild(grid);
+  act.appendChild(h("p", { class: "muted", style: "font-size:13px;margin:6px 0 0" }, Object.keys(D).length ? "Bar height is questions answered that day; colour is the share right (green 70%+, amber 50–69%, red under 50%)." : "Daily counts start with this version of ChemFlip. Days you studied before it show as a thin line."));
+  app.appendChild(act);
+  // chapters
+  const t = h("table", { class: "t", id: "pg-ch" }, h("tr", {}, h("th", {}, "Chapter"), h("th", { class: "n" }, "Answered"), h("th", { class: "n" }, "Right")));
+  rows.forEach(([c, s]) => t.appendChild(h("tr", {}, h("td", {}, h("button", { class: "linkbtn", onclick: () => go("chapter", c.n) }, c.title)), h("td", { class: "n" }, s.done + "/" + s.total), h("td", { class: "n" }, s.done ? pct(s.ok, s.done) + "%" : "–", bar(s.done ? s.ok / s.done : 0, s.done)))));
+  app.appendChild(h("div", { class: "card" }, h("b", {}, "Chapters"), t));
+  // topics and difficulty
+  const tp = {}, lv = {}; Object.entries(S.a).forEach(([id, r]) => { const q = QBYID[id]; if (!q) return; (tp[q.tp] = tp[q.tp] || [0, 0]); tp[q.tp][0]++; if (r.r) tp[q.tp][1]++; const L = q.L || 1; (lv[L] = lv[L] || [0, 0]); lv[L][0]++; if (r.r) lv[L][1]++; });
+  const ranked = Object.entries(tp).filter(([, v]) => v[0] >= 3).sort((a, b) => b[1][1] / b[1][0] - a[1][1] / a[1][0]);
+  const tc = h("div", { class: "card", id: "pg-topics" }, h("b", {}, "Topics"));
+  if (!ranked.length) tc.appendChild(h("p", { class: "muted" }, "Topics appear here after you've answered at least 3 questions in one."));
+  else { const list = (title, arr) => { const d = h("div", { style: "flex:1 1 240px" }, h("div", { class: "lab" }, title)); arr.forEach(([k, v]) => d.appendChild(h("div", { class: "meta" }, k + " — " + v[1] + "/" + v[0] + " (" + pct(v[1], v[0]) + "%)"))); return d; };
+    tc.appendChild(h("div", { style: "display:flex;gap:16px;flex-wrap:wrap;margin-top:6px" }, list("Strongest", ranked.slice(0, 5)), list("Needs work", ranked.slice(-5).reverse().filter(x => !ranked.slice(0, 5).includes(x))))); }
+  app.appendChild(tc);
+  const LN = { 1: "Easy", 2: "Medium", 3: "Hard" }, lt = h("table", { class: "t", id: "pg-lv" });
+  Object.keys(lv).sort().forEach(L => lt.appendChild(h("tr", {}, h("td", {}, LN[L] || "Level " + L), h("td", { class: "n" }, lv[L][0] + " answered"), h("td", { class: "n" }, pct(lv[L][1], lv[L][0]) + "%", bar(lv[L][1] / lv[L][0], 1)))));
+  if (Object.keys(lv).length) app.appendChild(h("div", { class: "card" }, h("b", {}, "By difficulty"), lt));
+  // practice tests and graded work
+  const pts = (S.pt || []).filter(x => x.course === course().id).slice(-8).reverse();
+  const pc = h("div", { class: "card", id: "pg-pt" }, h("b", {}, "Practice tests"), h("div", { class: "muted", style: "font-size:13px" }, "Practice tests never count toward official grades."));
+  if (!pts.length) pc.appendChild(h("p", { class: "muted" }, "None yet in this course."));
+  pts.forEach(x => pc.appendChild(h("div", { class: "meta" }, new Date(x.t).toLocaleDateString([], { month: "short", day: "numeric" }) + " · " + ((PT_MODES[x.mode] || {}).t || "Practice") + " · " + x.ok + "/" + x.n + " (" + pct(x.ok, x.n) + "%)")));
+  app.appendChild(pc);
+  const gr = ((S.dlCache && S.dlCache.who === "s" && S.dlCache.items) || []).filter(it => it.grade);
+  if (gr.length) { const gc = h("div", { class: "card", id: "pg-graded" }, h("b", {}, "Graded work (released grades)"));
+    gr.forEach(it => gc.appendChild(h("div", { class: "meta" }, KIND[it.kind] + ": " + it.title + " — " + it.grade.score + "/" + it.grade.total + (it.grade.pending ? " (some answers still being graded)" : "") + (it.grade.late ? " · late" : "")))); app.appendChild(gc); }
+  app.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "pg-recs", onclick: () => go("recs") }, "What to study next"), h("button", { class: "btn sec2", id: "pg-cal", onclick: () => go("calendar") }, "Calendar"), h("button", { class: "btn ghost", id: "pg-badges", onclick: () => go("profile") }, "Badges and profile")));
+};
+
+/* ----- calendar ----- */
+const CAL = { y: null, m: null };
+VIEWS.calendar = function () {
+  document.getElementById("title").textContent = "Calendar";
+  const T = isTeacher(); if (CAL.y === null) { const d = new Date(); CAL.y = d.getFullYear(); CAL.m = d.getMonth(); }
+  const c = S.dlCache && S.dlCache.who === (T ? "t" : "s") ? S.dlCache : null;
+  loadDeadlines(!GM.calFresh).then(n => { if (!GM.calFresh && n && cur().view === "calendar") { GM.calFresh = true; render(); } });
+  if (!T && !S.cls) { app.appendChild(h("div", { class: "card", id: "cal-join" }, h("b", {}, "Join your class to see deadlines"), h("p", { class: "muted" }, "Your instructor's graded work appears here with its due and lock dates."), h("button", { class: "btn", onclick: () => go("classes") }, "Join a class"))); }
+  const items = (c && c.items) || [], tz = (c && c.tz) || localTz();
+  const byDay = {}; const add = (iso, it, what) => { if (!iso) return; const k = isoToZoned(iso, it.tz || tz).slice(0, 10); (byDay[k] = byDay[k] || []).push([it, what]); };
+  items.forEach(it => { if (T && it.published === false) return; add(it.due, it, "due"); if (it.lock && it.lock !== it.due) add(it.lock, it, "locks"); if (it.open && Date.parse(it.open) > srvNow()) add(it.open, it, "opens"); });
+  const first = new Date(CAL.y, CAL.m, 1), label = first.toLocaleDateString([], { month: "long", year: "numeric" });
+  const nav = h("div", { class: "cal-nav" }, h("button", { class: "btn ghost small", id: "cal-prev", "aria-label": "Previous month", onclick: () => { CAL.m--; if (CAL.m < 0) { CAL.m = 11; CAL.y--; } render(); } }, "‹"),
+    h("h2", { id: "cal-month", style: "margin:0;flex:1;text-align:center" }, label),
+    h("button", { class: "btn ghost small", id: "cal-next", "aria-label": "Next month", onclick: () => { CAL.m++; if (CAL.m > 11) { CAL.m = 0; CAL.y++; } render(); } }, "›"),
+    h("button", { class: "btn ghost small", id: "cal-today", onclick: () => { CAL.y = null; render(); } }, "Today"));
+  const g = h("div", { class: "cal-grid", id: "cal-grid", role: "grid", "aria-label": label });
+  ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach(w => g.appendChild(h("div", { class: "cal-h", role: "columnheader" }, w)));
+  for (let i = 0; i < first.getDay(); i++) g.appendChild(h("div", { class: "cal-d out" }));
+  const nDays = new Date(CAL.y, CAL.m + 1, 0).getDate(), tk = dayKey(new Date());
+  for (let d = 1; d <= nDays; d++) {
+    const dt = new Date(CAL.y, CAL.m, d), k = CAL.y + "-" + String(CAL.m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0"), ev = byDay[k] || [];
+    const cell = h("div", { class: "cal-d" + (dayKey(dt) === tk ? " today" : ""), role: "gridcell", id: "cal-" + k, "aria-label": dt.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }) + (ev.length ? ", " + ev.length + " event" + (ev.length > 1 ? "s" : "") : "") },
+      h("span", { class: "n" }, String(d), !T && S.days.includes(dayKey(dt)) ? h("i", { class: "cal-st", title: "You studied this day" }) : null));
+    ev.forEach(([it, what]) => cell.appendChild(h("button", { class: "cal-e " + what + (it.done ? " done" : ""), title: KIND[it.kind] + ": " + it.title + " — " + what + " " + fmtTz(what === "due" ? it.due : what === "locks" ? it.lock : it.open, it.tz),
+      onclick: () => T ? go("asgdetail", { id: it.id, code: it.code }) : go("myasg") }, (what === "due" ? "" : what === "locks" ? "Locks: " : "Opens: ") + it.title)));
+    g.appendChild(cell);
+  }
+  app.appendChild(h("div", { class: "card" }, nav, g, h("p", { class: "muted", style: "font-size:13px;margin:8px 0 0" }, "Dates are shown in " + (tz || "").replace(/_/g, " ") + (T ? "" : ", your class's time zone") + "." + (!T ? " A dot marks days you studied." : "") + (c ? " Updated " + new Date(c.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + "." : ""))));
+  const up = upcoming(c), uc = h("div", { class: "card", id: "cal-up" }, h("b", {}, "Upcoming"));
+  if (!c) uc.appendChild(h("p", { class: "muted" }, DB && DB.live ? "⏳ Loading…" : "Deadlines need ChemFlip's online service."));
+  else if (!up.length) uc.appendChild(h("p", { class: "muted", id: "cal-none" }, T ? "No upcoming deadlines in your classes." : "Nothing due right now."));
+  up.slice(0, 12).forEach(it => uc.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "cal-up-" + it.id.slice(0, 8), onclick: () => T ? go("asgdetail", { id: it.id, code: it.code }) : go("myasg") },
+    h("div", { style: "flex:1" }, h("div", { class: "t" }, KIND[it.kind] + ": " + it.title + (T ? " · " + it.cls : "")), h("div", { class: "meta" }, "Due " + fmtTz(it.due, it.tz) + (it.ext ? " (your extension)" : "") + " · " + remLine(it)))))));
+  if (up.length) uc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "cal-ics", onclick: () => downloadIcs(up) }, "Add to my calendar (.ics)"),
+    !T ? h("button", { class: "btn ghost", id: "cal-rem", onclick: () => go("settings") }, "Reminder settings") : null));
+  if (up.length && !T) uc.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "The calendar file includes the same 3-day, 1-day and 2-hour reminders, so your phone or computer reminds you even when ChemFlip is closed. It doesn't update by itself: download it again after a date changes."));
+  app.appendChild(uc);
+};
+function remSettingsCard() {
+  if (isTeacher()) return null;
+  const P = remPrefs(), sysOk = typeof Notification !== "undefined";
+  const c = h("div", { class: "card", id: "rem-card" }, h("b", {}, "Deadline reminders"), h("p", { class: "muted" }, "ChemFlip reminds you 3 days, 1 day and 2 hours before graded work is due, unless you've already submitted it. Reminders show while ChemFlip is open; to be reminded when it's closed, use Calendar → Add to my calendar."));
+  const sw = (id, on, label, fn) => h("label", { class: "chk", style: "display:flex;gap:8px;align-items:center;margin:6px 0" }, h("input", { type: "checkbox", id, checked: on ? "" : null, onchange: e => fn(e.target.checked) }), label);
+  c.appendChild(sw("rem-on", P.on, "Remind me about deadlines", v => { P.on = v; save(); render(); }));
+  c.appendChild(sw("rem-canvas", P.canvas, "Also remind me about work placed in Canvas (Canvas already sends its own reminders for these)", v => { P.canvas = v; save(); render(); }));
+  c.appendChild(sw("rem-sys", P.sys && sysOk && Notification.permission === "granted", sysOk ? "Show reminders as system notifications" : "System notifications aren't available on this device", async v => {
+    if (!sysOk) return; if (v && Notification.permission !== "granted") { try { await Notification.requestPermission(); } catch (e) {} }
+    P.sys = v && Notification.permission === "granted"; save(); if (v && !P.sys) toast("Notifications are blocked. Allow them for ChemFlip in your browser or system settings."); render(); }));
+  if (!sysOk) c.querySelector("#rem-sys").disabled = true;
+  return c;
+}
 
 /* ---------- 5.0 Phase E: graded assignments with deadlines, locking and extensions (server-enforced) ---------- */
 const ASG = { off: 0, tz: null };   // off = server clock − device clock (ms); only used to show countdowns
@@ -4654,6 +4902,7 @@ VIEWS.admin = function () {
 
 /* ---------- settings ---------- */
 VIEWS.settings = function () {
+  { const rc = remSettingsCard(); if (rc) app.appendChild(rc); }
   app.appendChild(h("div", { class: "card", id: "sync-card" }, h("b", {}, "☁️ Sync across devices"), h("p", { class: "muted" }, S.acct && S.acct.email ? "Signed in as " + S.acct.email + (S.syncAt ? " · last synced " + new Date(S.syncAt).toLocaleString() : "") : "Sign in with your e-mail to continue on any device (Windows, Mac, iPhone, Android, web)."), h("button", { class: "btn small", id: "sync-btn", onclick: acctSheet }, S.acct && S.acct.email ? "Manage sync" : "☁️ Turn on sync")));
   { const wc = h("div", { class: "card", id: "work-card" }, h("b", {}, "📄 Photos of my work"), h("p", { class: "muted", id: "work-count" }, "Photos you take of your handwritten work are kept on this device, with their question."));
     app.appendChild(wc); workList().then(l => { const kb = l.reduce((a, r) => a + (r.kb || 0), 0); document.getElementById("work-count") && (document.getElementById("work-count").textContent = l.length ? l.length + " photo" + (l.length > 1 ? "s" : "") + " stored on this device (" + (kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB") + "). Open a question to see its photos." : "No photos yet. Use 📷 Photo of my work on any question to save your handwritten calculation with it.");
@@ -4703,6 +4952,7 @@ async function checkContent() {
 }
 loadRemote(); setTimeout(checkContent, 1500); setTimeout(() => eduRefresh(true), 1200); setTimeout(() => syncSchool(), 3000); setTimeout(() => { if (S.cls && S.cls.role !== "teacher") { syncScore(); loadClassInfo().then(() => { if (cur() && cur().view === "home") render(); }); } }, 2500);
 stack = [{ view: S.profile ? "home" : "onboard" }];
+setTimeout(() => { if (S.profile) remStart(); }, 4000);   // Phase J: deadline reminders
 if (window.matchMedia) try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") applyTheme(); }); } catch (e) {}
 render();
 </script>
