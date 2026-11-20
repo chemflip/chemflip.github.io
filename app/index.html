@@ -173,7 +173,7 @@ header .tourhl{background:rgba(255,255,255,.25)}
 textarea.field{font:inherit}
 .refdim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50}
 .refsheet{position:fixed;left:0;right:0;bottom:0;max-height:78vh;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom));z-index:51;box-shadow:0 -8px 30px rgba(0,0,0,.3);max-width:900px;margin:0 auto}
-.tlink{background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:var(--hair)}.acc-row{display:flex;gap:10px;align-items:flex-start}.acc-row>input{margin-top:14px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.tlink{background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:var(--hair)}.acc-row{display:flex;gap:10px;align-items:flex-start}.acc-row>input{margin-top:14px}
 .pg-bars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:92px;margin-top:8px}.pg-b{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}.pg-b i{width:70%;border-radius:3px 3px 0 0;display:block}.pg-b span{font-size:11px;color:var(--grey)}
 .cal-nav{display:flex;gap:6px;align-items:center;margin-bottom:8px}.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}.cal-h{font-size:12px;font-weight:600;text-align:center;color:var(--grey);padding:2px 0}
 .cal-d{min-height:78px;border:1px solid var(--hair);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:2px;min-width:0}.cal-d.out{border:0}.cal-d.today{outline:2px solid var(--teal,#156082)}
@@ -3367,12 +3367,15 @@ VIEWS.classes = function () {
   if (isTeacher()) { stack.pop(); go("teach"); return; }
   if (c) { go("cls", c.code); stack.splice(stack.length - 2, 1); return; }
   const card = h("div", { class: "card" }, h("b", {}, "🎟️ Join a class"), h("p", { class: "muted" }, "Ask your instructor for the 6-character class code."));
-  const inp = h("input", { class: "field code", id: "join-code", placeholder: "e.g. K7Q2MX", maxlength: "6" });
-  const msg = h("div", { class: "muted", style: "margin-top:6px" });
+  const inp = h("input", { class: "field code", id: "join-code", placeholder: "e.g. K7Q2MX", maxlength: "6", "aria-label": "Class code" });
+  const msg = h("div", { class: "muted", style: "margin-top:6px", id: "join-msg", "aria-live": "polite" });
   card.appendChild(inp); card.appendChild(msg);
+  if (S.joinCode) { inp.value = S.joinCode; if (DB.live && DB.call) joinPreview(S.joinCode, msg); }
+  if (DB.live && DB.call) app.appendChild(myRequestsCard());
   card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "join", onclick: async () => {
     const code = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); if (code.length !== 6) { msg.textContent = "Class codes have 6 characters."; return; }
     msg.textContent = "⏳ Looking up class…";
+    if (DB.live && DB.call) { await joinByCode(code, msg); return; }
     try { const r = await DB.get("classes", "code=eq." + code); if (!r || !r.length) { msg.textContent = "❌ No class with that code."; sfx("bad"); return; }
       await DB.ups("members", { class_code: code, sid: sid(), name: S.profile.name, avatar: myAv(), school: S.profile.school, stu_id: (S.profile.sid || "").trim() }, "class_code,sid");
       S.cls = { code, name: r[0].name, role: r[0].teacher_sid === sid() ? "teacher" : "student" }; S.cs = { answered: 0, correct: 0, ms: 0 }; save(); await syncScore(); sfx("win"); toast("🎉 Welcome to " + r[0].name + "!"); stack.pop(); go("cls", code);
@@ -3412,7 +3415,7 @@ VIEWS.cls = function (code) {
   const v = cur();
   const done = (el) => { if (cur() === v) { box.innerHTML = ""; box.appendChild(el); } };
   box.appendChild(h("div", { class: "card muted" }, "⏳ Loading…"));
-  if (key === "students") teacherStudents(c, done);
+  if (key === "students") teacherStudents(c, (el) => { const w = h("div", {}); w.appendChild(classAdminCards(c)); w.appendChild(el); done(w); });
   else if (key === "graded") teacherAsg(c, done);
   else if (key === "assign") teacherAssign(c, done);
   else if (key === "board") {
@@ -3704,7 +3707,8 @@ VIEWS.teach = function () {
   if (!DB) { notConnected(); return; }
   if (!DB.live) app.appendChild(h("div", { class: "card", style: "background:var(--chip)" }, h("b", {}, "🧪 Preview mode"), h("div", { class: "muted" }, "In this preview, classes are stored on this device only.")));
   const list = S.tclasses || [];
-  const card = h("div", { class: "card" }, h("b", {}, "📚 My classes"));
+  if (DB.live && DB.call) app.appendChild(coursesCard());
+  const card = h("div", { class: "card", id: "my-classes", style: DB.live && DB.call ? "display:none" : "" }, h("b", {}, "📚 My classes"));
   if (!list.length) card.appendChild(h("p", { class: "muted" }, "No classes yet. Create your first class below."));
   list.forEach(k => card.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "tc-" + k.code, onclick: () => { S.cls = { code: k.code, name: k.name, role: "teacher" }; save(); CLSTAB = 0; go("cls", k.code); } },
     h("div", { style: "font-size:26px" }, "👥"), h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), h("div", { class: "meta" }, "Class code " + k.code))))));
@@ -3741,9 +3745,10 @@ function teacherStudents(c, done) {
     const card = h("div", { class: "card" }, h("b", {}, "👩‍🎓 Students (" + rows.length + ")"), h("div", { class: "muted", style: "margin:4px 0 8px" }, "Tap a student to see chapters, weak topics and test scores."));
     if (!rows.length) card.appendChild(h("p", { class: "muted" }, "No students yet. Share the class code " + c.code + " with your students."));
     const tb = h("table", { class: "t" });
-    if (rows.length) tb.appendChild(h("tr", {}, h("th", {}, "Student"), h("th", { class: "n" }, "Answered"), h("th", { class: "n" }, "Accuracy"), h("th", { class: "n" }, "Last active")));
+    if (rows.length) tb.appendChild(h("tr", {}, h("th", {}, "Student"), h("th", { class: "n" }, "Answered"), h("th", { class: "n" }, "Accuracy"), h("th", { class: "n" }, "Last active"), h("th", { class: "n" }, h("span", { class: "sr-only" }, "Actions"))));
     rows.forEach(r => tb.appendChild(h("tr", { style: "cursor:pointer", onclick: () => go("student", r) }, h("td", {}, avi(r.avatar), " " + r.name), h("td", { class: "n" }, String(r.answered)),
-      h("td", { class: "n" }, r.answered ? pct(r.correct, r.answered) + "%" : "–"), h("td", { class: "n" }, r.updated_at ? new Date(r.updated_at).toLocaleDateString() : "–"))));
+      h("td", { class: "n" }, r.answered ? pct(r.correct, r.answered) + "%" : "–"), h("td", { class: "n" }, r.updated_at ? new Date(r.updated_at).toLocaleDateString() : "–"),
+      h("td", { class: "n" }, h("button", { class: "tlink", id: "rm-" + r.sid, "aria-label": "Remove " + r.name, onclick: (e) => { e.stopPropagation(); removeStudent(c, r); } }, "Remove")))));
     card.appendChild(tb);
     if (rows.length) card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "export-csv", onclick: () => {
       const csv = [["Name", "School", "Answered", "Correct", "Accuracy %", "Avg seconds per question", "Weak topics", "Last active"]].concat(rows.map(r => [r.name, r.school || "", r.answered, r.correct, r.answered ? pct(r.correct, r.answered) : "", r.answered ? Math.round(r.time_ms / r.answered / 1000) : "", ((r.stats && r.stats.weak) || []).map(w => w[0]).join("; "), r.updated_at || ""]))
@@ -3827,7 +3832,7 @@ function inviteText(c, pcode) {
   return "👋 Join our class \"" + c.name + "\" on " + CFG.title + "!\n\n" +
     "1️⃣ Install " + CFG.title + " (App Store, Google Play, Windows, or the web version)\n" +
     "2️⃣ Open it and choose 🎓 Student\n" +
-    "3️⃣ Tap 👥 My class and enter the class code:\n\n🔑 " + c.code + "\n\n" +
+    "3️⃣ Tap 👥 My class and enter the class code:\n\n🔑 " + c.code + "\n\nOr open this link: " + joinLink(c.code) + "\n\n" +
     "You'll see the class leaderboard 🏆, class tests 📝, assigned chapters 📌 and announcements 📣." + (pcode ? "\n\n💎 Premium is FREE for our class: it unlocks automatically when you join. (Or enter this access code under 💎 Premium: " + pcode + ")" : "") + (S.profile && S.profile.name ? "\n\n— " + S.profile.name : "");
 }
 function inviteSheet(c, pcode) {
@@ -3841,6 +3846,151 @@ function inviteSheet(c, pcode) {
     o("inv-copy", "📋", "Copy message", "Paste it into Canvas, Blackboard, or your syllabus", () => copyText(txt));
   });
 }
+/* ---------- 5.0 independent platform: courses, sections, joining by code or link (with instructor approval) ---------- */
+async function courseCall(body) { if (!DB || !DB.live || !DB.call) throw Object.assign(new Error("Courses need ChemFlip's online service. Connect to the internet and try again."), { status: 0 }); return DB.call(Object.assign({ op: "course" }, body)); }
+function joinLink(code) { return "https://chemflip.org/app/?join=" + code; }
+const JOIN_LABEL = { open: "Anyone with the code joins at once", approval: "You approve each student", closed: "Closed to new students" };
+const MODE_LABEL = { independent: "Independent (ChemFlip only)", canvas: "Canvas connected", email: "Email-only workflow" };
+function secLabel(k) { return (k.section ? "Section " + k.section : "") || k.name; }
+function enterClass(code, name) {
+  S.cls = { code, name, role: "student" }; S.cs = { answered: 0, correct: 0, ms: 0 }; S.joinCode = null; save();
+  syncScore().catch(() => {}); sfx("win"); toast("🎉 Welcome to " + name + "!"); stack = [{ view: "home" }]; go("cls", code);
+}
+async function joinByCode(code, msg) {
+  try {
+    const r = await courseCall({ action: "join", code, name: S.profile.name, avatar: myAv(), school: S.profile.school, stu_id: (S.profile.sid || "").trim(), email: (S.profile.email || "") });
+    if (r.status === "member") { enterClass(code, r.name); return; }
+    S.joinCode = null; save();
+    if (r.status === "pending") { sfx("ok"); msg.textContent = "📨 Request sent. Your instructor will approve it; you'll see the class here once they do."; render(); return; }
+    if (r.status === "rejected") { msg.textContent = "Your instructor didn't approve the last request. Check the code with them, or ask again tomorrow."; return; }
+  } catch (e) { sfx("bad"); msg.textContent = e.status === 404 ? "❌ No class with that code." : e.status === 403 ? "🔒 " + e.message : "❌ Couldn't connect. Check your internet and try again."; }
+}
+async function joinPreview(code, msg) {
+  try { const r = await courseCall({ action: "info", code });
+    if (r.member) { enterClass(code, r.name); return; }
+    msg.textContent = "You're invited to " + [r.course, r.section ? "Section " + r.section : "", r.name].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(" · ") + (r.teacher ? " with " + r.teacher : "") + ". " +
+      (r.join_mode === "approval" ? (r.request === "pending" ? "Your request is waiting for the instructor." : "Press Join class to ask your instructor to let you in.") : r.join_mode === "closed" ? "This class isn't accepting new students right now." : "Press Join class.");
+  } catch (e) { msg.textContent = e.status === 404 ? "❌ The invite link's class no longer exists. Ask your instructor for a new code." : ""; }
+}
+function myRequestsCard() {
+  const card = h("div", { class: "card", id: "my-requests", style: "display:none" });
+  courseCall({ action: "my_requests" }).then(async j => {
+    const open = (j.requests || []).filter(r => r.status === "pending" || (r.status === "rejected" && Date.now() - Date.parse(r.decided_at || r.requested_at) < 7 * 864e5) || r.status === "approved");
+    for (const r of open.filter(x => x.status === "approved")) {   // approved since last time: open the class
+      const i = await courseCall({ action: "info", code: r.class_code }).catch(() => null);
+      if (i && i.member && (!S.cls || S.cls.code !== r.class_code)) { enterClass(r.class_code, r.name); return; }
+    }
+    const show = open.filter(r => r.status !== "approved"); if (!show.length) return;
+    card.style.display = ""; card.appendChild(h("b", {}, "📨 Your join requests"));
+    show.forEach(r => card.appendChild(h("div", { class: "row", style: "display:flex;gap:8px;align-items:center;margin-top:8px", id: "req-" + r.class_code },
+      h("div", { style: "flex:1" }, h("div", {}, r.name + (r.section ? " · Section " + r.section : "")), h("div", { class: "muted" }, r.status === "pending" ? "⏳ Waiting for your instructor (sent " + new Date(r.requested_at).toLocaleDateString() + ")" : "✖️ Not approved. Check the code with your instructor.")),
+      r.status === "pending" ? h("button", { class: "btn ghost small", id: "req-check-" + r.class_code, onclick: async () => { const i = await courseCall({ action: "info", code: r.class_code }).catch(() => null); if (i && i.member) enterClass(r.class_code, r.name); else toast("Still waiting for your instructor."); } }, "Check") : null,
+      r.status === "pending" ? h("button", { class: "btn ghost small", id: "req-cancel-" + r.class_code, onclick: async () => { await courseCall({ action: "cancel_request", code: r.class_code }).catch(() => {}); render(); } }, "Cancel") : null)));
+  }).catch(() => {});
+  return card;
+}
+// ----- instructor: courses and sections on the dashboard
+let CRS = null;   // last {courses, sections} from the server
+function loadCourses() { return courseCall({ action: "mine" }).then(j => { CRS = j;
+  const have = new Set((S.tclasses || []).map(x => x.code)); let add = false;
+  (j.sections || []).forEach(k => { if (!have.has(k.code)) { S.tclasses = (S.tclasses || []).concat([{ code: k.code, name: k.name }]); add = true; } });
+  if (add) save(); return j; }); }
+function coursesCard() {
+  const card = h("div", { class: "card", id: "courses-card" }, h("b", {}, "🏫 Courses and sections"), h("div", { class: "muted", style: "margin:4px 0 8px" }, "Group your class sections into courses (e.g. CHEM 120 · Sections 01 and 02). Each section keeps its own code, students and grades."));
+  const body = h("div", {}, h("div", { class: "muted" }, "⏳ Loading…")); card.appendChild(body);
+  const openSec = (k) => { S.cls = { code: k.code, name: k.name, role: "teacher" }; save(); CLSTAB = 0; go("cls", k.code); };
+  const secRow = (k) => h("div", { class: "ch" }, h("button", { class: "main", id: "sec-" + k.code, onclick: () => openSec(k) }, h("div", { style: "font-size:22px" }, "👥"),
+    h("div", { style: "flex:1" }, h("div", { class: "t" }, k.course_id ? secLabel(k) + (k.section ? " — " + k.name : "") : k.name), h("div", { class: "meta" }, "Code " + k.code + " · " + k.students + " student" + (k.students === 1 ? "" : "s") + " · " + (k.join_mode === "approval" ? "approval to join" : k.join_mode === "closed" ? "closed" : "open") + (k.mode !== "independent" ? " · " + MODE_LABEL[k.mode] : ""))),
+    k.pending ? h("span", { class: "chip", id: "pend-" + k.code, style: "background:var(--gold);color:#1A1A1A" }, k.pending + " waiting") : null));
+  loadCourses().then(j => { body.innerHTML = "";
+    const live = (j.courses || []).filter(c => !c.archived_at), arch = (j.courses || []).filter(c => c.archived_at);
+    live.forEach(c => { const secs = j.sections.filter(k => k.course_id === c.id);
+      body.appendChild(h("div", { class: "crs", id: "crs-" + c.id, style: "margin:10px 0 4px" }, h("div", { style: "display:flex;align-items:center;gap:8px" }, h("b", { style: "flex:1" }, "📘 " + c.name + (c.term ? " · " + c.term : "")),
+        h("button", { class: "btn ghost small", id: "crs-edit-" + c.id, onclick: () => courseSheet(c) }, "Edit")),
+        secs.length ? secs.sort((a, b) => String(a.section || a.name).localeCompare(String(b.section || b.name))).map(secRow) : h("div", { class: "muted" }, "No sections yet. Open a class below and choose this course in its settings."))); });
+    const loose = j.sections.filter(k => !k.course_id || !live.some(c => c.id === k.course_id));
+    if (loose.length) body.appendChild(h("div", { style: "margin-top:10px" }, h("b", {}, live.length ? "Classes not in a course" : "Your classes"), loose.map(secRow)));
+    if (!j.sections.length && !live.length) body.appendChild(h("p", { class: "muted" }, "No classes yet. Create your first class below."));
+    if (arch.length) body.appendChild(h("details", { style: "margin-top:8px" }, h("summary", { class: "muted" }, "Archived courses (" + arch.length + ")"), arch.map(c => h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:6px" }, h("span", { style: "flex:1" }, c.name + (c.term ? " · " + c.term : "")),
+      h("button", { class: "btn ghost small", id: "crs-restore-" + c.id, onclick: async () => { await courseCall({ action: "course_archive", id: c.id, restore: true }); render(); } }, "Restore")))));
+    body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "new-course", onclick: () => courseSheet(null) }, "➕ New course")));
+  }).catch(e => { body.innerHTML = ""; body.appendChild(h("div", { class: "muted" }, e.status === 0 ? e.message : "❌ Couldn't load your courses. Check your connection. Your classes on this device are listed below."));
+    const mc = document.getElementById("my-classes"); if (mc) mc.style.display = ""; });
+  return card;
+}
+function courseSheet(c) {
+  sheet("course-sheet", c ? "Edit course" : "New course", (box, close) => {
+    const nm = h("input", { class: "field", id: "course-name", placeholder: "Course, e.g. CHEM 120 — Introductory Chemistry", maxlength: "120", "aria-label": "Course name" }); nm.value = c ? c.name : "";
+    const tm = h("input", { class: "field", id: "course-term", placeholder: "Term, e.g. Spring 2027 (optional)", maxlength: "60", style: "margin-top:8px", "aria-label": "Term" }); tm.value = c && c.term ? c.term : "";
+    const msg = h("div", { class: "muted", "aria-live": "polite" });
+    box.appendChild(nm); box.appendChild(tm); box.appendChild(msg);
+    box.appendChild(h("div", { class: "btnrow" }, c ? h("button", { class: "btn ghost", id: "course-archive", onclick: () => confirmBox("Archive this course?", "Its sections, students and grades stay. You can restore it any time.", async () => { await courseCall({ action: "course_archive", id: c.id }); close(); render(); }, "Archive") }, "Archive") : null,
+      h("button", { class: "btn", id: "course-save", onclick: async () => { if (!nm.value.trim()) { msg.textContent = "Give the course a name."; return; }
+        try { await courseCall({ action: "course_save", id: c ? c.id : undefined, name: nm.value, term: tm.value }); sfx("ok"); close(); render(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, c ? "Save" : "Create course")));
+    setTimeout(() => nm.focus(), 50);
+  });
+}
+// ----- instructor: one section's joining, mode, course, invite link and join requests (top of the Students tab)
+function classAdminCards(c) {
+  const wrap = h("div", { id: "class-admin" });
+  if (!DB || !DB.live || !DB.call) return wrap;
+  const req = h("div", { class: "card", id: "join-requests", style: "display:none" }); wrap.appendChild(req);
+  const set = h("details", { class: "card", id: "class-settings" }, h("summary", { style: "cursor:pointer" }, h("b", {}, "⚙️ Class settings, course and invite link")));
+  wrap.appendChild(set);
+  const drawReq = () => courseCall({ action: "requests", class_code: c.code }).then(j => {
+    const pend = (j.requests || []).filter(r => r.status === "pending"); req.innerHTML = ""; if (!pend.length) { req.style.display = "none"; return; }
+    req.style.display = ""; req.appendChild(h("b", {}, "📨 Students waiting to join (" + pend.length + ")"));
+    const picked = new Set();
+    pend.forEach(r => req.appendChild(h("label", { style: "display:flex;gap:8px;align-items:center;margin-top:8px", id: "jr-" + r.sid }, h("input", { type: "checkbox", class: "jr-pick", onchange: (e) => e.target.checked ? picked.add(r.sid) : picked.delete(r.sid) }),
+      h("span", { style: "flex:1" }, avi(r.avatar), " " + (r.name || "Student"), h("span", { class: "muted" }, [r.stu_id ? " · ID " + r.stu_id : "", r.email ? " · " + r.email : "", " · asked " + new Date(r.requested_at).toLocaleDateString()].join(""))))));
+    const act = async (approve, all) => { const sids = all ? pend.map(r => r.sid) : [...picked]; if (!sids.length) { toast("Tick the students first."); return; }
+      try { const r = await courseCall({ action: "decide", class_code: c.code, sids, approve }); sfx(approve ? "win" : "ok"); toast((approve ? "✅ Approved " : "Declined ") + r.count); render(); } catch (e) { toast("❌ " + e.message); } };
+    req.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "jr-reject", onclick: () => act(false) }, "Decline selected"), h("button", { class: "btn sec2 small", id: "jr-approve", onclick: () => act(true) }, "Approve selected"), h("button", { class: "btn small", id: "jr-approve-all", onclick: () => act(true, true) }, "Approve all")));
+  }).catch(() => {});
+  drawReq();
+  const fill = (j) => { const k = (j.sections || []).find(x => x.code === c.code) || { join_mode: "open", mode: "independent" };
+    const body = h("div", { style: "margin-top:10px" });
+    const crs = h("select", { class: "field", id: "set-course", "aria-label": "Course" }, h("option", { value: "" }, "Not in a course"), (j.courses || []).filter(x => !x.archived_at || x.id === k.course_id).map(x => h("option", { value: x.id }, x.name + (x.term ? " · " + x.term : ""))));
+    crs.value = k.course_id || "";
+    const sec = h("input", { class: "field", id: "set-section", placeholder: "Section, e.g. 01", maxlength: "40", style: "margin-top:8px", "aria-label": "Section" }); sec.value = k.section || "";
+    const radios = (name, opts, cur) => h("div", { role: "radiogroup", "aria-label": name, style: "margin-top:6px" }, Object.entries(opts).map(([v, t]) => h("label", { style: "display:flex;gap:8px;align-items:center;margin:4px 0" }, h("input", { type: "radio", name, value: v, id: name + "-" + v, checked: v === cur ? "checked" : false }), t)));
+    body.appendChild(h("div", { class: "muted" }, "Course and section")); body.appendChild(crs); body.appendChild(sec);
+    body.appendChild(h("div", { class: "muted", style: "margin-top:12px" }, "Who can join with the code or link")); body.appendChild(radios("set-join", JOIN_LABEL, k.join_mode));
+    body.appendChild(h("div", { class: "muted", style: "margin-top:12px" }, "How this class works")); body.appendChild(radios("set-mode", MODE_LABEL, k.mode));
+    body.appendChild(h("div", { class: "muted", style: "font-size:12px" }, k.canvas_linked ? "This class is linked to a Canvas course." : "Canvas is optional: everything works in ChemFlip without it."));
+    const msg = h("div", { class: "muted", "aria-live": "polite" }); body.appendChild(msg);
+    body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "set-save", onclick: async () => {
+      const jm = (body.querySelector("input[name=set-join]:checked") || {}).value, md = (body.querySelector("input[name=set-mode]:checked") || {}).value;
+      try { if (crs.value !== (k.course_id || "") || sec.value.trim() !== (k.section || "")) await courseCall({ action: "section", class_code: c.code, course_id: crs.value || null, section: sec.value });
+        if (jm !== k.join_mode || md !== k.mode) await courseCall({ action: "settings", class_code: c.code, join_mode: jm, mode: md });
+        sfx("ok"); msg.textContent = "✅ Saved."; loadCourses().catch(() => {});
+      } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Save settings")));
+    const link = joinLink(c.code);
+    body.appendChild(h("div", { class: "muted", style: "margin-top:14px" }, "Invite link (opens ChemFlip with the code filled in)"));
+    body.appendChild(h("div", { id: "invite-link", style: "font-family:ui-monospace,monospace;font-size:13px;background:var(--chip);border-radius:8px;padding:8px 10px;word-break:break-all" }, link));
+    const to = h("textarea", { class: "field", id: "invite-emails", placeholder: "Student emails, separated by commas or new lines (optional)", style: "margin-top:8px;min-height:56px", "aria-label": "Student emails" });
+    body.appendChild(to);
+    body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "copy-link", onclick: () => copyText(link) }, "📋 Copy link"),
+      h("button", { class: "btn ghost small", id: "share-link", onclick: () => shareText(inviteText(c, S.clsPrem)) }, "📲 Share"),
+      h("button", { class: "btn sec2 small", id: "email-invite", onclick: () => { const list = to.value.split(/[\s,;]+/).filter(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).slice(0, 200);
+        const a = h("a", { href: "mailto:" + encodeURIComponent(list.join(",")).replace(/%40/g, "@").replace(/%2C/g, ",") + "?subject=" + encodeURIComponent("Join " + c.name + " on ChemFlip") + "&body=" + encodeURIComponent(inviteText(c, S.clsPrem)) }); document.body.appendChild(a); a.click(); a.remove();
+        toast("✉️ A draft opened in your email app. ChemFlip doesn't send it — check it and press Send."); } }, "✉️ Email invite (draft)")));
+    body.appendChild(h("div", { class: "muted", style: "font-size:12px" }, "Email invites open as a draft in your own email app; nothing is sent until you press Send there."));
+    set.appendChild(body); };
+  (CRS ? Promise.resolve(CRS) : loadCourses()).then(fill).catch(() => set.appendChild(h("div", { class: "muted" }, "❌ Couldn't load the settings.")));
+  return wrap;
+}
+async function removeStudent(c, r) {
+  confirmBox("Remove " + (r.name || "this student") + " from " + c.name + "?", "They leave the class roster. Their answers, scores and grades are kept, and they can rejoin if you allow it.", async () => {
+    try { if (DB.live && DB.call) await courseCall({ action: "remove", class_code: c.code, sid: r.sid }); else await DB.del("members", "class_code=eq." + c.code + "&sid=eq." + r.sid);
+      sfx("ok"); toast("Removed " + (r.name || "student")); render(); } catch (e) { toast("❌ " + e.message); } }, "Remove");
+}
+(function joinFromUrl() {
+  try { const u = new URL(location.href), j = (u.searchParams.get("join") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (u.searchParams.has("join")) { u.searchParams.delete("join"); history.replaceState(null, "", u.pathname + (u.search || "") + u.hash); }
+    if (j.length === 6) { S.joinCode = j; save(); setTimeout(() => { if (S.profile && !isTeacher()) { stack = [{ view: "home" }]; go("classes"); } }, 120); }
+  } catch (e) {}
+})();
 function reviewSheet(auto) {
   let stars = 0;
   sheet("review-sheet", "⭐ Rate " + CFG.title, (box, close) => {
@@ -4462,6 +4612,8 @@ const HELP = [
   { id: "builder", t: "Instructors: building graded assignments", who: "instructor", kw: "assignment builder questions points versions template numeric structure short answer", b: ["The builder has 8 steps: basics, bank questions, your own questions, points, versions, dates, attempts and release, review.", "Your own questions can be numeric (with units, tolerance, significant figures and partial credit), structures, short written answers or multiple choice.", "Versions give each student a random draw of questions and/or their own order. Save any assignment as a template to reuse it."] },
   { id: "grading", t: "Instructors: grading and extensions", who: "instructor", kw: "grading grade comment override extension accommodation bulk credit regrade", b: ["The assignment screen shows who submitted and what needs grading. Short answers wait for you; every other type is graded by the server.", "On the grading screen you can change any question's points and leave a comment. Full credit for everyone and Regrade all are under Adjust grades for everyone.", "Give extensions to one student, a group, the whole class, or several selected students at once. Every change is kept in the history."] },
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
+  { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
+  { id: "joining", t: "Joining a class", who: "student", kw: "join class code invite link request approval waiting", b: ["Enter the 6-character class code under Classes, or open your instructor's invite link.", "Some classes need the instructor's approval: your request then shows as waiting under Classes, and the class opens once it is approved. Press Check to look again."] },
   { id: "canvas", t: "Canvas", who: "all", kw: "canvas lti grades roster deep link", b: ["ChemFlip can be added to a Canvas course by the school's Canvas administrator. Instructors can then add ChemFlip assignments from Canvas, sync the roster and send scores to the Canvas gradebook.", "Only scores are sent to Canvas, not submissions or extensions. ChemFlip also works fully without Canvas."] },
   { id: "access", t: "Accessibility and keyboard shortcuts", who: "all", kw: "accessibility keyboard shortcuts text size dark mode screen reader motion contrast", b: ["Ctrl+K or / opens search. Esc goes back. In a question, A–D or 1–4 picks an answer and Enter goes on.", "Settings → Appearance has light and dark themes. Settings → Accessibility has larger text and less motion.", "Every screen has a Skip to main content link for keyboard and screen-reader users."] },
   { id: "privacy", t: "Privacy and your data", who: "all", kw: "privacy data delete ferpa grades", b: ["Your answers stay on your device unless you join a class or sign in to sync. Instructors see only their own classes.", "Settings → Delete my data removes your class records and leaderboard entries from ChemFlip's server."] },
