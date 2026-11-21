@@ -573,7 +573,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 function render() {
   applyTheme(); applyA11y(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
@@ -3950,6 +3950,13 @@ function classAdminCards(c) {
     req.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "jr-reject", onclick: () => act(false) }, "Decline selected"), h("button", { class: "btn sec2 small", id: "jr-approve", onclick: () => act(true) }, "Approve selected"), h("button", { class: "btn small", id: "jr-approve-all", onclick: () => act(true, true) }, "Approve all")));
   }).catch(() => {});
   drawReq();
+  const cvBanner = () => {
+    courseCall({ action: "canvas", class_code: c.code }).then(cv => { const wait = cv.links.reduce((n, l) => n + l.waiting, 0);
+      if (cv.status === "not_linked" || (cv.status !== "failed" && !wait)) return;
+      wrap.insertBefore(h("div", { class: "card", id: "cvi-banner", role: "status", style: "border-left:4px solid " + (cv.status === "failed" ? "var(--bad)" : "var(--gold)") },
+        h("b", {}, cv.status === "failed" ? "⚠️ Some grades couldn't be sent to Canvas" : "⏸️ " + wait + " grade" + (wait === 1 ? "" : "s") + " waiting to go to Canvas"),
+        h("div", { class: "muted" }, "Everything is saved in ChemFlip. "), h("button", { class: "tlink", id: "cvi-banner-open", onclick: () => go("canvasInt", c.code) }, "Open Canvas Integration Settings")), wrap.firstChild); }).catch(() => {}); };
+  cvBanner();
   const fill = (j) => { const k = (j.sections || []).find(x => x.code === c.code) || { join_mode: "open", mode: "independent" };
     const body = h("div", { style: "margin-top:10px" });
     const crs = h("select", { class: "field", id: "set-course", "aria-label": "Course" }, h("option", { value: "" }, "Not in a course"), (j.courses || []).filter(x => !x.archived_at || x.id === k.course_id).map(x => h("option", { value: x.id }, x.name + (x.term ? " · " + x.term : ""))));
@@ -3960,6 +3967,7 @@ function classAdminCards(c) {
     body.appendChild(h("div", { class: "muted", style: "margin-top:12px" }, "Who can join with the code or link")); body.appendChild(radios("set-join", JOIN_LABEL, k.join_mode));
     body.appendChild(h("div", { class: "muted", style: "margin-top:12px" }, "How this class works")); body.appendChild(radios("set-mode", MODE_LABEL, k.mode));
     body.appendChild(h("div", { class: "muted", style: "font-size:12px" }, k.canvas_linked ? "This class is linked to a Canvas course." : "Canvas is optional: everything works in ChemFlip without it."));
+    body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "open-canvas-int", onclick: () => go("canvasInt", c.code) }, "🔗 Canvas Integration Settings")));
     const msg = h("div", { class: "muted", "aria-live": "polite" }); body.appendChild(msg);
     body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "set-save", onclick: async () => {
       const jm = (body.querySelector("input[name=set-join]:checked") || {}).value, md = (body.querySelector("input[name=set-mode]:checked") || {}).value;
@@ -3982,6 +3990,75 @@ function classAdminCards(c) {
   (CRS ? Promise.resolve(CRS) : loadCourses()).then(fill).catch(() => set.appendChild(h("div", { class: "muted" }, "❌ Couldn't load the settings.")));
   return wrap;
 }
+/* ---------- 5.0 independent platform: Canvas Integration Settings (per class; ChemFlip works fully without Canvas) ---------- */
+const CV_STATUS = { connected: ["🟢", "Connected"], disconnected: ["⚪", "Disconnected"], failed: ["🔴", "Synchronization Failed"], not_linked: ["⚪", "Not connected"] };
+const CV_DIR = { live: "✅ Yes", admin: "🔑 Needs your school's Canvas admin", launch: "When you open ChemFlip from Canvas", no: "—" };
+VIEWS.canvasInt = function (code) {
+  const c = myClass() && myClass().code === code ? myClass() : { code, name: "" };
+  document.getElementById("title").textContent = "Canvas Integration Settings";
+  app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "🔗 Canvas Integration Settings"), h("h2", {}, c.name || "Class " + code),
+    h("div", { class: "muted" }, "ChemFlip works fully on its own. Connecting Canvas is optional: it sends grades to your Canvas gradebook and reads your Canvas class list.")));
+  const box = h("div", { id: "cvi-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  const act = async (body, btn, okMsg) => { if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = "⏳ Working…"; }
+    try { const j = await courseCall(Object.assign({ class_code: code }, body)); if (okMsg) toast(okMsg); return j; }
+    catch (e) { toast("❌ " + e.message); return null; } finally { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = btn.dataset.t; } } };
+  const draw = (j) => {
+    box.innerHTML = "";
+    const [dot, label] = CV_STATUS[j.status] || CV_STATUS.not_linked;
+    const st = h("div", { class: "card", id: "cvi-status", role: "status" }, h("div", { style: "font-size:20px;font-weight:800" }, dot + " Canvas Status: " + label),
+      h("div", { class: "muted", id: "cvi-last" }, j.last_success ? "Last successful sync: " + fmtTz(j.last_success, localTz()) : j.status === "not_linked" ? "This class isn't linked to a Canvas course." : "No grades have been sent to Canvas yet."),
+      j.canvas_courses.length ? h("div", { class: "muted" }, "Canvas course: " + j.canvas_courses.map(k => k.title).join(", ") + (j.canvas_courses[0].roster_synced_at ? " · class list read " + fmtTz(j.canvas_courses[0].roster_synced_at, localTz()) : "")) : null,
+      j.status === "disconnected" ? h("div", { class: "muted" }, "Disconnected " + fmtTz(j.disconnected_at, localTz()) + ". Your Canvas links and waiting grades are kept; nothing is sent until you reconnect.") : null,
+      j.status === "failed" ? h("div", { style: "margin-top:6px" }, "Some grades couldn't be sent. ChemFlip keeps them and tries again; see the errors below.") : null);
+    box.appendChild(st);
+    if (j.status === "not_linked") {
+      box.appendChild(h("div", { class: "card", id: "cvi-connect" }, h("b", {}, "Connect to Canvas LMS"),
+        h("ol", { style: "margin:8px 0 0 18px;padding:0" },
+          h("li", {}, "Your school's Canvas administrator adds ChemFlip to Canvas once (LTI 1.3 developer key). ChemFlip can't do this step for them."),
+          h("li", {}, "In your Canvas course, open ChemFlip as the instructor (any ChemFlip link or the course navigation)."),
+          h("li", {}, "Choose this ChemFlip class (code " + code + ") when ChemFlip asks which class the Canvas course belongs to.")),
+        h("p", { class: "muted" }, "Until then everything works in ChemFlip: assignments, exams, grading and the gradebook don't need Canvas.")));
+    } else {
+      const auto = h("label", { style: "display:flex;gap:10px;align-items:center" }, h("input", { type: "checkbox", id: "cvi-auto", checked: j.auto ? "checked" : false, disabled: j.status === "disconnected" ? "disabled" : false,
+        onchange: async (e) => { const r = await act({ action: "canvas_set", auto: e.target.checked }, null, e.target.checked ? "Automatic sync on" : "Automatic sync off: grades wait until you press Sync now"); if (r) render(); } }),
+        h("span", {}, h("b", {}, "Send grades to Canvas automatically"), h("div", { class: "muted", style: "font-size:13px" }, "When off, grades wait in ChemFlip until you press Sync now.")));
+      const ctl = h("div", { class: "card", id: "cvi-controls" }, auto,
+        h("div", { class: "btnrow" },
+          j.status !== "disconnected" ? h("button", { class: "btn", id: "cvi-sync", onclick: async (e) => { const r = await act({ action: "canvas_sync" }, e.target); if (r) { toast(r.synced ? "✅ Sent " + r.synced.sent + (r.synced.failed ? " · " + r.synced.failed + " failed" : "") : "Done"); draw(r); } } }, "🔄 Sync now") : null,
+          j.status === "disconnected"
+            ? h("button", { class: "btn", id: "cvi-reconnect", onclick: async (e) => { if (await act({ action: "canvas_reconnect" }, e.target, "🔗 Canvas reconnected")) render(); } }, "🔗 Reconnect Canvas")
+            : h("button", { class: "btn ghost", id: "cvi-disconnect", onclick: () => confirmBox("Disconnect Canvas for this class?", "ChemFlip keeps working normally. Grades stop going to Canvas and wait here until you reconnect. Nothing is deleted in ChemFlip or Canvas.", async () => { if (await act({ action: "canvas_disconnect" }, null, "Canvas disconnected for this class")) render(); }, "Disconnect") }, "Disconnect Canvas")));
+      box.appendChild(ctl);
+      const lc = h("div", { class: "card", id: "cvi-links" }, h("b", {}, "Canvas assignments linked to this class"));
+      if (!j.links.length) lc.appendChild(h("p", { class: "muted" }, "None yet. In Canvas, create an assignment, choose External Tool → ChemFlip and pick a ChemFlip assignment."));
+      j.links.forEach(l => lc.appendChild(h("label", { style: "display:flex;gap:10px;align-items:flex-start;margin-top:10px", id: "cvi-l-" + l.id.slice(0, 8) },
+        h("input", { type: "checkbox", checked: l.sync ? "checked" : false, "aria-label": "Sync " + l.title, onchange: async (e) => { if (await act({ action: "canvas_set", link_id: l.id, sync: e.target.checked }, null, e.target.checked ? "Will sync " + l.title : "Won't sync " + l.title)) render(); } }),
+        h("span", { style: "flex:1" }, h("b", {}, l.title), l.assignment_title && l.assignment_title !== l.title ? h("span", { class: "muted" }, " · ChemFlip: " + l.assignment_title) : null,
+          h("div", { class: "muted", style: "font-size:13px" }, !l.graded ? "No Canvas grade column, so nothing is sent." : ["✅ " + l.sent + " sent", l.pending ? "⏳ " + l.pending + " sending" : "", l.waiting ? "⏸️ " + l.waiting + " waiting" : "", l.held ? "🔒 " + l.held + " held until grades are released" : "", l.errors ? "⚠️ " + l.errors + " failed" : "", l.last_sent ? "last " + fmtTz(l.last_sent, localTz()) : ""].filter(Boolean).join(" · "))))));
+      box.appendChild(lc);
+      if (j.errors.length) { const ec = h("div", { class: "card", id: "cvi-errors" }, h("b", {}, "⚠️ Errors (" + j.errors.length + ")"));
+        j.errors.forEach(x => ec.appendChild(h("div", { style: "font-size:14px;margin-top:6px" }, x.name + " · " + x.link + ": " + x.error + (x.retry_at ? " Next try " + fmtTz(x.retry_at, localTz()) + "." : x.permanent ? "" : " Press Sync now to try again."))));
+        box.appendChild(ec); }
+      const cc = h("div", { class: "card", id: "cvi-conflicts" }, h("b", {}, "Conflicts"));
+      if (!j.conflicts.length) cc.appendChild(h("p", { class: "muted" }, "✅ No differences between Canvas and ChemFlip dates."));
+      else { cc.appendChild(h("p", { class: "muted" }, "Canvas reported a different due date for these students. ChemFlip uses its own dates; apply Canvas's date as a ChemFlip extension if you want them to match."));
+        j.conflicts.forEach(x => cc.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px" }, h("span", { style: "flex:1;min-width:200px" }, h("b", {}, x.name), " · " + x.link, h("div", { class: "muted", style: "font-size:13px" }, "Canvas due " + fmtTz(x.canvas_due_at, localTz()) + " · ChemFlip due " + fmtTz(x.chemflip_due_at, localTz()))),
+          x.sid ? h("button", { class: "btn small", onclick: async (e) => { e.target.disabled = true; try { await asgCall({ action: "override", assignment_id: x.assignment_id, scope: "student", target: x.sid, due_at: x.canvas_due_at, lock_at: x.canvas_lock_at || x.canvas_due_at, note: "Matched to Canvas" }); toast("✅ Extension added"); render(); } catch (er) { toast("❌ " + er.message); e.target.disabled = false; } } }, "Use Canvas's date") : null))); }
+      box.appendChild(cc);
+      const hc = h("details", { class: "card", id: "cvi-history" }, h("summary", { style: "cursor:pointer" }, h("b", {}, "Synchronization history")));
+      const rows = j.history.map(x => h("tr", {}, h("td", {}, fmtTz(x.at, localTz(), false)), h("td", {}, x.name), h("td", {}, x.link), h("td", {}, { sent: "✅ Sent" + (x.score != null ? " " + x.score + "/" + x.max : ""), pending: "⏳ Sending", waiting: "⏸️ Waiting", held: "🔒 Held", error: "⚠️ " + (x.error || "Failed") }[x.status] || x.status)));
+      const logs = j.log.map(x => h("tr", {}, h("td", {}, fmtTz(x.at, localTz(), false)), h("td", { colspan: "3" }, { canvas_auto_on: "Automatic sync turned on", canvas_auto_off: "Automatic sync turned off", canvas_sync_now: "Sync now", canvas_link_skip: "An assignment was set not to sync", canvas_link_sync: "An assignment was set to sync", canvas_disconnect: "Canvas disconnected", canvas_reconnect: "Canvas reconnected" }[x.action] || x.action)));
+      hc.appendChild(rows.length || logs.length ? h("table", { class: "t", style: "margin-top:8px" }, h("tr", {}, h("th", {}, "When"), h("th", {}, "Student"), h("th", {}, "Assignment"), h("th", {}, "Result")), rows, logs.length ? h("tr", {}, h("th", { colspan: "4" }, "Setting changes")) : null, logs) : h("p", { class: "muted" }, "Nothing yet."));
+      box.appendChild(hc);
+    }
+    const dc = h("div", { class: "card", id: "cvi-directions" }, h("b", {}, "What ChemFlip can sync with Canvas"), h("div", { style: "overflow-x:auto" }, h("table", { class: "t", style: "margin-top:8px" },
+      h("tr", {}, h("th", {}, "Information"), h("th", {}, "ChemFlip → Canvas"), h("th", {}, "Canvas → ChemFlip")),
+      j.directions.map(d => h("tr", {}, h("td", {}, h("b", {}, d.what), h("div", { class: "muted", style: "font-size:12px" }, d.note)), h("td", {}, CV_DIR[d.to_canvas]), h("td", {}, CV_DIR[d.from_canvas]))))),
+      h("p", { class: "muted", style: "font-size:13px" }, "ChemFlip only reports something as synced after Canvas confirms it. A Canvas API key from your school's Canvas administrator would add the 🔑 items."));
+    box.appendChild(dc);
+  };
+  courseCall({ action: "canvas", class_code: code }).then(draw).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card muted" }, e.status === 0 ? e.message : "❌ " + e.message)); });
+};
 async function removeStudent(c, r) {
   confirmBox("Remove " + (r.name || "this student") + " from " + c.name + "?", "They leave the class roster. Their answers, scores and grades are kept, and they can rejoin if you allow it.", async () => {
     try { if (DB.live && DB.call) await courseCall({ action: "remove", class_code: c.code, sid: r.sid }); else await DB.del("members", "class_code=eq." + c.code + "&sid=eq." + r.sid);
@@ -4615,6 +4692,7 @@ const HELP = [
   { id: "grading", t: "Instructors: grading and extensions", who: "instructor", kw: "grading grade comment override extension accommodation bulk credit regrade", b: ["The assignment screen shows who submitted and what needs grading. Short answers wait for you; every other type is graded by the server.", "On the grading screen you can change any question's points and leave a comment. Full credit for everyone and Regrade all are under Adjust grades for everyone.", "Give extensions to one student, a group, the whole class, or several selected students at once. Every change is kept in the history."] },
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
+  { id: "canvasint", t: "Instructors: Canvas Integration Settings", who: "instructor", kw: "canvas connect disconnect sync now automatic status failed history conflicts lms grades", b: ["ChemFlip works fully without Canvas. In a class, open Students → Class settings → Canvas Integration Settings to see the Canvas status (Connected, Disconnected or Synchronization Failed) and the last successful sync.", "Turn automatic sync off to keep grades in ChemFlip until you press Sync now. Untick a Canvas assignment to stop syncing it. Disconnect stops all sending for the class; links and waiting grades are kept, and reconnecting sends them once.", "If Canvas is down, students and instructors keep working; failed grades are retried and listed with the reason. The page also lists Canvas date differences and exactly what can sync today."] },
   { id: "joining", t: "Joining a class", who: "student", kw: "join class code invite link request approval waiting", b: ["Enter the 6-character class code under Classes, or open your instructor's invite link.", "Some classes need the instructor's approval: your request then shows as waiting under Classes, and the class opens once it is approved. Press Check to look again."] },
   { id: "canvas", t: "Canvas", who: "all", kw: "canvas lti grades roster deep link", b: ["ChemFlip can be added to a Canvas course by the school's Canvas administrator. Instructors can then add ChemFlip assignments from Canvas, sync the roster and send scores to the Canvas gradebook.", "Only scores are sent to Canvas, not submissions or extensions. ChemFlip also works fully without Canvas."] },
   { id: "access", t: "Accessibility and keyboard shortcuts", who: "all", kw: "accessibility keyboard shortcuts text size dark mode screen reader motion contrast", b: ["Ctrl+K or / opens search. Esc goes back. In a question, A–D or 1–4 picks an answer and Enter goes on.", "Settings → Appearance has light and dark themes. Settings → Accessibility has larger text and less motion.", "Every screen has a Skip to main content link for keyboard and screen-reader users."] },
