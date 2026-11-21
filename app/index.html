@@ -573,7 +573,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 function render() {
   applyTheme(); applyA11y(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
@@ -5040,6 +5040,7 @@ const HELP = [
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
   { id: "examprint", t: "Instructors: print an exam, PDF, Word, versions and answer keys", who: "instructor", kw: "print exam pdf word docx export versions answer key bubble sheet email paper test", b: ["Open a quiz, test or assignment in your class and press 🖨️ Print / PDF / Word. Fill in the header (institution, course, date, time limit, instructions), choose how many versions (A–D, with shuffled questions and/or choices) and what to include: the student version, an instructor version with the key, with explanations, or the answer key only.", "Preview shows exactly what prints and what goes into the PDF. Download Word gives an editable .docx. Each version has its own key; student copies can end with a bubble answer sheet.", "Email makes the file and opens a draft in your own email app; ChemFlip doesn't send it. A warning appears before any file with answers is emailed. Save exam settings keeps your choices with the exam in your account."] },
+  { id: "gradebook", t: "Instructors: the gradebook", who: "instructor", kw: "gradebook grades total weighted categories letter missing late excused export csv excel import paper exam column", b: ["Class → Assignments → 📊 Gradebook. Every student and every published assignment, quiz, test and lab report, with the best attempt (late penalties applied), missing and late work, category percentages, the total and a letter grade.", "⚙️ Grading scheme: total points or weighted categories (weights add up to 100%), drop the lowest scores in a category, your letter scale, and whether missing work counts as 0 after the deadline.", "+ Add column for paper exams or anything graded elsewhere; enter scores or import them from a CSV (matched by student ID or name, with a preview). Click any grade to add a private comment or excuse it. Export to CSV or Excel."] },
   { id: "labemail", t: "Instructors: lab reports sent by email or on paper", who: "instructor", kw: "email attachment inbox paper missing upload match student lab report manager", b: ["Instructor dashboard → 📥 Lab report inbox lists every lab report in your sections, by course and section, with submitted, to-grade, missing and late counts.", "When a student emails a report, save the attachment from your email, open the lab report and press 📥 Add reports received by email or on paper. Add several files at once: each is matched to a student by the student ID or name in its file name, and you can change the match. Enter when the email arrived; late is worked out from that.", "ChemFlip never opens your mailbox. The student sees the report in their submissions (sent by email, added by your instructor) and gets your grade and feedback as usual."] },
   { id: "labreport", t: "Lab reports: photograph and submit", who: "all", kw: "lab report scan pdf photo camera pages upload handwritten submit receipt", b: ["Students: open My assignments → Submit lab report. Photograph each page (or add photos you already took). ChemFlip finds the page edges and straightens each page on your device; drag the corners to fix them, rotate sideways pages, and reorder or delete pages.", "Original (the default) keeps your handwriting exactly as photographed. Clearer brightens the page; Black & white is optional. Blurry, dark, blank or repeated pages and missing pages are flagged before you submit.", "Preview or download the PDF, share it, or press Submit to ChemFlip: you get a receipt code, and a retry after a lost connection never makes a second copy. Instructors: + Lab report in the class's assignment list; open the lab report to see every PDF, give points and feedback."] },
   { id: "canvasint", t: "Instructors: Canvas Integration Settings", who: "instructor", kw: "canvas connect disconnect sync now automatic status failed history conflicts lms grades", b: ["ChemFlip works fully without Canvas. In a class, open Students → Class settings → Canvas Integration Settings to see the Canvas status (Connected, Disconnected or Synchronization Failed) and the last successful sync.", "Turn automatic sync off to keep grades in ChemFlip until you press Sync now. Untick a Canvas assignment to stop syncing it. Disconnect stops all sending for the class; links and waiting grades are kept, and reconnecting sends them once.", "If Canvas is down, students and instructors keep working; failed grades are retried and listed with the reason. The page also lists Canvas date differences and exactly what can sync today."] },
@@ -5182,7 +5183,7 @@ function teacherAsg(c, done) {
     tzc.appendChild(sel); tzc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "asg-tz-save", onclick: async () => { try { await asgCall({ action: "tz", class_code: c.code, tz: sel.value }); toast("Time zone saved"); render(); } catch (e) { toast("❌ " + e.message); } } }, j.tz ? "Change time zone" : "Use this time zone")));
     if (!j.tz) tzc.style.borderLeft = "5px solid var(--gold)";
     wrap.appendChild(tzc);
-    const card = h("div", { class: "card", id: "asg-list" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center" }, h("b", {}, "Graded assignments, quizzes and tests"), h("span", { style: "display:flex;gap:6px" }, h("button", { class: "btn sec2 small", id: "asg-new-lab", onclick: () => go("labedit", { code: c.code }) }, "+ Lab report"), h("button", { class: "btn small", id: "asg-new", onclick: () => go("asgedit", { code: c.code }) }, "+ New"))));
+    const card = h("div", { class: "card", id: "asg-list" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center" }, h("b", {}, "Graded assignments, quizzes and tests"), h("span", { style: "display:flex;gap:6px;flex-wrap:wrap" }, h("button", { class: "btn sec2 small", id: "open-gradebook", onclick: () => go("gradebook", { code: c.code }) }, "📊 Gradebook"), h("button", { class: "btn sec2 small", id: "asg-new-lab", onclick: () => go("labedit", { code: c.code }) }, "+ Lab report"), h("button", { class: "btn small", id: "asg-new", onclick: () => go("asgedit", { code: c.code }) }, "+ New"))));
     if (!j.assignments.length) card.appendChild(h("p", { class: "muted" }, "None yet. Each one has its own open, due and lock dates, time limit, attempts and late policy, and you can extend deadlines for one student, a group or the whole class."));
     const pick = new Set(), bar = h("div", { class: "bulkbar", id: "asg-bulk", style: "display:none", role: "region", "aria-label": "Bulk actions" });
     const drawBar = () => { bar.style.display = pick.size ? "" : "none"; bar.innerHTML = ""; if (!pick.size) return;
@@ -5613,6 +5614,181 @@ VIEWS.examexport = function (arg) {
     box.appendChild(h("p", { class: "muted", id: "ex-note", style: "font-size:12.5px" }, "Pages are made on this device. Drawn-structure and written questions get answer space (a box or lines) on paper; on the answer key they show the correct structure (SMILES), value and unit, or your rubric."));
   }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
 };
+/* ----- 5.0 gradebook (instructor): computed from ChemFlip work + columns the instructor adds ----- */
+const GB_KINDS = { assignment: "Homework", quiz: "Quizzes", test: "Tests", lab: "Labs" };
+function gbDefaults() { return { mode: "points", categories: [{ name: "Homework", weight: 20, kinds: ["assignment"], drop: 0 }, { name: "Quizzes", weight: 20, kinds: ["quiz"], drop: 0 }, { name: "Tests", weight: 40, kinds: ["test"], drop: 0 }, { name: "Labs", weight: 20, kinds: ["lab"], drop: 0 }],
+  scale: [{ letter: "A", min: 90 }, { letter: "B", min: 80 }, { letter: "C", min: 70 }, { letter: "D", min: 60 }, { letter: "F", min: 0 }], colcat: {}, missing_zero: true, round: 1 }; }
+// Pure: every number the gradebook shows and exports comes from here.
+function gbCompute(d, S0) {
+  const s = Object.assign(gbDefaults(), S0 || {}), now = Date.parse(d.now || new Date().toISOString()), cellOf = {};
+  (d.cells || []).forEach(c => cellOf[c.col + "|" + c.sid] = c);
+  const catOf = col => s.colcat[col.id] || (col.manual ? col.category : (s.categories.find(c => c.kinds.includes(col.kind)) || {}).name) || "Other";
+  const cols = d.cols.filter(c => c.published).map(c => Object.assign({}, c, { manual: false })).concat((d.items || []).map(i => ({ id: i.id, kind: "manual", title: i.title, max: Number(i.max_points), due_at: i.due_at, manual: true, category: i.category, published: true })));
+  cols.forEach(c => c.cat = catOf(c));
+  const cats = s.categories.map(c => c.name); cols.forEach(c => { if (!cats.includes(c.cat)) cats.push(c.cat); });
+  const R = d.roster.map(m => {
+    const cells = {}, byCat = {};
+    cols.forEach(c => { const x = cellOf[c.id + "|" + m.sid] || {}; let v;
+      if (x.excused) v = { st: "excused" };
+      else if (!c.manual) { const g = (d.grades[c.id] || {})[m.sid] || { status: "not_due" };
+        if (g.status === "graded") v = { st: g.late ? "late" : "graded", pts: g.score, max: g.total || c.max, late: g.late, penalty: g.penalty };
+        else if (g.status === "missing") v = s.missing_zero ? { st: "missing", pts: 0, max: c.max } : { st: "missing" };
+        else v = { st: g.status }; }
+      else if (x.score != null) v = { st: "graded", pts: Number(x.score), max: c.max };
+      else if (c.due_at && now >= Date.parse(c.due_at)) v = s.missing_zero ? { st: "missing", pts: 0, max: c.max } : { st: "missing" };
+      else v = { st: "none" };
+      v.comment = x.comment || ""; cells[c.id] = v;
+      if (v.pts != null && v.max > 0) (byCat[c.cat] = byCat[c.cat] || []).push(v); });
+    const catPct = {}; let P = 0, M = 0;
+    Object.entries(byCat).forEach(([k, list]) => { const def = s.categories.find(c => c.name === k), drop = def ? def.drop || 0 : 0;
+      const keep = list.slice().sort((a, b) => a.pts / a.max - b.pts / b.max).slice(Math.min(drop, Math.max(0, list.length - 1)));
+      const p = keep.reduce((t, v) => t + v.pts, 0), mx = keep.reduce((t, v) => t + v.max, 0); catPct[k] = mx ? 100 * p / mx : null; P += p; M += mx; });
+    let total = null;
+    if (s.mode === "weighted") { let w = 0, t = 0; s.categories.forEach(c => { if (catPct[c.name] != null && c.weight > 0) { t += c.weight * catPct[c.name]; w += c.weight; } }); total = w ? t / w : null; }
+    else total = M ? 100 * P / M : null;
+    const r = v => v == null ? null : Math.round(v * Math.pow(10, s.round)) / Math.pow(10, s.round);
+    const letter = total == null ? "" : ((s.scale.find(x => r(total) >= x.min) || s.scale[s.scale.length - 1] || {}).letter || "");
+    return { m, cells, catPct: Object.fromEntries(Object.entries(catPct).map(([k, v]) => [k, r(v)])), total: r(total), letter, missing: Object.values(cells).filter(v => v.st === "missing").length, late: Object.values(cells).filter(v => v.late).length };
+  });
+  const avg = {}; cols.forEach(c => { const v = R.map(x => x.cells[c.id]).filter(v => v.pts != null && v.max > 0); avg[c.id] = v.length ? Math.round(1000 * v.reduce((t, x) => t + x.pts / x.max, 0) / v.length) / 10 : null; });
+  const tv = R.map(x => x.total).filter(x => x != null);
+  return { s, cols, cats: cats.filter(k => cols.some(c => c.cat === k)), rows: R, avg, classAvg: tv.length ? Math.round(10 * tv.reduce((a, b) => a + b, 0) / tv.length) / 10 : null };
+}
+function gbCellText(v) { return v.st === "excused" ? "Excused" : v.st === "missing" ? (v.pts != null ? "0 (missing)" : "Missing") : v.st === "pending" ? "To grade" : v.st === "in_progress" ? "In progress" : v.pts != null ? String(v.pts) : ""; }
+function gbTable(G) {   // header row + data rows, shared by CSV and Excel
+  const head = ["Student", "Student ID"].concat(G.cols.map(c => c.title + " (" + c.max + ")"), G.cats.map(k => k + " %"), ["Total %", "Letter", "Missing", "Late"]);
+  const rows = G.rows.map(r => [r.m.name, r.m.stu_id || ""].concat(G.cols.map(c => { const v = r.cells[c.id]; return v.st === "graded" || v.st === "late" ? v.pts : gbCellText(v); }), G.cats.map(k => r.catPct[k] ?? ""), [r.total ?? "", r.letter, r.missing, r.late]));
+  return [head].concat(rows);
+}
+function gbCsv(G) { return gbTable(G).map(r => r.map(x => { const s = String(x ?? ""); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? '"' + s.replace(/^([=+\-@])/, "'$1").replace(/"/g, '""') + '"' : s; }).join(",")).join("\r\n") + "\r\n"; }
+function gbXlsx(G, name) {
+  const col = i => { let s = ""; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const rows = gbTable(G).map((r, ri) => '<row r="' + (ri + 1) + '">' + r.map((x, ci) => { const ref = col(ci) + (ri + 1);
+    return typeof x === "number" && isFinite(x) ? '<c r="' + ref + '"' + (ri ? "" : ' s="1"') + '><v>' + x + '</v></c>' : '<c r="' + ref + '" t="inlineStr"' + (ri ? "" : ' s="1"') + '><is><t xml:space="preserve">' + exX(x ?? "") + '</t></is></c>'; }).join("") + '</row>').join("");
+  const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane xSplit="2" ySplit="1" topLeftCell="C2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="26" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/></cols><sheetData>' + rows + '</sheetData></worksheet>';
+  const wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + exX(String(name || "Gradebook").replace(/[\\\/?*\[\]:]/g, " ").slice(0, 31)) + '" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  return exZip([{ name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+    { name: "xl/workbook.xml", data: wb }, { name: "xl/styles.xml", data: styles },
+    { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { name: "xl/worksheets/sheet1.xml", data: sheet }]);
+}
+function gbParseCsv(text) { const rows = []; let row = [], f = "", q = false; const t = String(text).replace(/^﻿/, "");
+  for (let i = 0; i < t.length; i++) { const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true; else if (ch === "," || ch === ";" || ch === "\t") { row.push(f); f = ""; } else if (ch === "\n" || ch === "\r") { if (ch === "\r" && t[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; } else f += ch; }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); } return rows.filter(r => r.some(x => String(x).trim())); }
+// Rows of a spreadsheet → {sid, score}: the student ID column wins, then the exact name; the score column is the last numeric one.
+function gbMatchRows(rows, roster) {
+  if (!rows.length) return { ok: [], bad: [] };
+  const H = rows[0].map(x => String(x).toLowerCase().trim()), hasHead = H.some(x => /name|student|id|score|points|grade/.test(x)), body = hasHead ? rows.slice(1) : rows;
+  const idC = hasHead ? H.findIndex(x => /\bid\b|student id|sid|number/.test(x)) : -1, nmC = hasHead ? H.findIndex(x => /name|student$/.test(x)) : 0;
+  const scC = hasHead ? H.findIndex(x => /score|points|grade|mark|total/.test(x)) : (rows[0] || []).length - 1;
+  const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), byId = {}, byName = {};
+  roster.forEach(m => { if (m.stu_id) byId[String(m.stu_id).trim().toLowerCase()] = m; const n = norm(m.name); byName[n] = byName[n] ? "dup" : m; const p = n.split(" "); if (p.length === 2) { const rev = p[1] + " " + p[0]; byName[rev] = byName[rev] ? "dup" : m; } });
+  const ok = [], bad = [];
+  body.forEach((r, i) => { const id = idC >= 0 ? String(r[idC] || "").trim().toLowerCase() : "", nm = nmC >= 0 ? norm(r[nmC]) : "";
+    const m = (id && byId[id]) || (nm && byName[nm] && byName[nm] !== "dup" ? byName[nm] : null), raw = String(r[scC >= 0 ? scC : r.length - 1] || "").trim();
+    const sc = raw === "" ? null : Number(raw.replace(",", "."));
+    if (!m) bad.push({ line: i + (hasHead ? 2 : 1), why: "no student matches " + ([idC >= 0 ? r[idC] : "", nmC >= 0 ? r[nmC] : ""].filter(x => String(x || "").trim()).join(" / ") || "this row") });
+    else if (sc !== null && !Number.isFinite(sc)) bad.push({ line: i + (hasHead ? 2 : 1), why: "score isn't a number (" + raw + ")" });
+    else ok.push({ sid: m.sid, name: m.name, score: sc }); });
+  return { ok, bad };
+}
+VIEWS.gradebook = function (arg) {
+  if (!isTeacher()) { back(); return; }
+  const code = arg.code, box = h("div", { id: "gb-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  const reload = () => { VIEWS.gradebook.d = null; render(); };
+  asgCall({ action: "gb", class_code: code }).then(d => { VIEWS.gradebook.d = d; box.innerHTML = "";
+    document.getElementById("title").textContent = "Gradebook · " + d.class_name;
+    const G = gbCompute(d, d.settings), s = G.s, tz = d.tz || localTz();
+    const fname = ext => (d.class_name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") || "Class") + "-Gradebook-" + new Date().toISOString().slice(0, 10) + "." + ext;
+    box.appendChild(h("div", { class: "card", id: "gb-head" }, h("b", {}, "📊 Gradebook"),
+      h("div", { class: "muted", style: "font-size:13px" }, d.roster.length + " students · " + G.cols.length + " columns · " + (s.mode === "weighted" ? "weighted by category" : "total points") + (G.classAvg != null ? " · class average " + G.classAvg + "%" : "") + ". Scores come from ChemFlip work (best attempt, late penalties applied); add columns for paper exams or anything graded elsewhere."),
+      h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "gb-add", onclick: () => gbItemSheet(code, null, reload) }, "+ Add column"),
+        h("button", { class: "btn ghost small", id: "gb-csv", onclick: () => { labDownload(new Blob(["﻿" + gbCsv(G)], { type: "text/csv" }), fname("csv")); toast("⬇️ " + fname("csv")); } }, "⬇️ CSV"),
+        h("button", { class: "btn ghost small", id: "gb-xlsx", onclick: () => { labDownload(new Blob([gbXlsx(G, d.class_name)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fname("xlsx")); toast("⬇️ " + fname("xlsx")); } }, "⬇️ Excel")),
+      h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0 0" }, "Grades shown here are ChemFlip's. Canvas-linked assignments show 🔗; check Canvas Integration Settings for what has actually reached Canvas.")));
+    // grading scheme
+    const sc = JSON.parse(JSON.stringify(s)), schemeMsg = h("div", { class: "muted", role: "status", id: "gb-scheme-msg" });
+    const catBox = h("div", { id: "gb-cats" }), drawCats = () => { catBox.innerHTML = "";
+      sc.categories.forEach((c, i) => catBox.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0" },
+        h("input", { class: "field", id: "gb-cat-name-" + i, value: c.name, "aria-label": "Category " + (i + 1) + " name", style: "max-width:160px", oninput: e => c.name = e.target.value }),
+        h("label", { style: "display:flex;gap:4px;align-items:center" }, h("input", { class: "field", type: "number", id: "gb-cat-w-" + i, min: "0", max: "100", value: c.weight, style: "width:80px", "aria-label": c.name + " weight (%)", oninput: e => c.weight = +e.target.value }), "%"),
+        h("label", { style: "display:flex;gap:4px;align-items:center" }, "drop lowest", h("input", { class: "field", type: "number", id: "gb-cat-drop-" + i, min: "0", max: "10", value: c.drop || 0, style: "width:64px", "aria-label": c.name + ": number of lowest scores to drop", oninput: e => c.drop = +e.target.value })),
+        h("span", { class: "muted", style: "font-size:12px" }, c.kinds.length ? "gets " + c.kinds.map(k => GB_KINDS[k].toLowerCase()).join(", ") : ""),
+        h("button", { class: "btn ghost small", "aria-label": "Remove category " + c.name, onclick: () => { sc.categories.splice(i, 1); drawCats(); } }, "✕")))); };
+    drawCats();
+    const scaleIn = h("input", { class: "field", id: "gb-scale", value: sc.scale.map(x => x.letter + " " + x.min).join(", "), "aria-label": "Letter grades and their minimum percentage" });
+    const modeSel = h("select", { class: "field", id: "gb-mode", style: "max-width:260px", onchange: e => sc.mode = e.target.value }, h("option", { value: "points", selected: sc.mode === "points" ? "" : null }, "Total points"), h("option", { value: "weighted", selected: sc.mode === "weighted" ? "" : null }, "Weighted categories"));
+    const mz = h("input", { type: "checkbox", id: "gb-mz", onchange: e => sc.missing_zero = e.target.checked }); mz.checked = sc.missing_zero !== false;
+    box.appendChild(h("details", { class: "card", id: "gb-scheme" }, h("summary", {}, h("b", {}, "⚙️ Grading scheme")),
+      h("label", { class: "f", for: "gb-mode" }, "Final grade from"), modeSel, h("div", { class: "f", style: "margin-top:8px" }, "Categories (weights are used with \"Weighted categories\" and must add up to 100%)"), catBox,
+      h("button", { class: "btn ghost small", id: "gb-cat-add", onclick: () => { sc.categories.push({ name: "New category", weight: 0, kinds: [], drop: 0 }); drawCats(); } }, "+ Category"),
+      h("label", { class: "f", for: "gb-scale" }, "Letter grades (letter and minimum %, highest first)"), scaleIn,
+      h("label", { class: "check", for: "gb-mz" }, mz, h("span", {}, "Missing work counts as 0 after the deadline (otherwise it's left out)")),
+      h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "gb-scheme-save", onclick: async () => {
+        sc.scale = scaleIn.value.split(/[,;]/).map(x => x.trim()).filter(Boolean).map(x => { const m = /^(\S+)\s*[:=]?\s*([\d.]+)/.exec(x); return m ? { letter: m[1], min: +m[2] } : null; }).filter(Boolean);
+        if (!sc.scale.length) { schemeMsg.textContent = "❌ Enter letter grades like: A 90, B 80, C 70, D 60, F 0"; return; }
+        try { await asgCall({ action: "gb_cfg", class_code: code, settings: sc }); toast("✅ Grading scheme saved"); reload(); } catch (e) { schemeMsg.textContent = "❌ " + e.message; } } }, "Save scheme")), schemeMsg));
+    // table
+    const q = h("input", { class: "field", id: "gb-q", placeholder: "Find a student", "aria-label": "Find a student", style: "max-width:240px" });
+    const onlyMiss = h("input", { type: "checkbox", id: "gb-miss" });
+    const wrap = h("div", { id: "gb-wrap", style: "overflow:auto;max-height:70vh;border:1px solid var(--line,#ccd);border-radius:8px", tabindex: "0", role: "region", "aria-label": "Gradebook table" });
+    const draw = () => { wrap.innerHTML = ""; const tb = h("table", { class: "t gb", id: "gb-table", style: "border-collapse:separate;border-spacing:0;min-width:100%" });
+      const th = (x, extra) => h("th", Object.assign({ scope: "col", style: "position:sticky;top:0;background:var(--card,#fff);z-index:1;vertical-align:bottom;padding:6px;border-bottom:2px solid var(--line,#ccd);font-size:12.5px;text-align:left" }, extra || {}), x);
+      tb.appendChild(h("tr", {}, th("Student", { style: "position:sticky;left:0;top:0;z-index:2;background:var(--card,#fff);padding:6px;border-bottom:2px solid var(--line,#ccd);min-width:150px" }),
+        ...G.cols.map(c => th(h("button", { class: "linkish", id: "gb-col-" + c.id.slice(0, 8), style: "background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline dotted", onclick: () => c.manual ? gbItemSheet(code, (d.items || []).find(i => i.id === c.id), reload, d.roster) : go(c.kind === "lab" ? "asgdetail" : "asgdetail", { id: c.id, code }) },
+          h("div", { style: "font-weight:700;max-width:140px" }, c.title + (c.canvas ? " 🔗" : "")), h("div", { class: "muted", style: "font-weight:400" }, c.cat + " · " + c.max + " pts"), h("span", { class: "sr-only" }, c.manual ? " (edit column, enter or import scores)" : " (open assignment)")))),
+        ...G.cats.map(k => th(k + " %")), th("Total"), th("Grade")));
+      const term = q.value.trim().toLowerCase();
+      G.rows.filter(r => (!term || (r.m.name + " " + (r.m.stu_id || "")).toLowerCase().includes(term)) && (!onlyMiss.checked || r.missing)).forEach(r => {
+        const td = (x, st) => h("td", { style: "padding:5px 6px;border-bottom:1px solid var(--line,#eee);white-space:nowrap;" + (st || "") }, x);
+        tb.appendChild(h("tr", { id: "gb-r-" + r.m.sid }, h("th", { scope: "row", style: "position:sticky;left:0;background:var(--card,#fff);text-align:left;padding:5px 6px;border-bottom:1px solid var(--line,#eee);font-weight:600" }, r.m.name, r.m.stu_id ? h("div", { class: "muted", style: "font-weight:400;font-size:12px" }, r.m.stu_id) : null),
+          ...G.cols.map(c => { const v = r.cells[c.id], color = v.st === "missing" ? "color:var(--bad,#b3261e);" : v.st === "pending" ? "color:#8a6100;" : v.st === "excused" ? "color:#555;font-style:italic;" : "";
+            return td(h("button", { class: "gb-cell", id: "gb-c-" + c.id.slice(0, 8) + "-" + r.m.sid, style: "background:none;border:0;padding:0;font:inherit;cursor:pointer;" + color, "aria-label": r.m.name + ", " + c.title + ": " + (gbCellText(v) || "no grade yet") + (v.comment ? ", has a comment" : "") + ". Edit", onclick: () => gbCellSheet(code, c, r.m, v, reload) },
+              (gbCellText(v) || "–") + (v.late ? " ⏰" : "") + (v.comment ? " 💬" : ""))); }),
+          ...G.cats.map(k => td(r.catPct[k] == null ? "–" : r.catPct[k] + "%")), td(h("b", {}, r.total == null ? "–" : r.total + "%")), td(h("b", {}, r.letter || "–")))); });
+      tb.appendChild(h("tr", { id: "gb-avg" }, h("th", { scope: "row", style: "position:sticky;left:0;background:var(--card,#fff);text-align:left;padding:5px 6px" }, "Class average"), ...G.cols.map(c => h("td", { style: "padding:5px 6px", class: "muted" }, G.avg[c.id] == null ? "–" : G.avg[c.id] + "%")), ...G.cats.map(() => h("td", {})), h("td", { style: "padding:5px 6px" }, h("b", {}, G.classAvg == null ? "–" : G.classAvg + "%")), h("td", {})));
+      wrap.appendChild(tb); };
+    q.oninput = draw; onlyMiss.onchange = draw;
+    box.appendChild(h("div", { class: "card", id: "gb-card" }, h("div", { style: "display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:6px" }, q, h("label", { class: "check", for: "gb-miss", style: "margin:0" }, onlyMiss, h("span", {}, "Only students with missing work"))),
+      h("p", { class: "muted", style: "font-size:12.5px;margin:0 0 6px" }, "Click a grade to add a comment or excuse it; click a column you added to enter or import scores. ⏰ late · 💬 comment · \"To grade\" isn't counted until you grade it."), wrap));
+    draw();
+    if (!d.roster.length) box.appendChild(h("div", { class: "card muted" }, "No students yet. Share the class code or invite link."));
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+function gbModal(id, title, ...kids) { const m = h("div", { class: "modal", id, role: "dialog", "aria-modal": "true", "aria-label": title }, h("div", { class: "box", style: "max-width:560px;max-height:90vh;overflow:auto" }, h("div", { class: "cam-head" }, h("b", {}, title), h("button", { class: "btn ghost small", "aria-label": "Close", onclick: () => m.remove() }, "✕")), ...kids)); document.body.appendChild(m); setTimeout(() => { const f = m.querySelector("input,textarea,select"); if (f) f.focus(); }, 30); return m; }
+function gbCellSheet(code, c, stu, v, after) {
+  const msg = h("div", { class: "muted", role: "status", id: "gb-cell-msg" });
+  const sc = c.manual ? h("input", { class: "field", id: "gb-cell-score", type: "number", min: "0", step: "0.5", value: v.pts != null && v.st !== "missing" ? v.pts : "", style: "width:120px" }) : null;
+  const cm = h("textarea", { class: "field", id: "gb-cell-comment", rows: "3", maxlength: "1000" }); cm.value = v.comment || "";
+  const ex = h("input", { type: "checkbox", id: "gb-cell-excused" }); ex.checked = v.st === "excused";
+  const m = gbModal("gb-cell", stu.name + " · " + c.title,
+    h("p", { class: "muted", style: "font-size:13px" }, c.manual ? "Out of " + c.max + " points." : "Now: " + (gbCellText(v) || "no grade yet") + ". ChemFlip computes this grade from the student's work; change it by grading the assignment."),
+    sc ? h("div", {}, h("label", { class: "f", for: "gb-cell-score" }, "Score (empty = not graded)"), sc) : null,
+    h("label", { class: "f", for: "gb-cell-comment" }, "Comment (only you see it)"), cm,
+    h("label", { class: "check", for: "gb-cell-excused" }, ex, h("span", {}, "Excused (left out of the grade)")),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "gb-cell-save", onclick: async () => { const body = { action: "gb_cell", class_code: code, col: c.id, sid: stu.sid, comment: cm.value, excused: ex.checked }; if (sc) body.score = sc.value === "" ? null : +sc.value;
+      try { await asgCall(body); m.remove(); toast("✅ Saved"); after(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Save"), c.manual ? null : h("button", { class: "btn ghost", onclick: () => { m.remove(); go("asgdetail", { id: c.id, code }); } }, "Open assignment")), msg);
+}
+function gbItemSheet(code, it, after, roster) {
+  const msg = h("div", { class: "muted", role: "status", id: "gb-item-msg" }), F = { title: it ? it.title : "", max: it ? it.max_points : 100, cat: it ? it.category : "Tests", due: it && it.due_at ? isoToZoned(it.due_at, ASG.tz || localTz()) : "" };
+  const inp = (id, lab, k, type, ex) => { const i = h("input", Object.assign({ class: "field", id, type: type || "text", value: F[k] }, ex || {})); i.oninput = () => F[k] = i.value; return h("div", {}, h("label", { class: "f", for: id }, lab), i); };
+  const importBox = it ? h("div", { id: "gb-import", style: "border-top:1px solid var(--line,#ddd);margin-top:10px;padding-top:8px" }, h("b", {}, "Import scores from a spreadsheet"),
+    h("p", { class: "muted", style: "font-size:12.5px" }, "A CSV file (save Excel or Google Sheets as CSV) with a student ID or name column and a score column. You'll see what matched before anything is saved."),
+    h("input", { type: "file", id: "gb-import-file", accept: ".csv,text/csv,text/plain", "aria-label": "CSV file with scores", onchange: async e => { const f = e.target.files[0]; if (!f) return; const r = gbMatchRows(gbParseCsv(await f.text()), roster || []); prev.innerHTML = "";
+      prev.appendChild(h("div", { id: "gb-import-sum" }, "✓ " + r.ok.length + " row" + (r.ok.length === 1 ? "" : "s") + " matched" + (r.bad.length ? " · ⚠️ " + r.bad.length + " not imported" : "")));
+      if (r.bad.length) prev.appendChild(h("ul", { style: "font-size:12.5px;margin:4px 0" }, ...r.bad.slice(0, 20).map(b => h("li", {}, "Line " + b.line + ": " + b.why))));
+      if (r.ok.length) prev.appendChild(h("button", { class: "btn small", id: "gb-import-go", onclick: async () => { try { const x = await asgCall({ action: "gb_import", class_code: code, col: it.id, rows: r.ok.map(o => ({ sid: o.sid, score: o.score })) }); m.remove(); toast("✅ Imported " + x.count + " scores"); after(); } catch (er) { msg.textContent = "❌ " + er.message; } } }, "Import " + r.ok.length + " scores")); } })) : null;
+  const prev = h("div", { id: "gb-import-preview", role: "status" }); if (importBox) importBox.appendChild(prev);
+  const m = gbModal("gb-item", it ? "Column: " + it.title : "Add a column",
+    h("p", { class: "muted", style: "font-size:13px" }, "For paper exams, participation, or anything graded outside ChemFlip."),
+    inp("gb-item-title", "Title", "title", "text", { maxlength: "120", placeholder: "e.g. Midterm (paper)" }), inp("gb-item-max", "Points", "max", "number", { min: "1", max: "1000" }), inp("gb-item-cat", "Category", "cat", "text", { maxlength: "40" }), inp("gb-item-due", "Date (missing scores count after it; optional)", "due", "datetime-local"),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "gb-item-save", onclick: async () => { try { await asgCall({ action: "gb_item", class_code: code, id: it ? it.id : undefined, title: F.title, max_points: +F.max, category: F.cat, due_at: F.due ? zonedToIso(F.due, ASG.tz || localTz()) : null }); m.remove(); toast("✅ Column saved"); after(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, it ? "Save" : "Add column"),
+      it ? h("button", { class: "btn ghost", id: "gb-item-del", style: "color:var(--bad)", onclick: () => confirmBox("Remove the column " + it.title + "?", "It disappears from the gradebook and the totals. The scores stay in the records.", async () => { await asgCall({ action: "gb_item", class_code: code, id: it.id, delete: true }); m.remove(); after(); }, "Remove") }, "Remove column") : null), msg, importBox);
+}
 /* ----- 5.0 Email Submission Manager: reports received by email (or on paper) added by the instructor ----- */
 // File name → student: a student ID in the name wins; otherwise every part of the student's name must appear. Ambiguous → none.
 function labMatch(fname, roster) {
