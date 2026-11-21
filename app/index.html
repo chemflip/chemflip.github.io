@@ -573,7 +573,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 function render() {
   applyTheme(); applyA11y(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
@@ -2895,7 +2895,7 @@ function photoCapture(opts) {
     document.body.appendChild(wrap);
     const fileIn = (capture) => { const i = h("input", { type: "file", accept: "image/*", style: "display:none", id: capture ? "cam-file-cam" : "cam-file" }); if (capture) i.setAttribute("capture", opts.facing === "user" ? "user" : "environment");
       i.onchange = async () => { const f = i.files && i.files[0]; if (!f) return; if (!/^image\//.test(f.type || "image/")) { msg.textContent = "That file isn't an image. Choose a JPG, PNG or HEIC photo."; return; }
-        try { const url = await blobToDataUrl(f); img = await loadImg(url); camStop(); edit(); } catch (e) { msg.textContent = "Couldn't open that picture (some HEIC/RAW files aren't supported by this browser). Try a JPG or PNG, or take a new photo."; } };
+        try { const url = await blobToDataUrl(f); img = await loadImg(url); camStop(); next(); } catch (e) { msg.textContent = "Couldn't open that picture (some HEIC/RAW files aren't supported by this browser). Try a JPG or PNG, or take a new photo."; } };
       return i; };
     const upl = fileIn(false), devCam = fileIn(true); wrap.appendChild(upl); wrap.appendChild(devCam);
     const fallbackBtns = () => h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "cam-device", onclick: () => devCam.click() }, "📷 Use device camera"), h("button", { class: "btn sec2", id: "cam-upload", onclick: () => upl.click() }, "🖼️ Upload a photo"));
@@ -2903,7 +2903,7 @@ function photoCapture(opts) {
       stage = "live"; body.innerHTML = ""; msg.textContent = "";
       if (!camSupported()) { msg.textContent = camErrText(null); body.appendChild(fallbackBtns()); return; }
       const video = h("video", { id: "cam-video", autoplay: "", playsinline: "", muted: "", class: "cam-video" }); video.muted = true; video.setAttribute("playsinline", "");
-      const shoot = h("button", { class: "btn", id: "cam-shoot", disabled: "", onclick: () => { if (!video.videoWidth) return; const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight; c.getContext("2d").drawImage(video, 0, 0); camStop(); loadImg(c.toDataURL("image/jpeg", 0.95)).then(i => { img = i; sfx && sfx("tap"); edit(); }); } }, "📸 Take photo");
+      const shoot = h("button", { class: "btn", id: "cam-shoot", disabled: "", onclick: () => { if (!video.videoWidth) return; const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight; c.getContext("2d").drawImage(video, 0, 0); camStop(); loadImg(c.toDataURL("image/jpeg", 0.95)).then(i => { img = i; sfx && sfx("tap"); next(); }); } }, "📸 Take photo");
       const flip = h("button", { class: "btn sec2", id: "cam-flip", style: "display:none", onclick: () => { CAM.idx = (CAM.idx + 1) % CAM.devices.length; start(CAM.devices[CAM.idx].deviceId); } }, "🔄 Switch camera");
       body.appendChild(h("div", { class: "cam-stage" }, video, opts.square ? h("div", { class: "cam-guide sq" }) : h("div", { class: "cam-guide" })));
       body.appendChild(h("div", { class: "btnrow" }, shoot, flip, h("button", { class: "btn ghost", id: "cam-upload", onclick: () => upl.click() }, "🖼️ Upload instead")));
@@ -2925,6 +2925,8 @@ function photoCapture(opts) {
       start();
     }
     function rotated() { const c = document.createElement("canvas"), q = ((rot % 4) + 4) % 4; c.width = q % 2 ? img.height : img.width; c.height = q % 2 ? img.width : img.height; const g = c.getContext("2d"); g.translate(c.width / 2, c.height / 2); g.rotate(q * Math.PI / 2); g.drawImage(img, -img.width / 2, -img.height / 2); return c; }
+    // opts.raw: return the photo as taken (no crop/rotate stage; the lab scanner has its own page editor), longest side ≤ maxSide.
+    async function next() { if (!opts.raw) { edit(); return; } msg.textContent = "Saving…"; const c = document.createElement("canvas"); c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height; c.getContext("2d").drawImage(img, 0, 0); try { finish(await compressCanvas(c, opts.maxSide || 2400, opts.budgetKB || 1800)); } catch (e) { msg.textContent = "Couldn't save the photo on this device. Try again."; } }
     function defaultCrop(c) { if (!opts.square) return { x: 0, y: 0, w: 1, h: 1 }; const m = Math.min(c.width, c.height); return { x: (c.width - m) / 2 / c.width, y: (c.height - m) / 2 / c.height, w: m / c.width, h: m / c.height }; }
     function edit() {
       stage = "edit"; body.innerHTML = ""; msg.textContent = "Drag the corners to crop. Rotate if the page is sideways.";
@@ -2994,6 +2996,136 @@ function workPanel(q) {
   showDraw();
   return h("div", { class: "work", id: "work-panel" }, h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" }, btn, dbtn), strip, dthumb);
 }
+
+/* ---------- lab report scanner (5.0 independent platform) ----------
+   Everything here runs on the student's device. A page keeps its ORIGINAL photo untouched; the processed copy is made from it:
+   page corners (found automatically, adjustable), perspective correction, rotation, and an image mode. The default mode
+   "original" changes nothing in the picture except the crop/straightening, so handwritten formulas, numbers and results are
+   never altered. "clearer" only stretches brightness/contrast; "bw" makes a black-and-white copy (the student chooses it).
+   Quality checks: blurry, dark, blank or duplicate pages, and fewer pages than the instructor expects.
+   scPdf() writes a standard PDF (one JPEG image per page, Letter size) without any library. */
+function scCanvas(w, h) { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+function scDraw(src, maxSide) { const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height, k = Math.min(1, maxSide / Math.max(sw, sh)); const c = scCanvas(sw * k, sh * k); const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, c.width, c.height); return c; }
+function scGray(c) { const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data, n = c.width * c.height, g = new Uint8ClampedArray(n); for (let i = 0, j = 0; i < n; i++, j += 4) g[i] = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000; return g; }
+function scOtsu(g) { const hist = new Array(256).fill(0); for (const v of g) hist[v]++; let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i]; let sb = 0, wb = 0, best = 0, t = 128;
+  for (let i = 0; i < 256; i++) { wb += hist[i]; if (!wb) continue; const wf = g.length - wb; if (!wf) break; sb += i * hist[i]; const mb = sb / wb, mf = (sum - sb) / wf, v = wb * wf * (mb - mf) * (mb - mf); if (v > best) { best = v; t = i; } } return t; }
+// Page corners [tl, tr, br, bl] as fractions of the photo, or null when no clear page edge is found (then the whole photo is used).
+function scDetect(img) {
+  const c = scDraw(img, 360), w = c.width, h = c.height, g = scGray(c), t = scOtsu(g), n = w * h;
+  const seen = new Uint8Array(n), q = new Int32Array(n); let bestA = 0, best = null;
+  for (let s = 0; s < n; s++) { if (seen[s] || g[s] <= t) continue; let qh = 0, qt = 0, area = 0; q[qt++] = s; seen[s] = 1; const pts = [];
+    while (qh < qt) { const p = q[qh++]; area++; pts.push(p); const x = p % w, y = (p / w) | 0;
+      for (const nb of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1]) if (nb >= 0 && !seen[nb] && g[nb] > t) { seen[nb] = 1; q[qt++] = nb; } }
+    if (area > bestA) { bestA = area; best = pts; } }
+  if (!best || bestA < n * 0.15 || bestA > n * 0.97) return null;
+  let tl = [0, 0, 1e9], tr = [0, 0, -1e9], br = [0, 0, -1e9], bl = [0, 0, 1e9];
+  for (const p of best) { const x = p % w, y = (p / w) | 0; if (x + y < tl[2]) tl = [x, y, x + y]; if (x - y > tr[2]) tr = [x, y, x - y]; if (x + y > br[2]) br = [x, y, x + y]; if (x - y < bl[2]) bl = [x, y, x - y]; }
+  const cs = [tl, tr, br, bl].map(([x, y]) => [(x + 0.5) / w, (y + 0.5) / h]);
+  const area = Math.abs(cs.reduce((s, p, i) => { const nx = cs[(i + 1) % 4]; return s + p[0] * nx[1] - nx[0] * p[1]; }, 0)) / 2;
+  return area >= 0.15 ? cs : null;
+}
+const SC_FULL = [[0, 0], [1, 0], [1, 1], [0, 1]];
+// 3x3 projective transform that maps (u,v) in the output rectangle to (x,y) in the photo.
+function scHomography(dst, src) {
+  const A = [], B = [];
+  for (let i = 0; i < 4; i++) { const [u, v] = dst[i], [x, y] = src[i]; A.push([u, v, 1, 0, 0, 0, -u * x, -v * x]); B.push(x); A.push([0, 0, 0, u, v, 1, -u * y, -v * y]); B.push(y); }
+  for (let c = 0; c < 8; c++) { let p = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r; [A[c], A[p]] = [A[p], A[c]]; [B[c], B[p]] = [B[p], B[c]];
+    for (let r = 0; r < 8; r++) if (r !== c) { const f = A[r][c] / A[c][c]; for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k]; B[r] -= f * B[c]; } }
+  return B.map((b, i) => b / A[i][i]).concat([1]);
+}
+// Straighten the page: corners (fractions) -> upright rectangle, longest side maxSide px. Bilinear sampling.
+function scWarp(img, corners, maxSide) {
+  const src = scDraw(img, 2400), W = src.width, H = src.height, P = corners.map(([x, y]) => [x * W, y * H]);
+  const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  let ow = Math.max(d(P[0], P[1]), d(P[3], P[2])), oh = Math.max(d(P[0], P[3]), d(P[1], P[2]));
+  const k = Math.min(1, (maxSide || 1700) / Math.max(ow, oh)); ow = Math.max(8, Math.round(ow * k)); oh = Math.max(8, Math.round(oh * k));
+  const M = scHomography([[0, 0], [ow, 0], [ow, oh], [0, oh]], P);
+  const sd = src.getContext("2d").getImageData(0, 0, W, H).data, out = scCanvas(ow, oh), og = out.getContext("2d"), od = og.createImageData(ow, oh), o = od.data;
+  for (let v = 0; v < oh; v++) for (let u = 0; u < ow; u++) {
+    const z = M[6] * u + M[7] * v + 1, x = (M[0] * u + M[1] * v + M[2]) / z, y = (M[3] * u + M[4] * v + M[5]) / z;
+    const x0 = Math.max(0, Math.min(W - 2, Math.floor(x))), y0 = Math.max(0, Math.min(H - 2, Math.floor(y))), fx = Math.max(0, Math.min(1, x - x0)), fy = Math.max(0, Math.min(1, y - y0));
+    const i00 = (y0 * W + x0) * 4, i10 = i00 + 4, i01 = i00 + W * 4, i11 = i01 + 4, j = (v * ow + u) * 4;
+    for (let ch = 0; ch < 3; ch++) o[j + ch] = (sd[i00 + ch] * (1 - fx) + sd[i10 + ch] * fx) * (1 - fy) + (sd[i01 + ch] * (1 - fx) + sd[i11 + ch] * fx) * fy;
+    o[j + 3] = 255; }
+  og.putImageData(od, 0, 0); return out;
+}
+function scRotate(c, q) { q = ((q % 4) + 4) % 4; if (!q) return c; const o = scCanvas(q % 2 ? c.height : c.width, q % 2 ? c.width : c.height), g = o.getContext("2d"); g.translate(o.width / 2, o.height / 2); g.rotate(q * Math.PI / 2); g.drawImage(c, -c.width / 2, -c.height / 2); return o; }
+function scMode(c, mode) {
+  if (mode !== "clearer" && mode !== "bw") return c;
+  const o = scCanvas(c.width, c.height), g = o.getContext("2d"); g.drawImage(c, 0, 0); const id = g.getImageData(0, 0, o.width, o.height), d = id.data, n = o.width * o.height;
+  const lum = new Uint8ClampedArray(n); for (let i = 0, j = 0; i < n; i++, j += 4) lum[i] = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000;
+  if (mode === "clearer") {   // brightness/contrast stretch only (1st–99th percentile): no pixel is moved or redrawn
+    const hist = new Array(256).fill(0); for (const v of lum) hist[v]++; let lo = 0, hi = 255, acc = 0; for (; lo < 255 && (acc += hist[lo]) < n * 0.01; lo++); acc = 0; for (; hi > 0 && (acc += hist[hi]) < n * 0.01; hi--);
+    const s = hi > lo + 10 ? 255 / (hi - lo) : 1; for (let j = 0; j < d.length; j += 4) for (let ch = 0; ch < 3; ch++) d[j + ch] = (d[j + ch] - lo) * s;
+  } else {   // black and white: each pixel compared with the average of its neighbourhood (works with shadows)
+    const W = o.width, H = o.height, I = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) { let row = 0; for (let x = 0; x < W; x++) { row += lum[y * W + x]; I[(y + 1) * (W + 1) + x + 1] = I[y * (W + 1) + x + 1] + row; } }
+    const r = Math.max(8, Math.round(Math.max(W, H) / 60));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const x1 = Math.max(0, x - r), y1 = Math.max(0, y - r), x2 = Math.min(W, x + r + 1), y2 = Math.min(H, y + r + 1);
+      const m = (I[y2 * (W + 1) + x2] - I[y1 * (W + 1) + x2] - I[y2 * (W + 1) + x1] + I[y1 * (W + 1) + x1]) / ((x2 - x1) * (y2 - y1)), v = lum[y * W + x] < m * 0.88 ? 0 : 255, j = (y * W + x) * 4; d[j] = d[j + 1] = d[j + 2] = v; }
+  }
+  g.putImageData(id, 0, 0); return o;
+}
+// Quality: sharpness (variance of the Laplacian), brightness, blank page; plus a small fingerprint to spot duplicate pages.
+function scQuality(c) {
+  const s = scDraw(c, 640), w = s.width, h = s.height, g = scGray(s); let sum = 0, sum2 = 0; for (const v of g) { sum += v; sum2 += v * v; }
+  const mean = sum / g.length, sd = Math.sqrt(Math.max(0, sum2 / g.length - mean * mean));
+  let ls = 0, ls2 = 0, cnt = 0; for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, L = 4 * g[i] - g[i - 1] - g[i + 1] - g[i - w] - g[i + w]; ls += L; ls2 += L * L; cnt++; }
+  const lap = cnt ? ls2 / cnt - (ls / cnt) ** 2 : 0, warn = [];
+  if (sd < 6) warn.push("Looks blank"); else if (lap < 25) warn.push("Looks blurry: retake if any writing is hard to read");
+  if (mean < 70) warn.push("Quite dark: retake with more light");
+  const t = scDraw(c, 64), th = scCanvas(9, 8); th.getContext("2d").drawImage(t, 0, 0, 9, 8); const hg = scGray(th); let bits = "";
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits += hg[y * 9 + x] > hg[y * 9 + x + 1] ? "1" : "0";
+  return { sharp: Math.round(lap), bright: Math.round(mean), warn, hash: bits };
+}
+function scSimilar(a, b) { if (!a || !b) return false; let d = 0; for (let i = 0; i < 64; i++) if (a[i] !== b[i]) d++; return d <= 3; }
+function scBlobToBytes(b) { return b.arrayBuffer().then(x => new Uint8Array(x)); }
+async function scJpeg(c, budgetKB) { budgetKB = budgetKB || 450; let b = null; for (const q of [0.85, 0.78, 0.7, 0.62]) { b = await canvasBlob(c, q); if (b && b.size <= budgetKB * 1024) break; } return { blob: b, w: c.width, h: c.height }; }
+// Process one page from its original photo. Returns the processed JPEG and the quality result.
+async function scProcess(pg) {
+  const img = await loadImg(pg.origUrl || URL.createObjectURL(pg.orig));
+  let c = scWarp(img, pg.corners || SC_FULL, 1700); c = scRotate(c, pg.rot || 0); c = scMode(c, pg.mode || "original");
+  const qy = scQuality(c), j = await scJpeg(c, 450);
+  return Object.assign(pg, { out: j.blob, ow: j.w, oh: j.h, q: qy });
+}
+// Warnings for the whole report.
+function scChecks(pages, expect) {
+  const out = []; pages.forEach((p, i) => (p.q ? p.q.warn : []).forEach(w => out.push("Page " + (i + 1) + ": " + w)));
+  for (let i = 0; i < pages.length; i++) for (let j = 0; j < i; j++) if (pages[i].q && pages[j].q && scSimilar(pages[i].q.hash, pages[j].q.hash)) out.push("Page " + (i + 1) + " looks the same as page " + (j + 1));
+  if (expect && pages.length < expect) out.push("Your instructor expects " + expect + " page" + (expect > 1 ? "s" : "") + "; you have " + pages.length + ".");
+  return out;
+}
+/* ---------- PDF (images only) ---------- */
+function scPdfText(s) { s = String(s || ""); let hx = "FEFF"; for (const ch of s) { const c = ch.codePointAt(0); if (c > 0xffff) { const v = c - 0x10000; hx += (0xd800 + (v >> 10)).toString(16).padStart(4, "0") + (0xdc00 + (v & 1023)).toString(16).padStart(4, "0"); } else hx += c.toString(16).padStart(4, "0"); } return "<" + hx.toUpperCase() + ">"; }
+async function scPdf(pages, meta) {
+  const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+  const add = (x) => { const b = typeof x === "string" ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (n, body) => { offs[n] = len; add(n + " 0 obj\n"); (Array.isArray(body) ? body : [body]).forEach(add); add("\nendobj\n"); };
+  add("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n".replace(/[\u0080-ÿ]/g, "")); add(new Uint8Array([37, 226, 227, 207, 211, 10]));
+  const n = pages.length, kids = []; for (let i = 0; i < n; i++) kids.push((3 + i * 3) + " 0 R");
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>"); obj(2, "<< /Type /Pages /Count " + n + " /Kids [" + kids.join(" ") + "] >>");
+  for (let i = 0; i < n; i++) {
+    const p = pages[i], bytes = p.bytes, land = p.w > p.h, PW = land ? 792 : 612, PH = land ? 612 : 792, m = 18, k = Math.min((PW - 2 * m) / p.w, (PH - 2 * m) / p.h);
+    const dw = (p.w * k).toFixed(2), dh = (p.h * k).toFixed(2), x = ((PW - p.w * k) / 2).toFixed(2), y = ((PH - p.h * k) / 2).toFixed(2), pn = 3 + i * 3, cn = pn + 1, im = pn + 2;
+    const content = "q " + dw + " 0 0 " + dh + " " + x + " " + y + " cm /Im" + i + " Do Q";
+    obj(pn, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources << /XObject << /Im" + i + " " + im + " 0 R >> >> /Contents " + cn + " 0 R >>");
+    obj(cn, ["<< /Length " + content.length + " >>\nstream\n" + content + "\nendstream"]);
+    obj(im, ["<< /Type /XObject /Subtype /Image /Width " + p.w + " /Height " + p.h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + bytes.length + " >>\nstream\n", bytes, "\nendstream"]);
+  }
+  const info = 3 + n * 3, d = new Date(), pad = v => String(v).padStart(2, "0"), when = "D:" + d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + "Z";
+  obj(info, "<< /Title " + scPdfText(meta.title) + " /Author " + scPdfText(meta.author) + " /Subject " + scPdfText(meta.subject || "Lab report") + " /Producer (ChemFlip lab report scanner) /CreationDate (" + when + ") >>");
+  const xref = len, size = info + 1; add("xref\n0 " + size + "\n0000000000 65535 f \n");
+  for (let i = 1; i < size; i++) add(String(offs[i]).padStart(10, "0") + " 00000 n \n");
+  add("trailer\n<< /Size " + size + " /Root 1 0 R /Info " + info + " 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+  const out = new Uint8Array(len); let o = 0; for (const b of parts) { out.set(b, o); o += b.length; } return out;
+}
+function scB64(bytes) { let s = ""; const CH = 0x8000; for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH)); return btoa(s); }
+/* ---------- drafts on this device (IndexedDB): original photos + processing choices, per lab assignment ---------- */
+const SCDB = { db: null };
+function scDb() { return SCDB.db || (SCDB.db = new Promise((res, rej) => { if (!window.indexedDB) { rej(new Error("no IndexedDB")); return; } const r = indexedDB.open("chemflip-lab", 1); r.onupgradeneeded = () => r.result.createObjectStore("d"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); })); }
+async function scGetDraft(id) { try { const d = await scDb(); return await new Promise((res, rej) => { const q = d.transaction("d").objectStore("d").get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); } catch (e) { return null; } }
+async function scPutDraft(id, v) { try { const d = await scDb(); await new Promise((res, rej) => { const t = d.transaction("d", "readwrite"); t.objectStore("d").put(v, id); t.oncomplete = res; t.onerror = () => rej(t.error); }); return true; } catch (e) { return false; } }
+async function scDelDraft(id) { try { const d = await scDb(); await new Promise((res, rej) => { const t = d.transaction("d", "readwrite"); t.objectStore("d").delete(id); t.oncomplete = res; t.onerror = () => rej(t.error); }); } catch (e) {} }
 
 /* ================= 5.0 Phase H: chemistry answer editor + molecular structure editor ================= */
 /* ---------- formatting and parsing typed chemistry ---------- */
@@ -4692,6 +4824,7 @@ const HELP = [
   { id: "grading", t: "Instructors: grading and extensions", who: "instructor", kw: "grading grade comment override extension accommodation bulk credit regrade", b: ["The assignment screen shows who submitted and what needs grading. Short answers wait for you; every other type is graded by the server.", "On the grading screen you can change any question's points and leave a comment. Full credit for everyone and Regrade all are under Adjust grades for everyone.", "Give extensions to one student, a group, the whole class, or several selected students at once. Every change is kept in the history."] },
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
+  { id: "labreport", t: "Lab reports: photograph and submit", who: "all", kw: "lab report scan pdf photo camera pages upload handwritten submit receipt", b: ["Students: open My assignments → Submit lab report. Photograph each page (or add photos you already took). ChemFlip finds the page edges and straightens each page on your device; drag the corners to fix them, rotate sideways pages, and reorder or delete pages.", "Original (the default) keeps your handwriting exactly as photographed. Clearer brightens the page; Black & white is optional. Blurry, dark, blank or repeated pages and missing pages are flagged before you submit.", "Preview or download the PDF, share it, or press Submit to ChemFlip: you get a receipt code, and a retry after a lost connection never makes a second copy. Instructors: + Lab report in the class's assignment list; open the lab report to see every PDF, give points and feedback."] },
   { id: "canvasint", t: "Instructors: Canvas Integration Settings", who: "instructor", kw: "canvas connect disconnect sync now automatic status failed history conflicts lms grades", b: ["ChemFlip works fully without Canvas. In a class, open Students → Class settings → Canvas Integration Settings to see the Canvas status (Connected, Disconnected or Synchronization Failed) and the last successful sync.", "Turn automatic sync off to keep grades in ChemFlip until you press Sync now. Untick a Canvas assignment to stop syncing it. Disconnect stops all sending for the class; links and waiting grades are kept, and reconnecting sends them once.", "If Canvas is down, students and instructors keep working; failed grades are retried and listed with the reason. The page also lists Canvas date differences and exactly what can sync today."] },
   { id: "joining", t: "Joining a class", who: "student", kw: "join class code invite link request approval waiting", b: ["Enter the 6-character class code under Classes, or open your instructor's invite link.", "Some classes need the instructor's approval: your request then shows as waiting under Classes, and the class opens once it is approved. Press Check to look again."] },
   { id: "canvas", t: "Canvas", who: "all", kw: "canvas lti grades roster deep link", b: ["ChemFlip can be added to a Canvas course by the school's Canvas administrator. Instructors can then add ChemFlip assignments from Canvas, sync the roster and send scores to the Canvas gradebook.", "Only scores are sent to Canvas, not submissions or extensions. ChemFlip also works fully without Canvas."] },
@@ -4786,7 +4919,7 @@ function a11yCard() {
 function receiptCode(attemptId) { const x = String(attemptId || "").replace(/-/g, "").toUpperCase(); return "CF-" + x.slice(0, 4) + "-" + x.slice(4, 8); }
 function receiptText(r) {
   return ["ChemFlip submission receipt", "", "Receipt code: " + r.code, "Assignment: " + r.title, "Class: " + (r.cls || "—"), "Student: " + ((S.profile && S.profile.name) || "") , "Received by ChemFlip: " + fmtTz(r.at, r.tz),
-    "Status: " + (r.auto ? "Submitted automatically when time ran out" : r.late ? "Late" + (r.pen ? " (−" + r.pen + "%)" : "") : "On time"), "Questions answered: " + r.n + " of " + r.of, "", "Keep this receipt. Your instructor can look up the receipt code on the assignment."].join("\r\n");
+    "Status: " + (r.auto ? "Submitted automatically when time ran out" : r.late ? "Late" + (r.pen ? " (−" + r.pen + "%)" : "") : "On time"), (r.pages ? "Pages submitted: " + r.pages : "Questions answered: " + r.n + " of " + r.of), "", "Keep this receipt. Your instructor can look up the receipt code on the assignment."].join("\r\n");
 }
 function saveReceipt(r) { const blob = new Blob([receiptText(r)], { type: "text/plain" }), a = h("a", { href: URL.createObjectURL(blob), download: "ChemFlip-receipt-" + r.code + ".txt" }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
 function receiptCard(r) {
@@ -4819,7 +4952,7 @@ function tzOffsetMs(ms, tz) { const p = {}; new Intl.DateTimeFormat("en-US", { t
 function zonedToIso(local, tz) { if (!local) return null; const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local); if (!m) return null; const g = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]); let t = g - tzOffsetMs(g, tz); t = g - tzOffsetMs(t, tz); return new Date(t).toISOString(); }
 function isoToZoned(iso, tz) { if (!iso) return ""; const ms = Date.parse(iso) + tzOffsetMs(Date.parse(iso), tz); return new Date(ms).toISOString().slice(0, 16); }
 function left(ms) { if (ms <= 0) return "0:00"; const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60); return d ? d + "d " + hh + "h" : hh ? hh + "h " + mm + "m" : mm + ":" + String(s % 60).padStart(2, "0"); }
-const KIND = { assignment: "Assignment", quiz: "Quiz", test: "Test" };
+const KIND = { assignment: "Assignment", quiz: "Quiz", test: "Test", lab: "Lab report" };
 const STATE = { open: ["Open", "ok"], late: ["Late — still accepted", "warn"], closed: ["Closed", "bad"], not_open: ["Not open yet", ""] };
 
 /* ----- instructor: list in the class screen ----- */
@@ -4832,7 +4965,7 @@ function teacherAsg(c, done) {
     tzc.appendChild(sel); tzc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "asg-tz-save", onclick: async () => { try { await asgCall({ action: "tz", class_code: c.code, tz: sel.value }); toast("Time zone saved"); render(); } catch (e) { toast("❌ " + e.message); } } }, j.tz ? "Change time zone" : "Use this time zone")));
     if (!j.tz) tzc.style.borderLeft = "5px solid var(--gold)";
     wrap.appendChild(tzc);
-    const card = h("div", { class: "card", id: "asg-list" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center" }, h("b", {}, "Graded assignments, quizzes and tests"), h("button", { class: "btn small", id: "asg-new", onclick: () => go("asgedit", { code: c.code }) }, "+ New")));
+    const card = h("div", { class: "card", id: "asg-list" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center" }, h("b", {}, "Graded assignments, quizzes and tests"), h("span", { style: "display:flex;gap:6px" }, h("button", { class: "btn sec2 small", id: "asg-new-lab", onclick: () => go("labedit", { code: c.code }) }, "+ Lab report"), h("button", { class: "btn small", id: "asg-new", onclick: () => go("asgedit", { code: c.code }) }, "+ New"))));
     if (!j.assignments.length) card.appendChild(h("p", { class: "muted" }, "None yet. Each one has its own open, due and lock dates, time limit, attempts and late policy, and you can extend deadlines for one student, a group or the whole class."));
     const pick = new Set(), bar = h("div", { class: "bulkbar", id: "asg-bulk", style: "display:none", role: "region", "aria-label": "Bulk actions" });
     const drawBar = () => { bar.style.display = pick.size ? "" : "none"; bar.innerHTML = ""; if (!pick.size) return;
@@ -4910,7 +5043,7 @@ VIEWS.asgedit = function (arg) {
       c.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center;margin:6px 0" }, sel, h("button", { class: "btn sec2 small", id: "ae-tpl-use", onclick: () => { if (sel.value === "") return; aeApplyTemplate(F, tpls[+sel.value]); toast("📋 Template applied — check the dates"); render(); } }, "Use"),
         h("button", { class: "btn ghost small", id: "ae-tpl-del", onclick: () => { if (sel.value === "") return; confirmBox("Delete template " + tpls[+sel.value].name + "?", "Assignments made from it aren't affected.", () => { S.asgTpl.splice(+sel.value, 1); save(); render(); }, "Delete"); } }, "Delete"))); }
     field(c, "ae-title", "Title", "text", "title", { placeholder: "e.g. Homework 3: Stoichiometry" });
-    const kind = h("select", { class: "field", id: "ae-kind", onchange: e => F.kind = e.target.value }, Object.entries(KIND).map(([k, t]) => h("option", { value: k, selected: F.kind === k ? "" : null }, t)));
+    const kind = h("select", { class: "field", id: "ae-kind", onchange: e => F.kind = e.target.value }, Object.entries(KIND).filter(([k]) => k !== "lab").map(([k, t]) => h("option", { value: k, selected: F.kind === k ? "" : null }, t)));
     c.appendChild(h("label", { class: "f", for: "ae-kind" }, "Type")); c.appendChild(kind);
   });
   sec(2, "Questions from the ChemFlip bank", c => {
@@ -5034,10 +5167,10 @@ VIEWS.asgdetail = function (arg) {
   asgCall({ action: "detail", id: arg.id }).then(j => {
     const a = j.assignment, tz = a.tz; box.innerHTML = ""; document.getElementById("title").textContent = a.title;
     box.appendChild(h("div", { class: "card", id: "ad-head" }, h("b", {}, KIND[a.kind] + ": " + a.title),
-      h("div", { class: "muted" }, (a.qids.length + (a.items || []).length) + " questions" + (a.pool_draw ? " (" + a.pool_draw + " per student)" : "") + (a.shuffle ? " · shuffled" : "") + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "") + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode])),
+      h("div", { class: "muted" }, a.kind === "lab" ? a.max_points + " points · " + (a.expect_pages || 1) + " page" + (a.expect_pages > 1 ? "s" : "") + " expected · " + (a.max_attempts ? a.max_attempts + " upload" + (a.max_attempts > 1 ? "s" : "") : "unlimited uploads") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode]) : (a.qids.length + (a.items || []).length) + " questions" + (a.pool_draw ? " (" + a.pool_draw + " per student)" : "") + (a.shuffle ? " · shuffled" : "") + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "") + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode])),
       h("div", { style: "margin-top:6px" }, (a.open_at ? "Opens " + fmtTz(a.open_at, tz) + " · " : "") + "Due " + fmtTz(a.due_at, tz) + " · Locks " + fmtTz(a.lock_at || a.due_at, tz)),
       h("div", { class: "muted", style: "font-size:13px" }, "Grades: " + (a.grade_release_at ? fmtTz(a.grade_release_at, tz) : "right after submitting") + " · Solutions: " + (a.solution_release_at ? fmtTz(a.solution_release_at, tz) : "after the lock date")),
-      h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go("asgedit", { code: arg.code, a }) }, "Edit"),
+      h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go(a.kind === "lab" ? "labedit" : "asgedit", { code: arg.code, a }) }, "Edit"),
         h("button", { class: "btn sec2 small", id: "ad-class-ext", onclick: () => extSheet(a, "class", null, "the whole class", null, j) }, "Extend for whole class"),
         h("button", { class: "btn sec2 small", id: "ad-group", onclick: () => groupSheet(a, j) }, "Groups & group extension"),
         h("button", { class: "btn ghost small", id: "ad-del", onclick: () => confirmBox("Delete " + a.title + "?", "Students won't see it any more. Submissions are kept in the database.", async () => { await asgCall({ action: "delete", id: a.id }); toast("Deleted"); back(); }, "Delete") }, "Delete"))));
@@ -5054,7 +5187,7 @@ VIEWS.asgdetail = function (arg) {
         tb.appendChild(h("tr", { id: "ad-r-" + r.sid, "data-receipts": r.attempts.filter(x => x.status !== "in_progress").map(x => receiptCode(x.id)).join(" ") }, h("td", {}, h("input", { type: "checkbox", class: "ad-sel", "data-sid": r.sid, id: "ad-sel-" + r.sid, checked: sel.has(r.sid) ? "" : null, "aria-label": "Select " + r.name, onchange: e => { e.target.checked ? sel.add(r.sid) : sel.delete(r.sid); drawBulk(); } })), h("td", {}, avi(r.avatar), " " + r.name, e.source !== "base" ? h("span", { class: "chip " + (e.source === "student" ? "new" : ""), title: "Effective dates come from a " + e.source + " extension" }, e.source === "student" ? "Extension" : e.source === "group" ? "Group ext." : "Class ext.") : null, e.accommodation ? h("span", { class: "chip ok" }, "Accommodation") : null),
           h("td", {}, fmtTz(e.due_at, tz, false)), h("td", {}, fmtTz(e.lock_at, tz, false)), h("td", { class: "n" }, best ? best.score + "/" + best.total + (best.late ? " (late" + (best.penalty_pct ? ", −" + best.penalty_pct + "%" : "") + ")" : "") : r.attempts.some(x => x.status === "in_progress") ? "in progress" : "–"),
           h("td", {}, h("button", { class: "btn sec2 small", id: "ad-ext-" + r.sid, onclick: () => extSheet(a, "student", r.sid, r.name, live.find(o => o.scope === "student" && o.target === r.sid), j) }, "Extend / reopen"),
-            done.length ? h("button", { class: "btn small" + (done.some(x => x.pending > 0) ? "" : " ghost"), id: "ad-grade-" + r.sid, style: "margin-left:4px", onclick: () => go("asggrade", { attempt_id: done[done.length - 1].id, code: arg.code, aid: a.id }) }, done.some(x => x.pending > 0) ? "Grade (" + done[done.length - 1].pending + ")" : "Grade") : null))); }); };
+            done.length && a.kind !== "lab" ? h("button", { class: "btn small" + (done.some(x => x.pending > 0) ? "" : " ghost"), id: "ad-grade-" + r.sid, style: "margin-left:4px", onclick: () => go("asggrade", { attempt_id: done[done.length - 1].id, code: arg.code, aid: a.id }) }, done.some(x => x.pending > 0) ? "Grade (" + done[done.length - 1].pending + ")" : "Grade") : null))); }); };
     onlyAcc.onchange = draw; draw(); rc.appendChild(bulk);
     { const rq = h("input", { class: "field", id: "ad-rcpt", placeholder: "Find a receipt code, e.g. CF-1A2B-3C4D", "aria-label": "Find a submission receipt code", style: "max-width:320px" }), out = h("span", { class: "muted", id: "ad-rcpt-out", "aria-live": "polite" });
       rq.oninput = () => { tb.querySelectorAll("tr.hit").forEach(x => x.classList.remove("hit")); const code = rq.value.trim().toUpperCase(); if (code.length < 12) { out.textContent = ""; return; }
@@ -5062,7 +5195,8 @@ VIEWS.asgdetail = function (arg) {
         if (row) { row.classList.add("hit"); row.scrollIntoView({ block: "center" }); const r = j.roster.find(x => "ad-r-" + x.sid === row.id), at = r && r.attempts.find(x => receiptCode(x.id) === code); out.textContent = "\u2713 " + (r ? r.name : "") + (at ? ", attempt " + at.n + ", received " + fmtTz(at.submitted_at, tz) : ""); }
         else out.textContent = "No submission of this assignment has that receipt code."; };
       rc.appendChild(h("div", { style: "margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, rq, out)); }
-    if (j.needs_grading) { const firstP = j.roster.flatMap(r => r.attempts).find(x => x.pending > 0 && x.status !== "in_progress");
+    if (a.kind === "lab") labCard(a, box);
+    if (j.needs_grading && a.kind !== "lab") { const firstP = j.roster.flatMap(r => r.attempts).find(x => x.pending > 0 && x.status !== "in_progress");
       box.appendChild(h("div", { class: "card", id: "ad-needs", style: "border-left:5px solid var(--med,#e6a700)" }, h("b", {}, "📝 " + j.needs_grading + " submission" + (j.needs_grading > 1 ? "s" : "") + " need grading"),
         h("div", { class: "muted" }, "Short written answers wait for you. Scores sent to Canvas show as pending until you grade them."),
         firstP ? h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ad-grade-next", onclick: () => go("asggrade", { attempt_id: firstP.id, code: arg.code, aid: a.id }) }, "Start grading")) : null)); }
@@ -5180,18 +5314,197 @@ VIEWS.myasg = function () {
       const cd = h("span", { class: "cd", "data-due": e.due_at, "data-lock": e.lock_at });
       const card = h("div", { class: "card asgc", id: "ma-" + a.id.slice(0, 8) }, h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, KIND[a.kind] + ": " + a.title), h("span", { class: "chip " + st[1] }, st[0])),
         h("div", {}, "Due " + fmtTz(e.due_at, tz) + (e.source !== "base" ? " (your extension)" : ""), " ", cd),
-        h("div", { class: "muted", style: "font-size:13px" }, [e.open_at && a.state === "not_open" ? "Opens " + fmtTz(e.open_at, tz) : "", e.lock_at !== e.due_at ? "Late work until " + fmtTz(e.lock_at, tz, false) : "", e.time_limit_min ? e.time_limit_min + " min time limit" : "", e.max_attempts ? a.attempts_used + " of " + e.max_attempts + " attempts used" : a.attempts_used + " attempt(s) so far", (a.questions || a.qids.length) + " questions"].filter(Boolean).join(" · ")),
-        a.grade ? h("div", { style: "margin-top:4px" }, h("b", {}, "Score: " + a.grade.score + "/" + a.grade.total), a.grade.late ? " (late" + (a.grade.penalty_pct ? ", −" + a.grade.penalty_pct + "%" : "") + ")" : "") : a.submitted && !a.grade_released ? h("div", { class: "muted" }, "Submitted. Your grade is released " + fmtTz(a.grade_release_at, tz) + ".") : null);
+        h("div", { class: "muted", style: "font-size:13px" }, [e.open_at && a.state === "not_open" ? "Opens " + fmtTz(e.open_at, tz) : "", e.lock_at !== e.due_at ? "Late work until " + fmtTz(e.lock_at, tz, false) : "", e.time_limit_min ? e.time_limit_min + " min time limit" : "", e.max_attempts ? a.attempts_used + " of " + e.max_attempts + (a.kind === "lab" ? " uploads used" : " attempts used") : a.attempts_used + (a.kind === "lab" ? " upload(s) so far" : " attempt(s) so far"), a.kind === "lab" ? (a.max_points + " points") : (a.questions || a.qids.length) + " questions"].filter(Boolean).join(" · ")),
+        a.kind === "lab" && a.grade && a.grade.pending ? h("div", { class: "muted" }, "Submitted. Waiting for grading.") : a.grade ? h("div", { style: "margin-top:4px" }, h("b", {}, "Score: " + a.grade.score + "/" + a.grade.total), a.grade.late ? " (late" + (a.grade.penalty_pct ? ", −" + a.grade.penalty_pct + "%" : "") + ")" : "") : a.submitted && !a.grade_released ? h("div", { class: "muted" }, "Submitted. Your grade is released " + fmtTz(a.grade_release_at, tz) + ".") : null);
       const btns = h("div", { class: "btnrow" });
-      if (a.in_progress) btns.appendChild(h("button", { class: "btn", id: "ma-resume-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, "Resume (" + left(Date.parse(a.in_progress.ends_at) - srvNow()) + " left)"));
+      if (a.kind === "lab") btns.appendChild(h("button", { class: (a.state === "open" || a.state === "late") && !usedUp ? "btn" : "btn sec2", id: "ma-lab-" + a.id.slice(0, 8), onclick: () => go("labscan", { a, tz }) }, (a.state === "open" || a.state === "late") && !usedUp ? (a.submitted ? "📄 Submit a new version" : "📄 Submit lab report") : "📄 Lab report"));
+      else if (a.in_progress) btns.appendChild(h("button", { class: "btn", id: "ma-resume-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, "Resume (" + left(Date.parse(a.in_progress.ends_at) - srvNow()) + " left)"));
       else if ((a.state === "open" || a.state === "late") && !usedUp) btns.appendChild(h("button", { class: "btn", id: "ma-start-" + a.id.slice(0, 8), onclick: () => asgStart(a, tz) }, a.attempts_used ? "Start another attempt" : "Start"));
-      if (a.submitted) btns.appendChild(h("button", { class: "btn sec2", id: "ma-review-" + a.id.slice(0, 8), onclick: () => asgReview(a, tz) }, "Review"));
+      if (a.submitted && a.kind !== "lab") btns.appendChild(h("button", { class: "btn sec2", id: "ma-review-" + a.id.slice(0, 8), onclick: () => asgReview(a, tz) }, "Review"));
       card.appendChild(btns); box.appendChild(card);
       if (S.lti && S.lti.link && S.lti.link.assignment_id === a.id) { card.style.outline = "3px solid #E66000"; card.insertBefore(h("div", { class: "chip", style: "margin-bottom:6px" }, "🎓 Opened from Canvas"), card.firstChild);
         if (GM.asgFocus === a.id) { GM.asgFocus = null; setTimeout(() => card.scrollIntoView({ block: "center" }), 50); } } });
     const tickCd = () => { if (!document.getElementById("ma-box")) return; document.querySelectorAll(".cd").forEach(el => { const d = Date.parse(el.dataset.due) - srvNow(), l = Date.parse(el.dataset.lock) - srvNow(); el.textContent = d > 0 ? "· " + left(d) + " left" : l > 0 ? "· late, locks in " + left(l) : ""; }); setTimeout(tickCd, 1000); };
     tickCd();
   }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+/* ----- 5.0 lab reports: instructor form ----- */
+VIEWS.labedit = function (arg) {
+  if (!isTeacher()) { back(); return; }
+  const a = arg.a || {}, tz = ASG.tz || a.tz || localTz(), wk = new Date(srvNow() + 7 * 864e5);
+  if (!VIEWS.labedit.f || VIEWS.labedit.f.key !== (a.id || arg.code)) VIEWS.labedit.f = { key: a.id || arg.code, title: a.title || "", instructions: a.instructions || "", pts: a.max_points || 20, pages: a.expect_pages || 3,
+    open: isoToZoned(a.open_at, tz), due: a.due_at ? isoToZoned(a.due_at, tz) : isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59", lock: isoToZoned(a.lock_at, tz), att: a.max_attempts || 1,
+    late: (a.late_policy || {}).mode || "accept", pen: (a.late_policy || {}).pct_per_day || 10, penmax: (a.late_policy || {}).max_pct || 50, pub: a.published !== false };
+  const F = VIEWS.labedit.f;
+  document.getElementById("title").textContent = a.id ? "Edit " + (a.title || "lab report") : "New lab report";
+  const c = h("div", { class: "card", id: "le-form" }, h("b", {}, "📄 Lab report"), h("p", { class: "muted", style: "font-size:13px" }, "Students photograph their handwritten report page by page. ChemFlip straightens the pages on their device and makes one PDF, which arrives here with a receipt. You grade it with points and written feedback."));
+  const fld = (id, lab, type, key, extra) => { const i = h(type === "area" ? "textarea" : "input", Object.assign({ class: "field", id }, type === "area" ? { rows: "5" } : { type: type || "text" }, extra || {})); i.value = F[key] ?? ""; i.addEventListener("input", () => { F[key] = i.value; }); c.appendChild(h("label", { class: "f", for: id }, lab)); c.appendChild(i); return i; };
+  fld("le-title", "Title", "text", "title", { placeholder: "e.g. Lab 4: Titration of vinegar", maxlength: "120" });
+  fld("le-instr", "Instructions for students (optional)", "area", "instructions", { maxlength: "4000", placeholder: "What to include, page order, which tables and calculations…" });
+  const row = h("div", { style: "display:flex;gap:12px;flex-wrap:wrap" }); c.appendChild(row);
+  const small = (id, lab, key, mn, mx) => { const i = h("input", { class: "field", id, type: "number", min: mn, max: mx, style: "width:120px" }); i.value = F[key]; i.addEventListener("input", () => { F[key] = i.value; }); row.appendChild(h("div", {}, h("label", { class: "f", for: id }, lab), i)); };
+  small("le-pts", "Points", "pts", "1", "1000"); small("le-pages", "Expected pages", "pages", "1", "50"); small("le-att", "Uploads allowed", "att", "1", "50");
+  c.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "Dates are in the class time zone (" + tz.replace(/_/g, " ") + "). Students who upload again make a new version; you see all versions."));
+  fld("le-open", "Opens (optional)", "datetime-local", "open"); fld("le-due", "Due", "datetime-local", "due"); fld("le-lock", "Locks (optional; late uploads accepted until then)", "datetime-local", "lock");
+  const late = h("select", { class: "field", id: "le-late", onchange: e => { F.late = e.target.value; render(); } }, [["accept", "Accept late uploads, marked late"], ["penalty", "Accept with a penalty per day"], ["reject", "Don't accept late uploads"]].map(([v, t]) => h("option", { value: v, selected: F.late === v ? "" : null }, t)));
+  c.appendChild(h("label", { class: "f", for: "le-late" }, "Late uploads")); c.appendChild(late);
+  if (F.late === "penalty") { const r2 = h("div", { style: "display:flex;gap:12px" }); const p1 = h("input", { class: "field", id: "le-pen", type: "number", min: "1", max: "100", style: "width:100px", value: F.pen, oninput: e => F.pen = e.target.value }), p2 = h("input", { class: "field", id: "le-penmax", type: "number", min: "0", max: "100", style: "width:100px", value: F.penmax, oninput: e => F.penmax = e.target.value });
+    r2.appendChild(h("div", {}, h("label", { class: "f", for: "le-pen" }, "% off per day"), p1)); r2.appendChild(h("div", {}, h("label", { class: "f", for: "le-penmax" }, "Maximum %"), p2)); c.appendChild(r2); }
+  const pub = h("input", { type: "checkbox", id: "le-pub", onchange: e => F.pub = e.target.checked }); pub.checked = F.pub;
+  c.appendChild(h("label", { class: "check", for: "le-pub", style: "margin-top:8px" }, pub, h("span", {}, "Students can see it")));
+  const msg = h("div", { class: "muted", id: "le-msg", role: "status" });
+  c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "le-save", onclick: async () => {
+    if (!F.title.trim()) { msg.textContent = "❌ Give the lab report a title."; return; }
+    if (!(+F.pts > 0 && +F.pts <= 1000)) { msg.textContent = "❌ Points must be between 1 and 1000."; return; }
+    if (!(+F.pages >= 1 && +F.pages <= 50)) { msg.textContent = "❌ Expected pages must be between 1 and 50."; return; }
+    if (!F.due) { msg.textContent = "❌ Set a due date."; return; }
+    msg.textContent = "Saving…";
+    try { const r = await asgCall({ action: "save", id: a.id, class_code: arg.code, kind: "lab", title: F.title.trim(), instructions: F.instructions, max_points: +F.pts, expect_pages: Math.round(+F.pages), qids: [], items: [], answer_key: {}, points: {},
+        open_at: zonedToIso(F.open, tz), due_at: zonedToIso(F.due, tz), lock_at: zonedToIso(F.lock, tz), max_attempts: F.att ? Math.round(+F.att) : null, time_limit_min: null,
+        late_policy: F.late === "penalty" ? { mode: "penalty", pct_per_day: +F.pen, max_pct: +F.penmax } : { mode: F.late }, published: F.pub, tz });
+      VIEWS.labedit.f = null; toast("✅ Lab report saved" + (F.pub ? " — students see it now" : "")); stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
+    catch (e) { msg.textContent = "❌ " + e.message; } } }, a.id ? "Save changes" : "Create lab report")), msg);
+  app.appendChild(c);
+};
+/* ----- instructor: submissions of one lab report (inside the assignment screen) ----- */
+function labCard(a, box) {
+  const card = h("div", { class: "card", id: "lab-subs" }, h("b", {}, "📄 Lab reports"), h("div", { class: "muted" }, "⏳ Loading…")); box.appendChild(card);
+  asgCall({ action: "lab_list", assignment_id: a.id }).then(j => {
+    card.innerHTML = ""; const tz = a.tz, rows = j.submissions, latest = new Map(); rows.forEach(r => latest.set(r.sid, r));
+    const ng = [...latest.values()].filter(r => !r.graded).length;
+    card.appendChild(h("b", {}, "📄 Lab reports (" + latest.size + " submitted" + (ng ? ", " + ng + " to grade" : "") + ")"));
+    if (!rows.length) card.appendChild(h("p", { class: "muted" }, "No reports yet. Students submit from My assignments → Submit lab report."));
+    const open = async (r, dl) => { try { const o = await asgCall({ action: "lab_open", submission_id: r.id, download: !!dl }); window.open(o.url, "_blank", "noopener"); } catch (e) { toast("❌ " + e.message); } };
+    [...latest.values()].forEach(r => { const vers = rows.filter(x => x.sid === r.sid);
+      const pts = h("input", { class: "field", id: "lab-pts-" + r.id.slice(0, 8), type: "number", min: "0", max: String(j.assignment.max_points), step: "0.5", style: "width:90px", "aria-label": "Points for " + r.name });
+      if (r.score != null && r.graded) pts.value = r.score;
+      const fb = h("textarea", { class: "field", id: "lab-fb-" + r.id.slice(0, 8), rows: "2", maxlength: "4000", placeholder: "Feedback for " + r.name, "aria-label": "Feedback for " + r.name }); fb.value = r.feedback || "";
+      const out = h("span", { class: "muted", "aria-live": "polite" });
+      card.appendChild(h("div", { class: "lab-row", id: "lab-r-" + r.sid, style: "border-top:1px solid var(--line,#ddd);padding:8px 0" },
+        h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, r.name + (r.stu_id ? " (" + r.stu_id + ")" : "")),
+          h("span", {}, r.graded ? h("span", { class: "chip ok" }, "Graded " + r.score + "/" + r.total) : h("span", { class: "chip new" }, "To grade"), r.late ? h("span", { class: "chip warn" }, "Late" + (r.penalty_pct ? " −" + r.penalty_pct + "%" : "")) : null)),
+        h("div", { class: "muted", style: "font-size:13px" }, "Version " + r.n + (vers.length > 1 ? " of " + vers.length : "") + " · " + r.pages + " page" + (r.pages > 1 ? "s" : "") + " · " + Math.round(r.bytes / 1024) + " KB · received " + fmtTz(r.submitted_at, tz) + " · receipt " + r.receipt + (r.pages < (j.assignment.expect_pages || 0) ? " · fewer pages than expected (" + j.assignment.expect_pages + ")" : "")),
+        r.warnings.length ? h("div", { style: "font-size:12.5px;color:var(--warn,#a06b00)" }, "Student's device flagged: " + r.warnings.join("; ")) : null,
+        h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "lab-open-" + r.id.slice(0, 8), onclick: () => open(r) }, "Open PDF"), h("button", { class: "btn ghost small", id: "lab-dl-" + r.id.slice(0, 8), onclick: () => open(r, true) }, "Download"),
+          vers.length > 1 ? h("select", { class: "field", style: "width:auto", "aria-label": "Open an earlier version", onchange: e => { const v = vers.find(x => x.id === e.target.value); if (v) open(v); e.target.value = ""; } }, h("option", { value: "" }, "Earlier versions…"), ...vers.filter(x => x.id !== r.id).map(x => h("option", { value: x.id }, "Version " + x.n + " · " + fmtTz(x.submitted_at, tz, false)))) : null),
+        h("div", { style: "display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-top:4px" }, h("label", { style: "display:flex;gap:4px;align-items:center" }, pts, "/ " + j.assignment.max_points), h("div", { style: "flex:1;min-width:200px" }, fb),
+          h("button", { class: "btn small", id: "lab-save-" + r.id.slice(0, 8), onclick: async () => { if (pts.value === "") { out.textContent = "Enter points."; return; } out.textContent = "Saving…";
+            try { const g = await asgCall({ action: "lab_grade", assignment_id: a.id, submission_id: r.id, pts: +pts.value, feedback: fb.value }); out.textContent = "✓ Saved " + g.score + "/" + g.total; toast("✅ Grade returned to " + r.name); } catch (e) { out.textContent = "❌ " + e.message; } } }, r.graded ? "Update grade" : "Save grade"), out))); });
+    if (j.missing.length) card.appendChild(h("details", { id: "lab-missing", style: "margin-top:8px" }, h("summary", {}, j.missing.length + " student" + (j.missing.length > 1 ? "s haven't" : " hasn't") + " submitted"), h("ul", {}, ...j.missing.map(m => h("li", {}, m.name)))));
+  }).catch(e => { card.innerHTML = ""; card.appendChild(h("div", {}, "❌ " + e.message)); });
+}
+/* ----- student: scan pages and submit a lab report ----- */
+function labCid() { return "lr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
+async function labState(aid) {
+  const L = VIEWS.labscan; if (L.st && L.st.aid === aid) return L.st;
+  const d = await scGetDraft("lab-" + aid);
+  L.st = { aid, cid: (d && d.cid) || labCid(), pages: ((d && d.pages) || []).map(p => Object.assign({}, p)), busy: false };
+  for (const p of L.st.pages) { try { await scProcess(p); } catch (e) {} }
+  return L.st;
+}
+function labSave(st) { return scPutDraft("lab-" + st.aid, { cid: st.cid, t: Date.now(), pages: st.pages.map(p => ({ id: p.id, orig: p.orig, corners: p.corners, rot: p.rot, mode: p.mode })) }); }
+async function labAddBlob(st, blob) {
+  const p = { id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), orig: blob, rot: 0, mode: "original" };
+  try { const img = await loadImg(URL.createObjectURL(blob)); p.corners = scDetect(img) || SC_FULL; } catch (e) { toast("Couldn't open that picture. Try a JPG or PNG."); return null; }
+  await scProcess(p); st.pages.push(p); await labSave(st); return p;
+}
+async function labPdf(st, a) { const pages = []; for (const p of st.pages) { if (!p.out) await scProcess(p); pages.push({ bytes: await scBlobToBytes(p.out), w: p.ow, h: p.oh }); }
+  return scPdf(pages, { title: a.title, author: (S.profile && S.profile.name) || "", subject: "Lab report" }); }
+function labFileName(a) { return (a.title || "lab-report").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 60) + ".pdf"; }
+function labDownload(blob, name) { const u = URL.createObjectURL(blob), l = h("a", { href: u, download: name, style: "display:none" }); document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 4000); }
+function labEditor(st, p, done) {
+  let corners = (p.corners || SC_FULL).map(x => x.slice()), rot = p.rot || 0, mode = p.mode || "original";
+  const url = URL.createObjectURL(p.orig), img = h("img", { src: url, alt: "Original photo of the page", style: "display:block;max-width:100%;max-height:58vh;user-select:none;-webkit-user-drag:none", draggable: "false" });
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 1000 1000"); svg.setAttribute("preserveAspectRatio", "none"); svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
+  const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon"); poly.setAttribute("style", "fill:rgba(21,96,130,.15);stroke:#156082;stroke-width:4;vector-effect:non-scaling-stroke"); svg.appendChild(poly);
+  const stage = h("div", { style: "position:relative;display:inline-block;touch-action:none;max-width:100%" }, img, svg), names = ["top-left", "top-right", "bottom-right", "bottom-left"];
+  const hs = corners.map((_, i) => { const b = h("button", { class: "sc-h", id: "sc-h" + i, "aria-label": "Move " + names[i] + " corner (arrow keys)", style: "position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:3px solid #fff;background:#156082;box-shadow:0 1px 4px rgba(0,0,0,.5);padding:0;cursor:grab;touch-action:none" });
+    b.addEventListener("pointerdown", e => { e.preventDefault(); b.setPointerCapture(e.pointerId); const mv = ev => { const r = img.getBoundingClientRect(); corners[i] = [Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height))]; place(); };
+      const up = () => { b.removeEventListener("pointermove", mv); b.removeEventListener("pointerup", up); b.removeEventListener("pointercancel", up); }; b.addEventListener("pointermove", mv); b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); });
+    b.addEventListener("keydown", e => { const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (!d) return; e.preventDefault(); const s = e.shiftKey ? 0.05 : 0.01; corners[i] = [Math.max(0, Math.min(1, corners[i][0] + d[0] * s)), Math.max(0, Math.min(1, corners[i][1] + d[1] * s))]; place(); });
+    stage.appendChild(b); return b; });
+  const place = () => { corners.forEach((c, i) => { hs[i].style.left = (c[0] * 100) + "%"; hs[i].style.top = (c[1] * 100) + "%"; }); poly.setAttribute("points", corners.map(c => (c[0] * 1000) + "," + (c[1] * 1000)).join(" ")); };
+  const msg = h("div", { class: "muted", role: "status", "aria-live": "polite", id: "sc-msg", style: "font-size:13px" }, "Drag the four corners to the edges of the page. Rotate if it's sideways.");
+  const modeSel = h("div", { class: "seg", id: "sc-mode", role: "radiogroup", "aria-label": "Image" }, ...[["original", "Original"], ["clearer", "Clearer"], ["bw", "Black & white"]].map(([v, t]) => h("button", { class: mode === v ? "on" : "", id: "sc-mode-" + v, role: "radio", "aria-checked": mode === v ? "true" : "false", onclick: e => { mode = v; modeSel.querySelectorAll("button").forEach(x => { x.classList.toggle("on", x === e.currentTarget); x.setAttribute("aria-checked", x === e.currentTarget ? "true" : "false"); }); } }, t)));
+  const rotTxt = h("span", { class: "muted", id: "sc-rot" }, ""), showRot = () => rotTxt.textContent = rot ? "Turned " + (((rot % 4) + 4) % 4) * 90 + "°" : "";
+  const close = () => { URL.revokeObjectURL(url); m.remove(); document.removeEventListener("keydown", esc); }, esc = e => { if (e.key === "Escape" && !e.target.classList.contains("sc-h")) close(); };
+  const m = h("div", { class: "modal", id: "sc-edit", role: "dialog", "aria-modal": "true", "aria-label": "Edit page" }, h("div", { class: "box cam-box", style: "max-width:760px" },
+    h("div", { class: "cam-head" }, h("b", {}, "Edit page " + (st.pages.indexOf(p) + 1)), h("button", { class: "btn ghost small", "aria-label": "Close", onclick: close }, "✕")), msg,
+    h("div", { style: "text-align:center;margin:6px 0" }, stage),
+    h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "sc-auto", onclick: () => { const d = scDetect(img); if (d) { corners = d; place(); msg.textContent = "Page edges found. Check the corners."; } else msg.textContent = "No clear page edge found. Drag the corners yourself, or use the whole photo."; } }, "Find page edges"),
+      h("button", { class: "btn sec2 small", id: "sc-full", onclick: () => { corners = SC_FULL.map(x => x.slice()); place(); } }, "Whole photo"),
+      h("button", { class: "btn sec2 small", id: "sc-rotl", "aria-label": "Rotate left", onclick: () => { rot--; showRot(); } }, "⟲ Rotate"), h("button", { class: "btn sec2 small", id: "sc-rotr", "aria-label": "Rotate right", onclick: () => { rot++; showRot(); } }, "⟳ Rotate"), rotTxt),
+    h("div", { style: "margin-top:6px" }, modeSel), h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0" }, "Original keeps your handwriting exactly as photographed (only straightened). Clearer brightens the page. Black & white can make faint pencil hard to read; check the preview."),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "sc-done", onclick: async () => { msg.textContent = "Processing…"; Object.assign(p, { corners, rot, mode }); try { await scProcess(p); await labSave(st); close(); done(); } catch (e) { msg.textContent = "Couldn't process this page on this device. Try again."; } } }, "✓ Done"), h("button", { class: "btn ghost", onclick: close }, "Cancel"))));
+  document.body.appendChild(m); document.addEventListener("keydown", esc);
+  if (img.complete) place(); else img.onload = place; showRot();
+  setTimeout(() => hs[0].focus(), 50);
+}
+VIEWS.labscan = function (arg) {
+  const a = arg.a, tz = arg.tz || localTz(), e = a.effective || {};
+  document.getElementById("title").textContent = a.title;
+  const box = h("div", { id: "ls-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  const head = h("div", { class: "card", id: "ls-head" }, h("b", {}, "📄 " + a.title),
+    h("div", {}, "Due " + fmtTz(e.due_at || a.due_at, tz) + ((e.lock_at || a.lock_at) && (e.lock_at || a.lock_at) !== (e.due_at || a.due_at) ? " · late uploads until " + fmtTz(e.lock_at || a.lock_at, tz, false) : "")),
+    h("div", { class: "muted", style: "font-size:13px" }, [a.max_points ? a.max_points + " points" : "", a.expect_pages ? "Your instructor expects " + a.expect_pages + " page" + (a.expect_pages > 1 ? "s" : "") : "", e.max_attempts ? "Uploads: " + a.attempts_used + " of " + e.max_attempts : ""].filter(Boolean).join(" · ")),
+    a.instructions ? h("div", { id: "ls-instr", style: "white-space:pre-wrap;margin-top:6px;padding:8px;background:var(--soft,#f3f6f8);border-radius:8px" }, a.instructions) : null);
+  const subsC = h("div", { class: "card", id: "ls-subs", style: "display:none" });
+  const loadSubs = () => asgCall({ action: "lab_mine", assignment_id: a.id }).then(j => { subsC.innerHTML = ""; if (!j.submissions.length) { subsC.style.display = "none"; return; } subsC.style.display = "";
+    subsC.appendChild(h("b", {}, "Your submissions"));
+    j.submissions.slice().reverse().forEach(s => subsC.appendChild(h("div", { style: "border-top:1px solid var(--line,#ddd);padding:6px 0", id: "ls-sub-" + s.n },
+      h("div", {}, h("b", {}, "Version " + s.n), " · received " + fmtTz(s.submitted_at, tz) + " · " + s.pages + " page" + (s.pages > 1 ? "s" : "") + " · receipt ", h("code", {}, s.receipt), s.late ? h("span", { class: "chip warn" }, "Late") : null),
+      s.status === "returned" && s.score != null ? h("div", { id: "ls-grade-" + s.n }, h("b", {}, "Score: " + s.score + "/" + s.total), s.penalty_pct ? " (late −" + s.penalty_pct + "%)" : "", s.feedback ? h("div", { style: "white-space:pre-wrap;margin-top:2px" }, "Feedback: " + s.feedback) : null) : h("div", { class: "muted" }, s.status === "returned" ? "Graded; your grade is released " + fmtTz(a.grade_release_at, tz) + "." : "Submitted. Waiting for grading."),
+      h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "ls-open-" + s.n, onclick: async () => { try { const o = await asgCall({ action: "lab_open", submission_id: s.id }); window.open(o.url, "_blank", "noopener"); } catch (x) { toast("❌ " + x.message); } } }, "Open PDF"))))); return j; }).catch(() => {});
+  labState(a.id).then(st => { box.innerHTML = ""; box.appendChild(head); box.appendChild(subsC); loadSubs();
+    const canUp = (a.state === "open" || a.state === "late") && !(e.max_attempts && a.attempts_used >= e.max_attempts);
+    if (!canUp) { box.appendChild(h("div", { class: "card muted", id: "ls-closed" }, a.state === "not_open" ? "This lab report opens " + fmtTz(e.open_at, tz) + ". You can already photograph your pages; they stay on this device." : a.state === "closed" ? "This lab report is closed. Ask your instructor if you need an extension." : "You've used all your uploads.")); if (a.state !== "not_open") return; }
+    const pagesC = h("div", { class: "card", id: "ls-pages" }); box.appendChild(pagesC);
+    const actC = h("div", { class: "card", id: "ls-actions" }); box.appendChild(actC);
+    const fileIn = h("input", { type: "file", accept: "image/*", multiple: "", id: "ls-files", style: "display:none", onchange: async ev => { const fs = [...ev.target.files]; ev.target.value = ""; if (!fs.length) return;
+      if (st.pages.length + fs.length > 50) { toast("Up to 50 pages."); return; } toast("Adding " + fs.length + " page" + (fs.length > 1 ? "s" : "") + "…");
+      for (const f of fs) { try { await labAddBlob(st, f); } catch (x) {} } draw(); } });
+    const draw = () => {
+      pagesC.innerHTML = ""; pagesC.appendChild(h("b", {}, "Pages (" + st.pages.length + (a.expect_pages ? " of " + a.expect_pages + " expected" : "") + ")"));
+      pagesC.appendChild(h("p", { class: "muted", style: "font-size:13px;margin:2px 0 6px" }, "Photograph each page flat, in good light, filling the frame. Pages stay on this device until you submit."));
+      const grid = h("div", { id: "ls-grid", role: "list", style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px" }); pagesC.appendChild(grid);
+      st.pages.forEach((p, i) => { const u = p.out ? URL.createObjectURL(p.out) : ""; const w = p.q ? p.q.warn : [];
+        grid.appendChild(h("div", { role: "listitem", class: "ls-page", id: "ls-p" + i, style: "border:1px solid var(--line,#ccd);border-radius:8px;padding:6px;text-align:center" + (w.length ? ";border-color:var(--warn,#c80)" : "") },
+          h("img", { src: u, alt: "Page " + (i + 1), style: "max-width:100%;max-height:170px;display:block;margin:0 auto 4px", onload: () => URL.revokeObjectURL(u) }),
+          h("div", { style: "font-size:13px" }, h("b", {}, "Page " + (i + 1)), p.mode && p.mode !== "original" ? " · " + (p.mode === "bw" ? "B&W" : "Clearer") : ""),
+          w.length ? h("div", { style: "font-size:12px;color:var(--warn,#a06b00)" }, w.join("; ")) : null,
+          h("div", { style: "display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:4px" },
+            h("button", { class: "btn ghost small", id: "ls-up-" + i, "aria-label": "Move page " + (i + 1) + " earlier", disabled: i === 0 ? "" : null, onclick: async () => { [st.pages[i - 1], st.pages[i]] = [st.pages[i], st.pages[i - 1]]; await labSave(st); draw(); } }, "◀"),
+            h("button", { class: "btn ghost small", id: "ls-dn-" + i, "aria-label": "Move page " + (i + 1) + " later", disabled: i === st.pages.length - 1 ? "" : null, onclick: async () => { [st.pages[i + 1], st.pages[i]] = [st.pages[i], st.pages[i + 1]]; await labSave(st); draw(); } }, "▶"),
+            h("button", { class: "btn sec2 small", id: "ls-edit-" + i, "aria-label": "Edit page " + (i + 1), onclick: () => labEditor(st, p, draw) }, "Edit"),
+            h("button", { class: "btn ghost small", id: "ls-del-" + i, "aria-label": "Delete page " + (i + 1), style: "color:var(--bad)", onclick: () => confirmBox("Delete page " + (i + 1) + "?", "The photo is removed from this device.", async () => { st.pages.splice(i, 1); await labSave(st); draw(); }, "Delete") }, "✕")))); });
+      pagesC.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ls-cam", onclick: async () => { if (st.pages.length >= 50) { toast("Up to 50 pages."); return; }
+          const ph = await photoCapture({ title: "📷 Page " + (st.pages.length + 1), facing: "environment", raw: true, maxSide: 2400, budgetKB: 1800, hint: "Hold the phone straight above the page. You can fix the corners afterwards." });
+          if (!ph) return; await labAddBlob(st, ph.blob); draw(); } }, "📷 Photograph a page"), h("button", { class: "btn sec2", id: "ls-add", onclick: () => fileIn.click() }, "🖼️ Add photos"), fileIn));
+      actC.innerHTML = ""; const warns = scChecks(st.pages, a.expect_pages);
+      if (warns.length) actC.appendChild(h("div", { id: "ls-warn", role: "status", style: "border-left:5px solid var(--gold,#e6a700);padding:6px 10px;margin-bottom:8px" }, h("b", {}, "Check before you submit"), h("ul", { style: "margin:4px 0;padding-left:18px" }, ...warns.map(w => h("li", {}, w)))));
+      const has = st.pages.length > 0, dis = has ? null : "";
+      const msg = h("div", { class: "muted", id: "ls-msg", role: "status", "aria-live": "polite" });
+      actC.appendChild(h("div", { class: "btnrow" },
+        h("button", { class: "btn sec2", id: "ls-preview", disabled: dis, onclick: async () => { msg.textContent = "Making the PDF…"; try { const b = new Blob([await labPdf(st, a)], { type: "application/pdf" }), u = URL.createObjectURL(b); const w = window.open(u, "_blank"); if (!w) labDownload(b, labFileName(a)); msg.textContent = "PDF ready (" + Math.round(b.size / 1024) + " KB)."; } catch (x) { msg.textContent = "❌ Couldn't make the PDF on this device."; } } }, "👁️ Preview PDF"),
+        h("button", { class: "btn ghost", id: "ls-download", disabled: dis, onclick: async () => { try { labDownload(new Blob([await labPdf(st, a)], { type: "application/pdf" }), labFileName(a)); } catch (x) { toast("❌ Couldn't make the PDF."); } } }, "⬇️ Download PDF"),
+        h("button", { class: "btn ghost", id: "ls-originals", disabled: dis, onclick: () => st.pages.forEach((p, i) => setTimeout(() => labDownload(p.orig, labFileName(a).replace(/\.pdf$/, "") + "-page" + (i + 1) + "-original.jpg"), i * 400)) }, "⬇️ Original photos"),
+        navigator.share ? h("button", { class: "btn ghost", id: "ls-share", disabled: dis, onclick: async () => { try { const f = new File([await labPdf(st, a)], labFileName(a), { type: "application/pdf" }); if (navigator.canShare && !navigator.canShare({ files: [f] })) { toast("This device can't share files; use Download PDF and attach it."); return; } await navigator.share({ files: [f], title: a.title }); } catch (x) { if (x && x.name !== "AbortError") toast("Sharing didn't work; use Download PDF and attach it."); } } }, "📤 Share / email PDF") : null));
+      if (canUp) actC.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ls-submit", disabled: dis, onclick: () => {
+        const n = st.pages.length; confirmBox("Submit " + n + " page" + (n > 1 ? "s" : "") + " to your instructor?", (warns.length ? "There " + (warns.length > 1 ? "are " + warns.length + " warnings" : "is 1 warning") + " above. " : "") + (a.attempts_used ? "This becomes version " + (a.attempts_used + 1) + "; your instructor sees every version. " : "") + "You'll get a receipt.", async () => {
+          if (st.busy) return; st.busy = true; msg.textContent = "Making the PDF…";
+          try { const pdf = await labPdf(st, a); if (pdf.length > 12 * 1024 * 1024) { msg.textContent = "❌ The PDF is larger than 12 MB. Remove pages or use Black & white for text-only pages."; st.busy = false; return; }
+            msg.textContent = "Uploading " + Math.round(pdf.length / 1024) + " KB…";
+            const r = await asgCall({ action: "lab_submit", assignment_id: a.id, client_id: st.cid, pdf: scB64(pdf), pages: n, processing: st.pages.map(p => ({ rot: (((p.rot || 0) % 4) + 4) % 4, corners: p.corners, mode: p.mode, warn: p.q ? p.q.warn : [] })) });
+            const sb = r.submission; await scDelDraft("lab-" + a.id); VIEWS.labscan.st = null; a.attempts_used = (a.attempts_used || 0) + (r.duplicate ? 0 : 1); st.busy = false;
+            box.insertBefore(h("div", { class: "card", id: "ls-receipt", role: "status", style: "border-left:5px solid var(--ok,#2a8)" }, h("b", {}, "✅ Submitted"), h("div", {}, "Receipt ", h("code", { id: "ls-receipt-code" }, sb.receipt), " · version " + sb.n + " · " + sb.pages + " page" + (sb.pages > 1 ? "s" : "") + " · received " + fmtTz(sb.submitted_at, tz) + (sb.late ? " · late" : "")), h("div", { class: "muted", style: "font-size:13px" }, "Keep this receipt. Your instructor sees the PDF in ChemFlip.")), head.nextSibling);
+            S.receipts = S.receipts || []; if (!S.receipts.some(x => x.code === sb.receipt)) { S.receipts.push({ code: sb.receipt, title: a.title, at: sb.submitted_at, tz, late: sb.late, pen: sb.penalty_pct, pages: sb.pages, cls: a.class_code }); if (S.receipts.length > 200) S.receipts.shift(); save(); } toast("✅ Lab report submitted");
+            pagesC.remove(); actC.remove(); loadSubs();
+          } catch (x) { st.busy = false; msg.textContent = "❌ " + x.message + (/still on this device/.test(x.message) ? "" : " Your pages are still on this device.") + " Press Submit again when you're ready; it won't make a second copy."; } }, "Submit"); } }, "📨 Submit to ChemFlip")));
+      actC.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "Submit to Canvas directly needs your school's Canvas admin to connect ChemFlip; until then, use Download PDF and upload it in Canvas if your instructor asks for that."));
+      actC.appendChild(msg);
+    };
+    draw();
+  }).catch(x => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + (x && x.message || "Couldn't open the scanner on this device."))); });
 };
 async function asgStart(a, tz) {
   const go1 = async () => {
