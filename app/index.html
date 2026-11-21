@@ -573,7 +573,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 function render() {
   applyTheme(); applyA11y(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
@@ -3097,7 +3097,7 @@ function scChecks(pages, expect) {
 }
 /* ---------- PDF (images only) ---------- */
 function scPdfText(s) { s = String(s || ""); let hx = "FEFF"; for (const ch of s) { const c = ch.codePointAt(0); if (c > 0xffff) { const v = c - 0x10000; hx += (0xd800 + (v >> 10)).toString(16).padStart(4, "0") + (0xdc00 + (v & 1023)).toString(16).padStart(4, "0"); } else hx += c.toString(16).padStart(4, "0"); } return "<" + hx.toUpperCase() + ">"; }
-async function scPdf(pages, meta) {
+async function scPdf(pages, meta, size) {   // size: {w, h, m} in points for a fixed page size (exams); default Letter, 18 pt margin, landscape pages turned
   const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
   const add = (x) => { const b = typeof x === "string" ? enc.encode(x) : x; parts.push(b); len += b.length; };
   const obj = (n, body) => { offs[n] = len; add(n + " 0 obj\n"); (Array.isArray(body) ? body : [body]).forEach(add); add("\nendobj\n"); };
@@ -3105,7 +3105,7 @@ async function scPdf(pages, meta) {
   const n = pages.length, kids = []; for (let i = 0; i < n; i++) kids.push((3 + i * 3) + " 0 R");
   obj(1, "<< /Type /Catalog /Pages 2 0 R >>"); obj(2, "<< /Type /Pages /Count " + n + " /Kids [" + kids.join(" ") + "] >>");
   for (let i = 0; i < n; i++) {
-    const p = pages[i], bytes = p.bytes, land = p.w > p.h, PW = land ? 792 : 612, PH = land ? 612 : 792, m = 18, k = Math.min((PW - 2 * m) / p.w, (PH - 2 * m) / p.h);
+    const p = pages[i], bytes = p.bytes, land = !size && p.w > p.h, PW = size ? size.w : land ? 792 : 612, PH = size ? size.h : land ? 612 : 792, m = size ? size.m : 18, k = Math.min((PW - 2 * m) / p.w, (PH - 2 * m) / p.h);
     const dw = (p.w * k).toFixed(2), dh = (p.h * k).toFixed(2), x = ((PW - p.w * k) / 2).toFixed(2), y = ((PH - p.h * k) / 2).toFixed(2), pn = 3 + i * 3, cn = pn + 1, im = pn + 2;
     const content = "q " + dw + " 0 0 " + dh + " " + x + " " + y + " cm /Im" + i + " Do Q";
     obj(pn, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources << /XObject << /Im" + i + " " + im + " 0 R >> >> /Contents " + cn + " 0 R >>");
@@ -3114,9 +3114,9 @@ async function scPdf(pages, meta) {
   }
   const info = 3 + n * 3, d = new Date(), pad = v => String(v).padStart(2, "0"), when = "D:" + d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + "Z";
   obj(info, "<< /Title " + scPdfText(meta.title) + " /Author " + scPdfText(meta.author) + " /Subject " + scPdfText(meta.subject || "Lab report") + " /Producer (ChemFlip lab report scanner) /CreationDate (" + when + ") >>");
-  const xref = len, size = info + 1; add("xref\n0 " + size + "\n0000000000 65535 f \n");
-  for (let i = 1; i < size; i++) add(String(offs[i]).padStart(10, "0") + " 00000 n \n");
-  add("trailer\n<< /Size " + size + " /Root 1 0 R /Info " + info + " 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+  const xref = len, nObj = info + 1; add("xref\n0 " + nObj + "\n0000000000 65535 f \n");
+  for (let i = 1; i < nObj; i++) add(String(offs[i]).padStart(10, "0") + " 00000 n \n");
+  add("trailer\n<< /Size " + nObj + " /Root 1 0 R /Info " + info + " 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
   const out = new Uint8Array(len); let o = 0; for (const b of parts) { out.set(b, o); o += b.length; } return out;
 }
 function scB64(bytes) { let s = ""; const CH = 0x8000; for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH)); return btoa(s); }
@@ -3126,6 +3126,221 @@ function scDb() { return SCDB.db || (SCDB.db = new Promise((res, rej) => { if (!
 async function scGetDraft(id) { try { const d = await scDb(); return await new Promise((res, rej) => { const q = d.transaction("d").objectStore("d").get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); } catch (e) { return null; } }
 async function scPutDraft(id, v) { try { const d = await scDb(); await new Promise((res, rej) => { const t = d.transaction("d", "readwrite"); t.objectStore("d").put(v, id); t.oncomplete = res; t.onerror = () => rej(t.error); }); return true; } catch (e) { return false; } }
 async function scDelDraft(id) { try { const d = await scDb(); await new Promise((res, rej) => { const t = d.transaction("d", "readwrite"); t.objectStore("d").delete(id); t.oncomplete = res; t.onerror = () => rej(t.error); }); } catch (e) {} }
+
+/* ---------- 5.0 exams: preview, print, PDF, Word, email, save (instructor) ----------
+   One exam model (questions from an assignment: ChemFlip bank questions + the instructor's own) is turned into:
+   - pages drawn on canvas (Preview, Print and Download PDF all show the same pages; PDF = page images, Letter or A4)
+   - an editable Word file (.docx written here, no library: text, numbering, points, answer lines, figures as PNG)
+   Versions A–D shuffle question order and/or answer choices with a fixed seed, so a version always comes out the same,
+   and every version has its own answer key. Answer keys and explanations appear only in the instructor/key exports. */
+const EXV = "ABCDEFGH";
+function exSeeded(seed) { let h = 2166136261; for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1e9) / 1e9; }; }
+function exShuffle(arr, rnd) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// Choices that must keep their place ("All of the above", "Both A and B") are never moved.
+const EX_FIXED = /\b(all|none|both|neither) of (the )?(above|these)\b|\bboth [a-d] and [a-d]\b|\b[a-d] and [a-d]\b|\bonly [a-d]\b/i;
+// Questions of an assignment in the instructor's order, with keys (needs the instructor's detail view of the assignment).
+function exItems(a) {
+  const out = [];
+  (a.qids || []).forEach(id => { const q = QBYID[id]; if (!q) return; const key = a.answer_key && a.answer_key[id] != null ? a.answer_key[id] : q.a;
+    out.push({ id, kind: "mc", pts: Number((a.points || {})[id]) > 0 ? Number(a.points[id]) : 1, stem: q.q, opts: q.o.slice(), ans: key, expl: q.s || "", fig: q.im && FIGS[q.im] ? FIGS[q.im] : null, tp: q.tp || "" }); });
+  (a.items || []).forEach(it => { const b = { id: it.id, kind: it.type, pts: Number(it.points) > 0 ? Number(it.points) : 1, stem: it.stem || "", expl: it.solution || "" };
+    if (it.type === "mc") Object.assign(b, { opts: (it.options || []).slice(), ans: it.answer });
+    if (it.type === "num") Object.assign(b, { keyText: String(it.value) + (it.unit ? " " + it.unit : "") + (it.sig ? " (" + it.sig + " significant figures)" : "") + (it.tol_abs != null ? ", ± " + it.tol_abs : ", within " + (it.tol_pct == null ? 1 : it.tol_pct) + "%"), lines: 4 });
+    if (it.type === "struct") Object.assign(b, { keyText: "Structure (SMILES): " + (it.smiles || ""), box: true });
+    if (it.type === "short") Object.assign(b, { keyText: it.rubric ? "Rubric: " + it.rubric : "Graded by the instructor", lines: 6 });
+    out.push(b); });
+  return out;
+}
+// One version: question order and choice order, with the key for that version.
+function exVersion(items, v, cfg, seedBase) {
+  const rnd = exSeeded(seedBase + "|" + v);
+  const order = v > 0 && cfg.shuffleQ ? exShuffle(items, rnd) : items.slice();
+  return order.map((it, n) => {
+    const q = Object.assign({}, it, { n: n + 1 });
+    if (it.kind === "mc" && it.opts) {
+      let idx = it.opts.map((_, k) => k);
+      if (v > 0 && cfg.shuffleC && !it.opts.some(o => EX_FIXED.test(o))) idx = exShuffle(idx, rnd);
+      q.opts = idx.map(k => it.opts[k]); q.ans = idx.indexOf(it.ans); q.keyText = String.fromCharCode(65 + q.ans) + ". " + q.opts[q.ans];
+    }
+    return q; });
+}
+function exModel(a, cfg) {
+  const items = exItems(a), n = Math.max(1, Math.min(8, cfg.versions | 0 || 1)), seed = a.id || a.title;
+  return { items, total: items.reduce((t, q) => t + q.pts, 0), versions: Array.from({ length: n }, (_, v) => ({ letter: n > 1 ? EXV[v] : "", qs: exVersion(items, v, cfg, seed) })) };
+}
+/* ---------- page layout on canvas ---------- */
+const EX_DPI = 150;   // 150 dpi pages: sharp print, small PDF
+function exPaper(cfg) { return cfg.paper === "a4" ? { w: 8.27, h: 11.69 } : { w: 8.5, h: 11 }; }
+const exFont = (pt, bold, italic) => (italic ? "italic " : "") + (bold ? "700 " : "400 ") + Math.round(pt * EX_DPI / 72) + 'px "Times New Roman", Times, "Liberation Serif", serif';
+function exWrap(g, text, maxW) {   // words wrap; very long "words" (formulas) break by character
+  const out = []; String(text).split("\n").forEach(par => { let line = "";
+    par.split(/(\s+)/).forEach(w => { if (!w) return; const t = line + w; if (g.measureText(t).width <= maxW || !line.trim()) { if (g.measureText(t).width > maxW && !line.trim()) { let chunk = ""; for (const ch of w) { if (g.measureText(chunk + ch).width > maxW) { out.push(chunk); chunk = ""; } chunk += ch; } line = chunk; } else line = t; } else { out.push(line.replace(/\s+$/, "")); line = w.trimStart(); } });
+    out.push(line.replace(/\s+$/, "")); }); return out;
+}
+async function exSvgImg(svg) { const u = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })); try { const i = await loadImg(u); return i; } finally { setTimeout(() => URL.revokeObjectURL(u), 5000); } }
+// Lays out one document part and returns pages of drawing operations.
+async function exLayout(parts, cfg) {
+  const P = exPaper(cfg), W = Math.round(P.w * EX_DPI), H = Math.round(P.h * EX_DPI), M = Math.round(0.75 * EX_DPI), FOOT = Math.round(0.45 * EX_DPI);
+  const meas = document.createElement("canvas").getContext("2d"), pt = cfg.font || 12, LH = 1.35;
+  const pages = []; let ops = null, y = 0, footer = "";
+  const newPage = () => { ops = []; pages.push({ ops, footer }); y = M; };
+  const lineH = (p) => Math.round(p * EX_DPI / 72 * LH);
+  const textOps = (text, x, maxW, p, bold, italic, color) => { meas.font = exFont(p, bold, italic); return exWrap(meas, text, maxW).map(s => ({ t: "text", s, x, font: exFont(p, bold, italic), color: color || "#111", h: lineH(p) })); };
+  // a block = list of ops with relative y; placed as a unit (moved to the next page if it doesn't fit)
+  const place = (block, keep) => { const hgt = block.reduce((m, o) => Math.max(m, o.dy + (o.h || 0)), 0);
+    if (y + hgt > H - M - FOOT && y > M + 5 && keep !== false) newPage();
+    block.forEach(o => ops.push(Object.assign({}, o, { y: y + o.dy }))); y += hgt; };
+  const stack = (list, gap) => { let dy = 0; const out = []; list.forEach(o => { if (o.gapBefore) dy += o.gapBefore; out.push(Object.assign(o, { dy })); dy += (o.h || 0) + (gap || 0); }); return out; };
+  for (const part of parts) {
+    footer = part.footer; newPage();
+    for (const b of part.blocks) {
+      if (b.t === "head") {
+        const L = []; if (b.inst) L.push(...textOps(b.inst, M, W - 2 * M, pt, true));
+        if (b.course) L.push(...textOps(b.course, M, W - 2 * M, pt));
+        L.push(...textOps(b.title + (b.version ? "  ·  Version " + b.version : ""), M, W - 2 * M, pt + 5, true, false, "#0E2841"));
+        if (b.meta) L.push(...textOps(b.meta, M, W - 2 * M, pt - 1, false, false, "#444"));
+        let blk = stack(L, 2);
+        let dy = blk.length ? blk[blk.length - 1].dy + blk[blk.length - 1].h + 8 : 0;
+        blk.push({ t: "rule", x1: M, x2: W - M, dy, h: 4, wd: 3 }); dy += 14;
+        if (b.fields) { const f = exFont(pt); blk.push({ t: "text", s: "Name: ______________________________   Student ID: _______________", x: M, font: f, color: "#111", dy, h: lineH(pt) }); dy += lineH(pt) + 10; }
+        place(blk);
+        if (b.instructions) { y += 6; place(stack(textOps(b.instructions, M, W - 2 * M, pt - 1, false, true, "#222"))); }
+        y += 14;
+      } else if (b.t === "h2") { y += 8; place(stack(textOps(b.s, M, W - 2 * M, pt + 2, true, false, "#0E2841"))); y += 6; }
+      else if (b.t === "p") { place(stack(textOps(b.s, M, W - 2 * M, b.pt || pt, b.bold, b.italic, b.color))); y += b.gap || 4; }
+      else if (b.t === "q") {
+        const q = b.q, ind = Math.round(0.38 * EX_DPI), x0 = M + ind, mw = W - M - x0, L = [];
+        const num = { t: "text", s: q.n + ".", x: M, font: exFont(pt, true), color: "#111", h: 0, dy: 0 };
+        L.push(...textOps(q.stem + (cfg.points ? "  (" + q.pts + " pt" + (q.pts === 1 ? "" : "s") + ")" : ""), x0, mw, pt));
+        if (q.fig && b.img) { const s = Math.min(1, (mw * 0.8) / b.img.width, (2.2 * EX_DPI) / b.img.height); L.push({ t: "img", img: b.img, x: x0, w: Math.round(b.img.width * s), h: Math.round(b.img.height * s) + 6, gapBefore: 4 }); }
+        if (q.kind === "mc" && q.opts) q.opts.forEach((o, k) => { const key = b.showKey && k === q.ans; const t = textOps(String.fromCharCode(65 + k) + ".  " + o + (key ? "   ✓" : ""), x0 + 14, mw - 14, pt, key, false, key ? "#1E7B4F" : "#111"); t[0].gapBefore = 3; L.push(...t); });
+        if (q.kind !== "mc") { if (b.showKey) L.push(...textOps("Answer: " + (q.keyText || ""), x0, mw, pt, true, false, "#1E7B4F").map((o, i) => Object.assign(o, i ? {} : { gapBefore: 6 })));
+          else if (q.box) L.push({ t: "box", x: x0, w: mw, h: Math.round(2.4 * EX_DPI), gapBefore: 8 });
+          else for (let k = 0; k < (q.lines || 4) * (cfg.space || 1); k++) L.push({ t: "rule", x1: x0, x2: W - M, h: Math.round(0.36 * EX_DPI), wd: 1, gapBefore: k ? 0 : 6, under: true }); }
+        if (b.showExpl && q.expl) L.push(...textOps("Explanation: " + q.expl, x0, mw, pt - 1, false, true, "#355").map((o, i) => Object.assign(o, i ? {} : { gapBefore: 6 })));
+        const blk = stack(L, 1); blk.unshift(num); place(blk); y += Math.round(pt * EX_DPI / 72 * 0.9);
+      } else if (b.t === "keytable") {
+        const f = exFont(pt), colW = (W - 2 * M) / b.cols; let r = 0;
+        const rows = Math.ceil(b.rows.length / b.cols), hh = lineH(pt) + 2, list = [];
+        b.rows.forEach((s, i) => { const c = Math.floor(i / rows), rr = i % rows; list.push({ t: "text", s, x: M + c * colW, font: f, color: "#111", h: hh, dy: rr * hh }); r = Math.max(r, rr); });
+        // split long tables across pages row by row
+        for (let rr = 0; rr <= r; rr++) place(list.filter(o => o.dy === rr * hh).map(o => Object.assign({}, o, { dy: 0 })));
+        y += 8;
+      } else if (b.t === "bubbles") {
+        const per = 25, rowH = Math.round(0.3 * EX_DPI), colW = Math.round((W - 2 * M) / Math.ceil(b.n / per) ), f = exFont(pt - 1), fb = exFont(pt - 2, true), rad = Math.round(0.09 * EX_DPI);
+        const startY = y; let maxY = y;
+        for (let i = 0; i < b.n; i++) { const c = Math.floor(i / per), rr = i % per; const yy = startY + rr * rowH, xx = M + c * Math.min(colW, Math.round(2.1 * EX_DPI));
+          if (yy + rowH > H - M - FOOT) break;
+          ops.push({ t: "text", s: String(i + 1) + ".", x: xx, y: yy, font: f, color: "#111" });
+          for (let k = 0; k < b.choices; k++) ops.push({ t: "bubble", cx: xx + Math.round(0.42 * EX_DPI) + k * Math.round(0.32 * EX_DPI), cy: yy + Math.round(rowH * 0.42), r: rad, s: String.fromCharCode(65 + k), font: fb });
+          maxY = Math.max(maxY, yy + rowH); }
+        y = maxY + 10;
+      }
+    }
+  }
+  pages.forEach((p, i) => p.footer = (p.footer ? p.footer + "  ·  " : "") + "Page " + (i + 1) + " of " + pages.length);
+  return { W, H, M, FOOT, pages };
+}
+function exDraw(L, page) {
+  const c = document.createElement("canvas"); c.width = L.W; c.height = L.H; const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, L.W, L.H); g.textBaseline = "top";
+  for (const o of page.ops) {
+    if (o.t === "text") { g.font = o.font; g.fillStyle = o.color || "#111"; g.fillText(o.s, o.x, o.y); }
+    else if (o.t === "rule") { g.strokeStyle = o.under ? "#999" : "#0E2841"; g.lineWidth = o.wd || 1; const yy = o.y + (o.under ? o.h - 2 : 1); g.beginPath(); g.moveTo(o.x1, yy); g.lineTo(o.x2, yy); g.stroke(); }
+    else if (o.t === "box") { g.strokeStyle = "#999"; g.lineWidth = 1.5; g.strokeRect(o.x, o.y, o.w, o.h - 4); }
+    else if (o.t === "img") g.drawImage(o.img, o.x, o.y, o.w, o.h - 6);
+    else if (o.t === "bubble") { g.strokeStyle = "#333"; g.lineWidth = 1.5; g.beginPath(); g.arc(o.cx, o.cy, o.r, 0, Math.PI * 2); g.stroke(); g.font = o.font; g.fillStyle = "#555"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(o.s, o.cx, o.cy + 1); g.textAlign = "left"; g.textBaseline = "top"; }
+  }
+  g.font = exFont(9); g.fillStyle = "#666"; g.textBaseline = "alphabetic";
+  g.beginPath(); g.strokeStyle = "#C9D6DE"; g.lineWidth = 1; g.moveTo(L.M, L.H - L.FOOT); g.lineTo(L.W - L.M, L.H - L.FOOT); g.stroke();
+  g.fillText(page.footer, L.M, L.H - L.FOOT + Math.round(0.25 * EX_DPI));
+  return c;
+}
+/* ---------- what goes into a file ---------- */
+const EX_WHAT = { student: "Student version (questions only)", instructor: "Instructor version (questions + answer key)", explain: "Questions with answer key and explanations", key: "Answer key only" };
+function exHead(cfg, a, ver, total, extra) {
+  const meta = [cfg.date ? "Date: " + cfg.date : "", cfg.limit ? "Time: " + cfg.limit + " min" : "", cfg.points ? "Total: " + total + " points" : ""].filter(Boolean).join("     ");
+  return { t: "head", inst: cfg.inst, course: cfg.course, title: (cfg.title || a.title) + (extra || ""), version: ver, meta, fields: cfg.fields && !extra, instructions: extra ? "" : cfg.instructions };
+}
+async function exParts(a, cfg, M, what, only) {
+  const parts = [], figs = {};
+  for (const it of M.items) if (it.fig && !figs[it.id]) { try { figs[it.id] = await exSvgImg(it.fig); } catch (e) { figs[it.id] = null; } }
+  const vs = only == null ? M.versions : [M.versions[only]], title = cfg.title || a.title;
+  for (const V of vs) {
+    const foot = title + (V.letter ? " · Version " + V.letter : "");
+    if (what !== "key") parts.push({ footer: foot, blocks: [exHead(cfg, a, V.letter, M.total, what === "student" ? "" : " (instructor copy)"),
+      ...V.qs.map(q => ({ t: "q", q, img: figs[q.id], showKey: what !== "student", showExpl: what === "explain" }))] });
+    if (what === "key" || (what !== "student" && cfg.keyPage)) parts.push({ footer: foot + " · Answer key", blocks: [exHead(cfg, a, V.letter, M.total, " — Answer key"),
+      { t: "keytable", cols: 2, rows: V.qs.map(q => q.n + ".  " + (q.kind === "mc" ? String.fromCharCode(65 + q.ans) : (q.keyText || "").slice(0, 60)) + (cfg.points ? "   (" + q.pts + ")" : "")) }] });
+    if (what === "student" && cfg.bubbles) { const mc = V.qs.filter(q => q.kind === "mc"); if (mc.length) parts.push({ footer: foot + " · Answer sheet", blocks: [exHead(cfg, a, V.letter, M.total, " — Answer sheet"),
+      { t: "p", s: "Fill in one bubble per question. Questions " + mc.map(q => q.n).slice(0, 1) + (mc.length > 1 ? "–" + mc[mc.length - 1].n : "") + (mc.length < V.qs.length ? " (multiple choice only; write other answers on the exam)" : "") + ".", italic: true },
+      { t: "p", s: "Name: ______________________________   Student ID: _______________" }, { t: "bubbles", n: V.qs.length, choices: Math.max(4, ...mc.map(q => q.opts.length)) }] }); }
+  }
+  return parts;
+}
+async function exPages(a, cfg, what, only) { const M = exModel(a, cfg); const L = await exLayout(await exParts(a, cfg, M, what, only), cfg); return { L, canvases: L.pages.map(p => exDraw(L, p)), model: M }; }
+async function exPdf(a, cfg, what, only) {
+  const { canvases } = await exPages(a, cfg, what, only), pages = [];
+  for (const c of canvases) { const j = await scJpeg(c, 700); pages.push({ bytes: await scBlobToBytes(j.blob), w: j.w, h: j.h }); }
+  return scPdf(pages, { title: (cfg.title || a.title) + " — " + EX_WHAT[what], author: cfg.instructor || "", subject: "Exam" }, cfg.paper === "a4" ? { w: 595, h: 842, m: 0 } : { w: 612, h: 792, m: 0 });
+}
+/* ---------- Word (.docx) ---------- */
+function exCrc(b) { let c, crc = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) { c = (crc ^ b[i]) & 0xFF; for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xEDB88320 : c >>> 1; crc = (crc >>> 8) ^ c; } return (crc ^ 0xFFFFFFFF) >>> 0; }
+function exZip(files) {   // stored (no compression) zip: every Word version opens it
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const u16 = v => [v & 255, (v >> 8) & 255], u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  for (const f of files) { const name = enc.encode(f.name), data = typeof f.data === "string" ? enc.encode(f.data) : f.data, crc = exCrc(data);
+    const loc = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0)]);
+    parts.push(loc, name, data); cen.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), name);
+    off += loc.length + name.length + data.length; }
+  const cs = cen.reduce((s, b) => s + b.length, 0), end = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cs), ...u32(off), ...u16(0)]);
+  const all = parts.concat(cen, [end]), out = new Uint8Array(all.reduce((s, b) => s + b.length, 0)); let o = 0; for (const b of all) { out.set(b, o); o += b.length; } return out;
+}
+const exX = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "");
+async function exDocx(a, cfg, what, only) {
+  const M = exModel(a, cfg), pt2 = Math.round((cfg.font || 12) * 2), media = [], figRel = {};
+  const run = (t, o) => { o = o || {}; return '<w:r><w:rPr>' + (o.b ? '<w:b/>' : '') + (o.i ? '<w:i/>' : '') + (o.color ? '<w:color w:val="' + o.color + '"/>' : '') + '<w:sz w:val="' + (o.sz || pt2) + '"/></w:rPr><w:t xml:space="preserve">' + exX(t) + '</w:t></w:r>'; };
+  const para = (runs, o) => { o = o || {}; return '<w:p><w:pPr>' + (o.keep ? '<w:keepNext/>' : '') + (o.pb ? '<w:pageBreakBefore/>' : '') + '<w:spacing w:before="' + (o.before || 0) + '" w:after="' + (o.after == null ? 60 : o.after) + '"/>' + (o.ind ? '<w:ind w:left="' + o.ind + '" w:hanging="' + (o.hang || 0) + '"/>' : '') + (o.border ? '<w:pBdr><w:bottom w:val="single" w:sz="' + (o.border) + '" w:space="1" w:color="' + (o.bcolor || "0E2841") + '"/></w:pBdr>' : '') + '</w:pPr>' + runs + '</w:p>'; };
+  for (const it of M.items) if (it.fig && !figRel[it.id]) { try { const img = await exSvgImg(it.fig), k = Math.min(1, 900 / img.width), c = document.createElement("canvas"); c.width = Math.round(img.width * k * 2); c.height = Math.round(img.height * k * 2); const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    const png = await new Promise(r => c.toBlob(r, "image/png")); const n = media.length + 1; media.push({ name: "word/media/fig" + n + ".png", data: await scBlobToBytes(png) }); figRel[it.id] = { rid: "rIdF" + n, n, w: c.width / 2, h: c.height / 2 }; } catch (e) {} }
+  const pic = (f) => { const maxW = 5.5 * 914400, emuW = Math.min(maxW, Math.round(f.w / 96 * 914400)), emuH = Math.round(emuW * f.h / f.w);
+    return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + emuW + '" cy="' + emuH + '"/><wp:docPr id="' + f.n + '" name="Figure ' + f.n + '"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="' + f.n + '" name="fig' + f.n + '.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + f.rid + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + emuW + '" cy="' + emuH + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>'; };
+  let body = "", first = true; const title = cfg.title || a.title;
+  const head = (V, extra) => { let s = "";
+    if (cfg.inst) s += para(run(cfg.inst, { b: true }), { pb: !first }), first = false;
+    if (cfg.course) s += para(run(cfg.course), { pb: !first && !s }), first = false;
+    s += para(run(title + (extra || "") + (V.letter ? "  ·  Version " + V.letter : ""), { b: true, sz: pt2 + 10, color: "0E2841" }), { pb: !first && !s, border: 12 }); first = false;
+    const meta = [cfg.date ? "Date: " + cfg.date : "", cfg.limit ? "Time: " + cfg.limit + " min" : "", cfg.points ? "Total: " + M.total + " points" : ""].filter(Boolean).join("     ");
+    if (meta) s += para(run(meta, { sz: pt2 - 2, color: "444444" }));
+    if (cfg.fields && !extra) s += para(run("Name: ______________________________   Student ID: _______________"), { before: 120, after: 120 });
+    if (cfg.instructions && !extra) s += para(run(cfg.instructions, { i: true, sz: pt2 - 2 }), { after: 200 });
+    return s; };
+  const vs = only == null ? M.versions : [M.versions[only]];
+  for (const V of vs) {
+    if (what !== "key") { body += head(V, what === "student" ? "" : " (instructor copy)");
+      for (const q of V.qs) { const key = what !== "student";
+        body += para(run(q.n + ".\t", { b: true }) + run(q.stem + (cfg.points ? "  (" + q.pts + " pt" + (q.pts === 1 ? "" : "s") + ")" : "")), { before: 160, ind: 540, hang: 540, keep: true });
+        if (q.fig && figRel[q.id]) body += para(pic(figRel[q.id]), { ind: 540, keep: true });
+        if (q.kind === "mc") q.opts.forEach((o, k) => { const ok = key && k === q.ans; body += para(run(String.fromCharCode(65 + k) + ".\t" + o + (ok ? "   ✓" : ""), ok ? { b: true, color: "1E7B4F" } : {}), { ind: 1080, hang: 400, keep: k < q.opts.length - 1, after: 20 }); });
+        else if (key) body += para(run("Answer: " + (q.keyText || ""), { b: true, color: "1E7B4F" }), { ind: 540 });
+        else for (let k = 0; k < (q.box ? 8 : (q.lines || 4) * (cfg.space || 1)); k++) body += para(run(" "), { ind: 540, border: q.box ? 0 : 4, bcolor: "999999", after: 120, keep: true });
+        if (what === "explain" && q.expl) body += para(run("Explanation: " + q.expl, { i: true, sz: pt2 - 2, color: "335555" }), { ind: 540 }); } }
+    if (what === "key" || (what !== "student" && cfg.keyPage)) { body += head(V, " — Answer key");
+      body += '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:insideH w:val="single" w:sz="2" w:color="C9D6DE"/></w:tblBorders></w:tblPr>' + V.qs.map(q => '<w:tr><w:tc><w:p>' + run(q.n + ".", { b: true }) + '</w:p></w:tc><w:tc><w:p>' + run(q.kind === "mc" ? String.fromCharCode(65 + q.ans) + "  " + q.opts[q.ans] : q.keyText || "") + '</w:p></w:tc>' + (cfg.points ? '<w:tc><w:p>' + run(q.pts + " pt" + (q.pts === 1 ? "" : "s")) + '</w:p></w:tc>' : '') + '</w:tr>').join("") + '</w:tbl>'; }
+  }
+  const P = exPaper(cfg), twW = Math.round(P.w * 1440), twH = Math.round(P.h * 1440);
+  const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>' + body +
+    '<w:sectPr><w:footerReference w:type="default" r:id="rIdFt"/><w:pgSz w:w="' + twW + '" w:h="' + twH + '"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="600" w:footer="600" w:gutter="0"/></w:sectPr></w:body></w:document>';
+  const footer = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="right"/></w:pPr>' + run(title + "  ·  Page ", { sz: 18, color: "666666" }) + '<w:r><w:rPr><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>';
+  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman" w:eastAsia="Times New Roman"/><w:sz w:val="' + pt2 + '"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSt" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdFt" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' + Object.values(figRel).map(f => '<Relationship Id="' + f.rid + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/fig' + f.n + '.png"/>').join("") + '</Relationships>';
+  const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>';
+  const root = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>';
+  const core = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>' + exX(title + " — " + EX_WHAT[what]) + '</dc:title><dc:creator>' + exX(cfg.instructor || "") + '</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + new Date().toISOString().slice(0, 19) + 'Z</dcterms:created></cp:coreProperties>';
+  return exZip([{ name: "[Content_Types].xml", data: ct }, { name: "_rels/.rels", data: root }, { name: "docProps/core.xml", data: core }, { name: "word/document.xml", data: doc }, { name: "word/styles.xml", data: styles }, { name: "word/footer1.xml", data: footer }, { name: "word/_rels/document.xml.rels", data: rels }].concat(media));
+}
+function exFileName(a, cfg, what, only, ext) { const M = exModel(a, cfg); const v = only != null && M.versions.length > 1 ? "-Version" + EXV[only] : M.versions.length > 1 ? "-AllVersions" : "";
+  return ((cfg.title || a.title).replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 50) || "Exam") + v + { student: "", instructor: "-Instructor", explain: "-Instructor-Explanations", key: "-AnswerKey" }[what] + "." + ext; }
 
 /* ================= 5.0 Phase H: chemistry answer editor + molecular structure editor ================= */
 /* ---------- formatting and parsing typed chemistry ---------- */
@@ -4824,6 +5039,7 @@ const HELP = [
   { id: "grading", t: "Instructors: grading and extensions", who: "instructor", kw: "grading grade comment override extension accommodation bulk credit regrade", b: ["The assignment screen shows who submitted and what needs grading. Short answers wait for you; every other type is graded by the server.", "On the grading screen you can change any question's points and leave a comment. Full credit for everyone and Regrade all are under Adjust grades for everyone.", "Give extensions to one student, a group, the whole class, or several selected students at once. Every change is kept in the history."] },
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
+  { id: "examprint", t: "Instructors: print an exam, PDF, Word, versions and answer keys", who: "instructor", kw: "print exam pdf word docx export versions answer key bubble sheet email paper test", b: ["Open a quiz, test or assignment in your class and press 🖨️ Print / PDF / Word. Fill in the header (institution, course, date, time limit, instructions), choose how many versions (A–D, with shuffled questions and/or choices) and what to include: the student version, an instructor version with the key, with explanations, or the answer key only.", "Preview shows exactly what prints and what goes into the PDF. Download Word gives an editable .docx. Each version has its own key; student copies can end with a bubble answer sheet.", "Email makes the file and opens a draft in your own email app; ChemFlip doesn't send it. A warning appears before any file with answers is emailed. Save exam settings keeps your choices with the exam in your account."] },
   { id: "labreport", t: "Lab reports: photograph and submit", who: "all", kw: "lab report scan pdf photo camera pages upload handwritten submit receipt", b: ["Students: open My assignments → Submit lab report. Photograph each page (or add photos you already took). ChemFlip finds the page edges and straightens each page on your device; drag the corners to fix them, rotate sideways pages, and reorder or delete pages.", "Original (the default) keeps your handwriting exactly as photographed. Clearer brightens the page; Black & white is optional. Blurry, dark, blank or repeated pages and missing pages are flagged before you submit.", "Preview or download the PDF, share it, or press Submit to ChemFlip: you get a receipt code, and a retry after a lost connection never makes a second copy. Instructors: + Lab report in the class's assignment list; open the lab report to see every PDF, give points and feedback."] },
   { id: "canvasint", t: "Instructors: Canvas Integration Settings", who: "instructor", kw: "canvas connect disconnect sync now automatic status failed history conflicts lms grades", b: ["ChemFlip works fully without Canvas. In a class, open Students → Class settings → Canvas Integration Settings to see the Canvas status (Connected, Disconnected or Synchronization Failed) and the last successful sync.", "Turn automatic sync off to keep grades in ChemFlip until you press Sync now. Untick a Canvas assignment to stop syncing it. Disconnect stops all sending for the class; links and waiting grades are kept, and reconnecting sends them once.", "If Canvas is down, students and instructors keep working; failed grades are retried and listed with the reason. The page also lists Canvas date differences and exactly what can sync today."] },
   { id: "joining", t: "Joining a class", who: "student", kw: "join class code invite link request approval waiting", b: ["Enter the 6-character class code under Classes, or open your instructor's invite link.", "Some classes need the instructor's approval: your request then shows as waiting under Classes, and the class opens once it is approved. Press Check to look again."] },
@@ -5171,6 +5387,7 @@ VIEWS.asgdetail = function (arg) {
       h("div", { style: "margin-top:6px" }, (a.open_at ? "Opens " + fmtTz(a.open_at, tz) + " · " : "") + "Due " + fmtTz(a.due_at, tz) + " · Locks " + fmtTz(a.lock_at || a.due_at, tz)),
       h("div", { class: "muted", style: "font-size:13px" }, "Grades: " + (a.grade_release_at ? fmtTz(a.grade_release_at, tz) : "right after submitting") + " · Solutions: " + (a.solution_release_at ? fmtTz(a.solution_release_at, tz) : "after the lock date")),
       h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go(a.kind === "lab" ? "labedit" : "asgedit", { code: arg.code, a }) }, "Edit"),
+        a.kind !== "lab" ? h("button", { class: "btn sec2 small", id: "ad-print", onclick: () => go("examexport", { id: a.id, code: arg.code }) }, "🖨️ Print / PDF / Word") : null,
         h("button", { class: "btn sec2 small", id: "ad-class-ext", onclick: () => extSheet(a, "class", null, "the whole class", null, j) }, "Extend for whole class"),
         h("button", { class: "btn sec2 small", id: "ad-group", onclick: () => groupSheet(a, j) }, "Groups & group extension"),
         h("button", { class: "btn ghost small", id: "ad-del", onclick: () => confirmBox("Delete " + a.title + "?", "Students won't see it any more. Submissions are kept in the database.", async () => { await asgCall({ action: "delete", id: a.id }); toast("Deleted"); back(); }, "Delete") }, "Delete"))));
@@ -5326,6 +5543,73 @@ VIEWS.myasg = function () {
         if (GM.asgFocus === a.id) { GM.asgFocus = null; setTimeout(() => card.scrollIntoView({ block: "center" }), 50); } } });
     const tickCd = () => { if (!document.getElementById("ma-box")) return; document.querySelectorAll(".cd").forEach(el => { const d = Date.parse(el.dataset.due) - srvNow(), l = Date.parse(el.dataset.lock) - srvNow(); el.textContent = d > 0 ? "· " + left(d) + " left" : l > 0 ? "· late, locks in " + left(l) : ""; }); setTimeout(tickCd, 1000); };
     tickCd();
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+/* ----- 5.0 exams: export screen (instructor) ----- */
+function exDefaults(a, code) { const p = S.profile || {}, c = (S.cls && S.cls.code === code) ? S.cls : null;
+  return Object.assign({ title: a.title, inst: p.school || "", course: c && c.name ? c.name : "", instructor: p.name || "", date: "", limit: a.time_limit_min || "", fields: true, points: true,
+    instructions: "Answer every question. Show your work for calculations; answers without work may not receive full credit. Use the space provided.", versions: 1, shuffleQ: true, shuffleC: true, font: 12, paper: "letter", space: 1, keyPage: true, bubbles: false, what: "student", only: "all",
+    to: "", subject: "", msg: "" }, a.print_cfg || {}); }
+VIEWS.examexport = function (arg) {
+  if (!isTeacher()) { back(); return; }
+  const box = h("div", { id: "ex-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  asgCall({ action: "detail", id: arg.id }).then(j => {
+    const a = j.assignment; box.innerHTML = ""; document.getElementById("title").textContent = "Print / export: " + a.title;
+    if (a.kind === "lab") { box.appendChild(h("div", { class: "card" }, "Lab reports have no questions to print.")); return; }
+    const K = "ex:" + a.id; VIEWS.examexport.cfg = VIEWS.examexport.cfg && VIEWS.examexport.cfg.k === K ? VIEWS.examexport.cfg : Object.assign(exDefaults(a, arg.code), { k: K });
+    const F = VIEWS.examexport.cfg, n = exItems(a).length;
+    const inp = (id, lab, key, type, extra) => { const i = h(type === "area" ? "textarea" : "input", Object.assign({ class: "field", id }, type === "area" ? { rows: "3" } : { type: type || "text" }, extra || {})); i.value = F[key] ?? ""; i.addEventListener("input", () => { F[key] = type === "number" ? (i.value === "" ? "" : +i.value) : i.value; }); return h("div", {}, h("label", { class: "f", for: id }, lab), i); };
+    const chk = (id, lab, key, after) => { const c = h("input", { type: "checkbox", id, onchange: e => { F[key] = e.target.checked; if (after) after(); } }); c.checked = !!F[key]; return h("label", { class: "check", for: id }, c, h("span", {}, lab)); };
+    const sel = (id, lab, key, opts, after) => { const s = h("select", { class: "field", id, onchange: e => { F[key] = /^\d+$/.test(e.target.value) ? +e.target.value : e.target.value; if (after) after(); } }, opts.map(([v, t]) => h("option", { value: String(v), selected: String(F[key]) === String(v) ? "" : null }, t))); return h("div", {}, h("label", { class: "f", for: id }, lab), s); };
+    const grid = (...xs) => h("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 14px" }, ...xs);
+    box.appendChild(h("div", { class: "card", id: "ex-head" }, h("b", {}, "🖨️ " + a.title), h("p", { class: "muted", style: "font-size:13px" }, n + " question" + (n === 1 ? "" : "s") + (a.pool_draw ? ". Online, each student gets " + a.pool_draw + "; printed versions contain all " + n : "") + ". Choose what to include, check the preview, then print, download or email.")));
+    const vBox = h("div");
+    const drawV = () => { vBox.innerHTML = ""; if (F.versions > 1) vBox.appendChild(h("div", {}, chk("ex-shq", "Shuffle question order in versions B, C…", "shuffleQ"), chk("ex-shc", "Shuffle answer choices in versions B, C… (\"All of the above\"-type choices stay in place)", "shuffleC"),
+      sel("ex-only", "Which versions", "only", [["all", "All versions in one file"]].concat(Array.from({ length: F.versions }, (_, v) => [v, "Version " + EXV[v] + " only"]))))); };
+    drawV();
+    box.appendChild(h("details", { class: "card", id: "ex-hdr", open: "" }, h("summary", {}, h("b", {}, "Header and instructions")),
+      grid(inp("ex-title", "Exam title", "title"), inp("ex-inst", "Institution", "inst"), inp("ex-course", "Course and section", "course"), inp("ex-instr", "Instructor", "instructor"), inp("ex-date", "Date (as printed)", "date", "text", { placeholder: "e.g. Monday, Dec 7, 2026" }), inp("ex-limit", "Time limit (minutes)", "limit", "number", { min: "0", max: "600" })),
+      inp("ex-instructions", "Instructions for students", "instructions", "area"), chk("ex-fields", "Name and Student ID fields", "fields"), chk("ex-points", "Show points per question and total", "points")));
+    box.appendChild(h("details", { class: "card", id: "ex-ver", open: "" }, h("summary", {}, h("b", {}, "Versions")), sel("ex-nv", "Number of versions", "versions", [[1, "One version"], [2, "A and B"], [3, "A, B and C"], [4, "A, B, C and D"]], () => { if (F.only !== "all" && F.only >= F.versions) F.only = "all"; drawV(); }), vBox,
+      h("p", { class: "muted", style: "font-size:12.5px" }, "Each version has its own answer key. Version A keeps your order.")));
+    box.appendChild(h("details", { class: "card", id: "ex-fmt" }, h("summary", {}, h("b", {}, "Layout")), grid(sel("ex-font", "Text size", "font", [[11, "11 pt"], [12, "12 pt"], [13, "13 pt"], [14, "14 pt"]]), sel("ex-paper", "Paper", "paper", [["letter", "US Letter"], ["a4", "A4"]]), sel("ex-space", "Answer space for written answers", "space", [[1, "Normal"], [2, "Double"]])),
+      chk("ex-keypage", "Instructor copies end with an answer-key page", "keyPage"), chk("ex-bubbles", "Student copies end with a bubble answer sheet", "bubbles")));
+    const what = h("div", { class: "card", id: "ex-what", role: "radiogroup", "aria-label": "What to export" }, h("b", {}, "What to include"));
+    Object.entries(EX_WHAT).forEach(([k, t]) => { const r = h("input", { type: "radio", name: "ex-what", id: "ex-what-" + k, value: k, onchange: () => { F.what = k; warnKey(); } }); r.checked = F.what === k; what.appendChild(h("label", { class: "check", for: "ex-what-" + k }, r, h("span", {}, t))); });
+    const keyWarn = h("div", { id: "ex-keywarn", role: "status", style: "display:none;border-left:5px solid var(--bad,#b3261e);padding:6px 10px;margin-top:6px" }, "⚠️ This export contains the answers. Don't give it to students.");
+    const warnKey = () => keyWarn.style.display = F.what === "student" ? "none" : ""; warnKey(); what.appendChild(keyWarn); box.appendChild(what);
+    const msg = h("div", { class: "muted", id: "ex-msg", role: "status", "aria-live": "polite" }), prev = h("div", { id: "ex-preview", style: "display:grid;gap:12px;margin-top:8px" });
+    const only = () => F.only === "all" || F.versions < 2 ? null : +F.only, busy = async (label, fn) => { msg.textContent = label; try { await fn(); } catch (e) { console.error(e); msg.textContent = "❌ Couldn't make the file on this device: " + (e.message || e); } };
+    const pdfBlob = async () => new Blob([await exPdf(a, F, F.what, only())], { type: "application/pdf" }), docBlob = async () => new Blob([await exDocx(a, F, F.what, only())], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const actions = h("div", { class: "card", id: "ex-actions" }, h("div", { class: "btnrow" },
+      h("button", { class: "btn", id: "ex-preview-btn", onclick: () => busy("Making the preview…", async () => { const r = await exPages(a, F, F.what, only()); prev.innerHTML = ""; r.canvases.forEach((c, i) => { c.style.cssText = "width:100%;max-width:640px;border:1px solid #ccd;box-shadow:0 1px 4px rgba(0,0,0,.15);background:#fff"; c.setAttribute("role", "img"); c.setAttribute("aria-label", "Page " + (i + 1) + " of " + r.canvases.length); prev.appendChild(c); }); msg.textContent = r.canvases.length + " page" + (r.canvases.length > 1 ? "s" : "") + ". This is exactly what prints and what goes into the PDF."; }) }, "👁️ Preview"),
+      h("button", { class: "btn sec2", id: "ex-print", onclick: () => busy("Preparing to print…", async () => { const r = await exPages(a, F, F.what, only()); let pr = document.getElementById("ex-print-area"); if (pr) pr.remove();
+        pr = h("div", { id: "ex-print-area" }); for (const c of r.canvases) pr.appendChild(h("img", { src: c.toDataURL("image/png"), alt: "" }));
+        const st = h("style", { id: "ex-print-css" }, "@page{size:" + (F.paper === "a4" ? "A4" : "letter") + ";margin:0}#ex-print-area{display:none}@media print{body.print-exam>*:not(#ex-print-area){display:none!important}body.print-exam #ex-print-area{display:block}#ex-print-area img{width:100%;display:block;page-break-after:always;break-after:page}}");
+        document.head.appendChild(st); document.body.appendChild(pr); document.body.classList.add("print-exam"); msg.textContent = "";
+        const done = () => { document.body.classList.remove("print-exam"); pr.remove(); st.remove(); window.removeEventListener("afterprint", done); }; window.addEventListener("afterprint", done); window.print(); setTimeout(() => { if (!matchMedia("print").matches) done(); }, 1500); }) }, "🖨️ Print"),
+      h("button", { class: "btn sec2", id: "ex-pdf", onclick: () => busy("Making the PDF…", async () => { const b = await pdfBlob(), nm = exFileName(a, F, F.what, only(), "pdf"); labDownload(b, nm); msg.textContent = "⬇️ " + nm + " (" + Math.round(b.size / 1024) + " KB)"; }) }, "⬇️ Download PDF"),
+      h("button", { class: "btn sec2", id: "ex-docx", onclick: () => busy("Making the Word file…", async () => { const b = await docBlob(), nm = exFileName(a, F, F.what, only(), "docx"); labDownload(b, nm); msg.textContent = "⬇️ " + nm + " (" + Math.round(b.size / 1024) + " KB). Edit it in Word, Google Docs, Pages or LibreOffice."; }) }, "⬇️ Download Word"),
+      h("button", { class: "btn sec2", id: "ex-email", onclick: () => emailBox() }, "✉️ Email"),
+      h("button", { class: "btn ghost", id: "ex-save", onclick: async () => { const { k: _k, ...cfg } = F; try { await asgCall({ action: "print_cfg", id: a.id, cfg }); a.print_cfg = cfg; msg.textContent = "💾 Saved with this exam in your ChemFlip account. It opens with these settings next time, on any device."; } catch (e) { msg.textContent = "❌ " + e.message; } } }, "💾 Save exam settings")), msg, prev);
+    const emailBox = () => {
+      const old = document.getElementById("ex-mail"); if (old) { old.remove(); return; }
+      if (!F.subject) F.subject = (F.title || a.title) + (F.what === "student" ? "" : " (" + EX_WHAT[F.what] + ")");
+      const fmt = h("select", { class: "field", id: "ex-mail-fmt" }, h("option", { value: "pdf" }, "PDF"), h("option", { value: "docx" }, "Word (.docx)"));
+      const card = h("div", { class: "card", id: "ex-mail", style: "border-left:5px solid var(--gold,#e6a700)" }, h("b", {}, "✉️ Email the exam"),
+        h("p", { class: "muted", style: "font-size:13px" }, "ChemFlip doesn't send email itself yet. It makes the file, then opens your own email app with a draft (on phones and tablets the file is attached through the share menu; on a computer it is downloaded for you to attach). Nothing is sent until you press Send in your email app."),
+        inp("ex-to", "To (one or more addresses, separated by commas)", "to", "text", { autocomplete: "email" }), inp("ex-subject", "Subject", "subject"), inp("ex-body", "Message", "msg", "area"), h("div", {}, h("label", { class: "f", for: "ex-mail-fmt" }, "Attach as"), fmt),
+        h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ex-mail-go", onclick: () => {
+          const go = () => busy("Making the file…", async () => { const isPdf = fmt.value === "pdf", b = isPdf ? await pdfBlob() : await docBlob(), nm = exFileName(a, F, F.what, only(), isPdf ? "pdf" : "docx");
+            const to = String(F.to || "").split(/[,;\s]+/).filter(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+            const file = new File([b], nm, { type: b.type });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: F.subject, text: F.msg || "" }); msg.textContent = "📤 Shared " + nm + " through your device. Check your email app's Sent folder to confirm it went out."; return; } catch (e) { if (e && e.name === "AbortError") { msg.textContent = "Not shared."; return; } } }
+            labDownload(b, nm); location.href = "mailto:" + to.map(encodeURIComponent).join(",") + "?subject=" + encodeURIComponent(F.subject || "") + "&body=" + encodeURIComponent((F.msg || "") + "\n\n[Attach the file " + nm + " from your Downloads folder before sending.]");
+            msg.textContent = "📝 Draft opened in your email app and " + nm + " downloaded. Attach the file, then press Send. ChemFlip has not sent anything."; });
+          if (F.what !== "student") confirmBox("This file contains the answer key", "Send it only to instructors or teaching assistants, never to students. Continue?", go, "Continue"); else go(); } }, "Make file and open email draft")));
+      actions.after(card); };
+    box.appendChild(actions);
+    box.appendChild(h("p", { class: "muted", id: "ex-note", style: "font-size:12.5px" }, "Pages are made on this device. Drawn-structure and written questions get answer space (a box or lines) on paper; on the answer key they show the correct structure (SMILES), value and unit, or your rubric."));
   }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
 };
 /* ----- 5.0 lab reports: instructor form ----- */
