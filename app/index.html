@@ -5040,6 +5040,7 @@ const HELP = [
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
   { id: "examprint", t: "Instructors: print an exam, PDF, Word, versions and answer keys", who: "instructor", kw: "print exam pdf word docx export versions answer key bubble sheet email paper test", b: ["Open a quiz, test or assignment in your class and press 🖨️ Print / PDF / Word. Fill in the header (institution, course, date, time limit, instructions), choose how many versions (A–D, with shuffled questions and/or choices) and what to include: the student version, an instructor version with the key, with explanations, or the answer key only.", "Preview shows exactly what prints and what goes into the PDF. Download Word gives an editable .docx. Each version has its own key; student copies can end with a bubble answer sheet.", "Email makes the file and opens a draft in your own email app; ChemFlip doesn't send it. A warning appears before any file with answers is emailed. Save exam settings keeps your choices with the exam in your account."] },
+  { id: "notices", t: "Email notices", who: "all", kw: "email notices notifications reminders unsubscribe code alerts", b: ["Email notices are optional. In Settings → Email notices, enter your address, then enter the 6-digit code ChemFlip emails you. Instructors can use the instructor email they already verified.", "Choose which emails you get: new work, new tests, a reminder a day before work is due, missing work, confirmation when your work is received, returned feedback and class announcements.", "Grades are never sent by email. A feedback email only says your work was returned; open ChemFlip to see the grade.", "Every email has a link to stop all ChemFlip emails. You can also switch emails off or remove your address in Settings at any time. Work placed in Canvas gets Canvas's own due-date reminders instead of ChemFlip's."] },
   { id: "records", t: "Privacy and student records", who: "all", kw: "privacy records ferpa download my data export who opened access log retention delete files", b: ["A student's answers, grades, lab reports and feedback can be seen only by that student and the instructors of the class. Files open only through private links that expire after 10 minutes; there are no public links, and ChemFlip never emails grades.", "Students: Settings → Privacy and my records → Download my data saves everything ChemFlip's server keeps for your device as a file. Who has opened my records lists each time an instructor opened, graded or changed your work.", "Instructors: Students → Class settings → Student files and privacy. Choose how long students' report files are kept after a lab report locks. Nothing is removed automatically: files past the rule are listed, and they're removed only when you type the class code to confirm. Grades, feedback and receipts are always kept."] },
   { id: "rubrics", t: "Instructors: rubrics, markup and returning work", who: "instructor", kw: "rubric criteria levels markup annotate pen highlight draft return feedback attach file partial credit", b: ["Rubrics: on a lab report, open Rubric, start from the lab report template or add your own criteria and levels, then Save rubric. While grading, choose one level per criterion; ChemFlip adds the points and scales them to the report's points, and you can adjust by a few points. A written-answer question in a quiz can have its own rubric (Your own questions → Rubric with levels).", "Draft or return: Save draft keeps the grade to yourself (the student, the gradebook and Canvas see nothing yet). Return to student sends it; Return all drafts sends every draft at once.", "🖍️ Mark up pages: draw, highlight, tick, cross or place a typed note on each page of a scanned report. Saving makes a marked-up PDF for the student; their original stays unchanged, and you can edit your marks later.", "📎 Attach file: add a PDF or a photo (turned into a PDF on your device), up to 5 per submission. On quizzes you can also write overall feedback and attach files. Students see marked-up pages, files, feedback and the rubric levels once the work is returned and the grade is released. Files open only through short-lived private links."] },
   { id: "gradebook", t: "Instructors: the gradebook", who: "instructor", kw: "gradebook grades total weighted categories letter missing late excused export csv excel import paper exam column", b: ["Class → Assignments → 📊 Gradebook. Every student and every published assignment, quiz, test and lab report, with the best attempt (late penalties applied), missing and late work, category percentages, the total and a letter grade.", "⚙️ Grading scheme: total points or weighted categories (weights add up to 100%), drop the lowest scores in a category, your letter scale, and whether missing work counts as 0 after the deadline.", "+ Add column for paper exams or anything graded elsewhere; enter scores or import them from a CSV (matched by student ID or name, with a preview). Click any grade to add a private comment or excuse it. Export to CSV or Excel."] },
@@ -6468,8 +6469,73 @@ function adminDash(call, box) {
 }
 
 /* ---------- settings ---------- */
+// Optional email notices (5.0): the person proves an address with a 6-digit code, then chooses which notices to get.
+// Grades are never emailed. Everything goes through {op:"notify"}; the address is kept only on ChemFlip's server.
+const notifyCall = body => { if (!DB || !DB.live || !DB.call) throw new Error("Email notices need ChemFlip's online service."); return DB.call(Object.assign({ op: "notify" }, body)); };
+const NOTICE_KIND = { assignment: "New work", exam: "New test", deadline: "Due soon", missing: "Missing", submitted: "Received", returned: "Feedback ready", announcement: "Announcement" };
+function noticesCard() {
+  if (!DB || !DB.live) return null;
+  const card = h("div", { class: "card", id: "notices-card" }, h("b", {}, "✉️ Email notices"),
+    h("p", { class: "muted" }, "Optional. ChemFlip can email you about new work, deadlines, received work, returned feedback and announcements. Grades are never sent by email."));
+  const body = h("div", { id: "nt-body" }, h("p", { class: "muted" }, "⏳ Loading…")), msg = h("div", { class: "muted", id: "nt-msg", role: "status", "aria-live": "polite" });
+  card.appendChild(body); card.appendChild(msg);
+  const say = (t) => { msg.textContent = t; };
+  const draw = (v) => {
+    body.innerHTML = "";
+    if (!v.configured) { body.appendChild(h("p", { class: "muted", id: "nt-off" }, "Email notices aren't available yet. Reminders still appear in ChemFlip and in your calendar file.")); return; }
+    const act = async (b, done) => { say("…"); try { const j = await notifyCall(b); draw(j); say(done || ""); } catch (e) { say("❌ " + e.message); } };
+    if (v.verified) {
+      body.appendChild(h("p", { id: "nt-addr" }, "Sending to ", h("b", {}, v.email), " ✓", v.source === "instructor" ? h("span", { class: "muted" }, " (your instructor email)") : null));
+      const list = h("fieldset", { id: "nt-kinds", style: "border:0;padding:0;margin:0 0 8px" }, h("legend", { class: "muted", style: "font-size:13px;margin-bottom:4px" }, "Email me about:"));
+      v.kinds.forEach(k => { const id = "nt-k-" + k.id, cb = h("input", { type: "checkbox", id });
+        cb.checked = v.prefs[k.id] !== false;
+        cb.onchange = async () => { const p = Object.assign({}, v.prefs, { [k.id]: cb.checked }); cb.disabled = true;
+          try { const j = await notifyCall({ action: "prefs", prefs: p }); v.prefs = j.prefs; say("✓ Saved"); } catch (e) { cb.checked = !cb.checked; say("❌ " + e.message); } cb.disabled = false; };
+        list.appendChild(h("div", { style: "display:flex;gap:8px;align-items:flex-start;margin:4px 0" }, cb, h("label", { for: id, style: "font-size:14px" }, k.label))); });
+      body.appendChild(list);
+      body.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap" },
+        h("button", { class: "btn ghost small", id: "nt-history", onclick: noticesHistory }, "📬 Recent emails"),
+        h("button", { class: "btn ghost small", id: "nt-change", onclick: () => draw(Object.assign({}, v, { verified: false, pending_code: false, email: null })) }, "Change address"),
+        h("button", { class: "btn ghost small", id: "nt-remove", style: "color:var(--bad)", onclick: () => confirmBox("Stop all emails?", "ChemFlip removes your address and sends no more emails. You can add it again any time.", () => act({ action: "remove" }, "✓ Emails stopped and address removed."), "Stop emails") }, "Stop all emails")));
+      return;
+    }
+    if (v.pending_code && v.email) {
+      const code = h("input", { class: "field", id: "nt-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6", placeholder: "123456", "aria-label": "6-digit code from the email", style: "max-width:140px;letter-spacing:3px" });
+      const verify = () => { const c = code.value.replace(/\D/g, ""); if (c.length !== 6) { say("Enter the 6 digits from the email."); code.focus(); return; } act({ action: "verify", code: c }, "✓ Email notices are on. Choose which ones you want below."); };
+      code.onkeydown = e => { if (e.key === "Enter") verify(); };
+      body.appendChild(h("p", { id: "nt-sent" }, "We emailed a 6-digit code to ", h("b", {}, v.email), ". It expires in 15 minutes. Check your spam folder if it isn't there."));
+      body.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap;align-items:center" }, code, h("button", { class: "btn small", id: "nt-verify", onclick: verify }, "Turn on emails")));
+      body.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap" },
+        h("button", { class: "btn ghost small", id: "nt-resend", onclick: () => act({ action: "set_email", email: v.email }, "✓ New code sent.") }, "Send a new code"),
+        h("button", { class: "btn ghost small", id: "nt-change", onclick: () => draw(Object.assign({}, v, { pending_code: false, email: null })) }, "Use a different address")));
+      setTimeout(() => code.focus(), 50); return;
+    }
+    const em = h("input", { class: "field", id: "nt-email", type: "email", autocomplete: "email", placeholder: "you@school.edu", "aria-label": "Email address for notices" });
+    if (v.email) em.value = v.email;
+    const send = () => { const e = em.value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { say("Enter a full email address, like name@school.edu."); em.focus(); return; } act({ action: "set_email", email: e }, "✓ Code sent. Enter it above."); };
+    em.onkeydown = e => { if (e.key === "Enter") send(); };
+    body.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap;align-items:center" }, em, h("button", { class: "btn small", id: "nt-send", onclick: send }, "Send code")));
+    if (v.instructor_email) body.appendChild(h("button", { class: "btn sec2 small", id: "nt-use-ins", onclick: () => act({ action: "use_instructor" }, "✓ Email notices are on.") }, "Use " + v.instructor_email));
+  };
+  notifyCall({ action: "get" }).then(draw).catch(e => { body.innerHTML = ""; say("❌ " + e.message); });
+  return card;
+}
+async function noticesHistory() {
+  try { const j = await notifyCall({ action: "history" });
+    sheet("nt-hist", "Recent emails", box => {
+      box.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "The last 20 email notices for this device. Grades are never included."));
+      if (!j.items.length) { box.appendChild(h("p", { id: "nt-hist-empty" }, "No emails yet.")); return; }
+      const st = { sent: "sent", pending: "waiting to send", sending: "sending", skipped: "not sent (switched off)", error: "couldn't be delivered" };
+      box.appendChild(h("ul", { id: "nt-hist-list", style: "padding-left:18px" }, ...j.items.map(i => h("li", { style: "margin:4px 0" }, h("b", {}, NOTICE_KIND[i.kind] || i.kind), i.title ? ": " + i.title : "", h("span", { class: "muted" }, " · " + new Date(i.at).toLocaleString() + " · " + (st[i.status] || i.status))))));
+    });
+  } catch (e) { toast("❌ " + e.message); }
+}
+(function noticesFromUrl() {   // links in emails open Settings at the email notices card (…/app/#notices)
+  try { if (location.hash === "#notices") { history.replaceState(null, "", location.pathname + location.search); setTimeout(() => { if (S.profile) { go("settings"); setTimeout(() => { const c = document.getElementById("notices-card"); if (c) c.scrollIntoView({ block: "start" }); }, 150); } }, 160); } } catch (e) {}
+})();
 VIEWS.settings = function () {
   { const rc = remSettingsCard(); if (rc) app.appendChild(rc); }
+  { const nc = noticesCard(); if (nc) app.appendChild(nc); }
   app.appendChild(h("div", { class: "card", id: "sync-card" }, h("b", {}, "☁️ Sync across devices"), h("p", { class: "muted" }, S.acct && S.acct.email ? "Signed in as " + S.acct.email + (S.syncAt ? " · last synced " + new Date(S.syncAt).toLocaleString() : "") : "Sign in with your e-mail to continue on any device (Windows, Mac, iPhone, Android, web)."), h("button", { class: "btn small", id: "sync-btn", onclick: acctSheet }, S.acct && S.acct.email ? "Manage sync" : "☁️ Turn on sync")));
   { const wc = h("div", { class: "card", id: "work-card" }, h("b", {}, "📄 Photos of my work"), h("p", { class: "muted", id: "work-count" }, "Photos you take of your handwritten work are kept on this device, with their question."));
     app.appendChild(wc); workList().then(l => { const kb = l.reduce((a, r) => a + (r.kb || 0), 0); document.getElementById("work-count") && (document.getElementById("work-count").textContent = l.length ? l.length + " photo" + (l.length > 1 ? "s" : "") + " stored on this device (" + (kb > 1024 ? (kb / 1024).toFixed(1) + " MB" : kb + " KB") + "). Open a question to see its photos." : "No photos yet. Use 📷 Photo of my work on any question to save your handwritten calculation with it.");
