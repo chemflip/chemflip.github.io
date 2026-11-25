@@ -92,7 +92,7 @@ label.f{display:block;font-weight:700;color:var(--navy);margin:12px 0 5px;font-s
 .acc summary{padding:10px 12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none}
 .acc summary::-webkit-details-marker{display:none}
 .acc .body{padding:0 12px 6px}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:60}
 .modal .box{background:var(--card);border-radius:16px;padding:18px;max-width:440px;width:100%;max-height:85vh;overflow:auto}
 .ref h3{color:var(--navy);margin:14px 0 6px;font-size:16px}.ref table{width:100%;border-collapse:collapse;font-size:14px}
 .ref td,.ref th{border-bottom:1px solid var(--hair);padding:6px 4px;text-align:left;vertical-align:top}.ref th{color:var(--grey);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
@@ -559,8 +559,14 @@ function who() { const p = S.profile || {}; return [p.avatar ? p.avatar + " " + 
 let stack = [];
 // Phase K: after moving to another screen, keyboard and screen-reader focus starts at the new content (not on a control that no longer exists)
 function focusMain() { const a = document.getElementById("app"), f = document.activeElement; if (a && (!f || f === document.body || !document.body.contains(f) || !a.contains(f))) try { a.focus({ preventScroll: true }); } catch (e) {} }
-function go(view, arg) { stack.push({ view, arg }); render(); window.scrollTo(0, 0); focusMain(); }
-function back() { if (QUIZ && QUIZ.timer) { clearInterval(QUIZ.timer); QUIZ.timer = null; } if (stack.length > 1) { stack.pop(); render(); window.scrollTo(0, 0); focusMain(); return true; } return false; }
+// 5.0 editing: a form with unsaved changes sets LEAVE (returns true while there are unsaved changes); leaving asks first.
+let LEAVE = null;
+function guardLeave(fn) { if (LEAVE && LEAVE()) { confirmBox("Leave without saving?", "Your changes haven't been saved. Leave this page and discard them?", () => { LEAVE = null; fn(); }, "Discard changes"); return false; } LEAVE = null; fn(); return true; }
+window.addEventListener("beforeunload", e => { if (LEAVE && LEAVE()) { e.preventDefault(); e.returnValue = ""; } });
+function go(view, arg) { if (LEAVE && LEAVE()) { guardLeave(() => go(view, arg)); return; } stack.push({ view, arg }); render(); window.scrollTo(0, 0); focusMain(); }
+function back() { if (LEAVE && LEAVE()) { guardLeave(back); return true; }
+ return back0(); }
+function back0() { if (QUIZ && QUIZ.timer) { clearInterval(QUIZ.timer); QUIZ.timer = null; } if (stack.length > 1) { stack.pop(); render(); window.scrollTo(0, 0); focusMain(); return true; } return false; }
 window.appBack = back;
 document.getElementById("back").onclick = back;
 document.addEventListener("keydown", e => {
@@ -573,9 +579,11 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+let RENDER_N = 0, RENDER_AT = 0, LAST_INPUT = 0;
+["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { LAST_INPUT = performance.now(); }, true));
 function render() {
-  applyTheme(); applyA11y(); syncAudioBtns();
+  RENDER_N++; RENDER_AT = performance.now(); LEAVE = null; applyTheme(); applyA11y(); syncAudioBtns();
   const v = cur(); app.innerHTML = ""; bottom(null);
   document.getElementById("back").style.display = stack.length > 1 ? "" : "none";
   const prem = isPremium(); const pl = document.getElementById("plan"); pl.textContent = prem ? (trialLeft() > 0 && !S.prem ? "Trial · " + trialLeft() + " days" : "Premium") : "Free"; pl.className = "badge" + (prem ? "" : " free");
@@ -644,7 +652,7 @@ function renderSide() {
   const v = cur().view; side.innerHTML = "";
   if (!S.profile || v === "onboard") { document.body.classList.remove("shell"); return; }
   document.body.classList.add("shell");
-  const reset = (view, arg) => () => { stack = [{ view: "home" }]; if (view !== "home") stack.push({ view, arg }); render(); window.scrollTo(0, 0); };
+  const reset = (view, arg) => () => guardLeave(() => { stack = [{ view: "home" }]; if (view !== "home") stack.push({ view, arg }); render(); window.scrollTo(0, 0); });
   const brand = h("div", { class: "brand" }); brand.innerHTML = LOGO_SVG + "<span>" + CFG.short + "</span>"; side.appendChild(brand);
   if (CFG.courses.length > 1) { const c = course(); side.appendChild(h("button", { class: "crs", id: "side-course", onclick: courseSheet }, h("span", {}, h("small", {}, "Course"), h("b", {}, c.name)), ico("chev", 16))); }
   const g1 = h("div", { class: "grp" }); const T0 = isTeacher();
@@ -3654,14 +3662,40 @@ const DB = (() => {
     // 4.2.1: every class, game, leaderboard and code request goes through the ChemFlip service (edge function "cf"),
     // which checks this device and the access rules. The tables are closed to the public key.
     const CF = CFG.sb.url.replace(/\/$/, "") + "/functions/v1/cf";
-    const call = async (body) => {
-      const r = await fetch(CF, { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.sb.key, "x-cf-sid": sid(), "x-cf-key": devKey() }, body: JSON.stringify(body) });
+    // 5.0 speed: run next to the database (us-west-2); if that region can't be reached, use the default route once.
+    const REG = CFG.sb.region === false ? "" : "?forceFunctionRegion=" + (CFG.sb.region || "us-west-2");
+    let regOk = true;
+    const raw = async (body) => {
+      const send = (q) => fetch(CF + q, { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.sb.key, "x-cf-sid": sid(), "x-cf-key": devKey() }, body: JSON.stringify(body) });
+      let r; try { r = await send(regOk ? REG : ""); } catch (e) { if (!regOk || !REG) throw e; regOk = false; r = await send(""); }
       const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
       if (!r.ok) { const e = new Error((j && j.error) || t || r.status); e.status = r.status; throw e; }
       return j;
     };
+    // 5.0 speed: screens that only read show the last answer at once and refresh it in the background (stale-while-revalidate).
+    // Anything that changes data clears the whole cache, so a page never shows data older than the user's own last change.
+    // Kept in memory only (never written to the device), at most 120 answers, each at most 10 minutes old.
+    const READ = { asg: new Set(["mine", "list", "detail", "lab_inbox", "lab_list", "lab_mine", "gb", "review", "exam_email_info", "lab_email_info"]), course: new Set(["mine", "info", "my_requests", "requests", "canvas"]), notify: new Set(["get", "history"]) };
+    // Background saves that never change what these screens show (practice scores, autosave of answers) keep the cache.
+    const QUIET = (b) => (b.op === "db" && /^(scores|school_scores|quest_scores)$/.test(String(b.table || ""))) || (b.op === "asg" && b.action === "autosave");
+    const isRead = (b) => (b.op === "db" && b.m === "get") || b.op === "rpc" || (READ[b.op] && READ[b.op].has(String(b.action || "")));
+    const C = new Map(), FLY = new Map(), FRESH = 1500, MAXAGE = 10 * 60e3;
+    const copy = (v) => v == null ? v : JSON.parse(JSON.stringify(v));
+    const busy = () => { const a = document.activeElement; return (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || !!document.querySelector(".modal, .sheet, .refsheet, .refdim, dialog[open]"); };
+    const fetchRead = (k, body) => { if (FLY.has(k)) return FLY.get(k); const p = raw(body).then(j => { C.set(k, { j: copy(j), at: Date.now() }); if (C.size > 120) C.delete(C.keys().next().value); return j; }).finally(() => FLY.delete(k)); FLY.set(k, p); return p; };
+    const call = async (body, opts) => {
+      if (opts && opts.fresh && isRead(body)) return copy(await fetchRead(JSON.stringify(body), body));   // callers that keep their own copy (reminders) always ask the server
+      if (!isRead(body)) { if (!QUIET(body)) C.clear(); return raw(body); }
+      const k = JSON.stringify(body), hit = C.get(k), now = Date.now();
+      if (!hit || now - hit.at > MAXAGE) return copy(await fetchRead(k, body));
+      if (now - hit.at > FRESH) { const gen = RENDER_N, old = JSON.stringify(hit.j);
+        // redraw with the new data only if the person hasn't started using this page (no click or key since it was drawn)
+        const quiet = () => gen === RENDER_N && !busy() && LAST_INPUT < RENDER_AT;
+        fetchRead(k, body).then(j => { if (JSON.stringify(j) !== old && quiet()) render(); }, () => { C.delete(k); if (quiet()) render(); }); }
+      const j = copy(hit.j); if (j && typeof j === "object" && !Array.isArray(j)) j.__cached = true; return j;
+    };
     const op = (m, table, filter, row, extra) => call(Object.assign({ op: "db", m, table, filter: filter || "", row }, extra || {}));
-    return { live: true, call,
+    return { live: true, call, raw, clearCache: () => C.clear(), cacheInfo: () => [...C.entries()].map(([k, v]) => [k.slice(0, 80), Date.now() - v.at]),
       get: (table, filter) => op("get", table, filter),
       ins: (table, row) => op("ins", table, "", row),
       ups: (table, row, on) => op("ups", table, "", row, { on: on || "" }),
@@ -3768,8 +3802,11 @@ VIEWS.cls = function (code) {
   else if (key === "graded") teacherAsg(c, done);
   else if (key === "assign") teacherAssign(c, done);
   else if (key === "board") {
-    syncScore().then(() => DB.get("scores", "class_code=eq." + c.code)).then(rows => {
-      rows = (rows || []).filter(r => r.answered > 0).sort((a, b) => b.correct - a.correct || (a.time_ms / Math.max(1, a.answered)) - (b.time_ms / Math.max(1, b.answered)));
+    syncScore().catch(() => {});   // 5.0 speed: save my score and read the board at the same time; my own row uses this device's numbers
+    DB.get("scores", "class_code=eq." + c.code).then(rows => {
+      rows = (rows || []).filter(r => r.sid !== sid());
+      if (S.cs && c.role !== "teacher") rows.push({ sid: sid(), name: S.profile.name, avatar: myAv(), answered: S.cs.answered, correct: S.cs.correct, time_ms: Math.round(S.cs.ms) });
+      rows = rows.filter(r => r.answered > 0).sort((a, b) => b.correct - a.correct || (a.time_ms / Math.max(1, a.answered)) - (b.time_ms / Math.max(1, b.answered)));
       const card = h("div", { class: "card" }, h("b", {}, "🏆 Class leaderboard"), h("div", { class: "muted", style: "margin:4px 0 8px" }, "Ranked by correct answers; ties go to the faster average time per question. Practice anywhere in the app to climb!"));
       if (!rows.length) card.appendChild(h("p", { class: "muted" }, "No scores yet — answer some questions to get on the board! 🚀"));
       const t = h("table", { class: "t" });
@@ -3837,10 +3874,57 @@ VIEWS.newtest = function () {
   } }, "📤 Post test to class")]);
 };
 
+// 5.0 editing: class and group tests can be changed after they are posted (title, type, questions, order, time limit).
+// Results already taken are kept; changed questions apply to students who take the test afterwards.
+VIEWS.ctestedit = function (t) {
+  if (!myClass() || myClass().role !== "teacher") { back0(); return; }
+  document.getElementById("title").textContent = "Edit " + t.title;
+  const E = VIEWS.ctestedit.e && VIEWS.ctestedit.e.id === t.id ? VIEWS.ctestedit.e : (VIEWS.ctestedit.e = { id: t.id, title: t.title, kind: t.kind || "class", minutes: t.minutes, qids: (t.qids || []).slice(), chs: {}, add: 5, L: 0 });
+  const snap = () => JSON.stringify([E.title, E.kind, Math.round(+E.minutes), E.qids]), orig = JSON.stringify([t.title, t.kind || "class", Math.round(+t.minutes), t.qids || []]);
+  LEAVE = () => !!VIEWS.ctestedit.e && snap() !== orig;
+  const card = h("div", { class: "card", id: "cte-basics" }, h("b", {}, "Basics"));
+  const ti = h("input", { class: "field", id: "cte-title", maxlength: "120" }); ti.value = E.title; ti.oninput = () => E.title = ti.value;
+  card.appendChild(h("label", { class: "f", for: "cte-title" }, "Title")); card.appendChild(ti);
+  const ks = h("select", { class: "field", id: "cte-kind" }, h("option", { value: "class", selected: E.kind === "class" ? "" : null }, "Class test (individual)"), h("option", { value: "group", selected: E.kind === "group" ? "" : null }, "Group test (teams)")); ks.onchange = () => E.kind = ks.value;
+  card.appendChild(h("label", { class: "f", for: "cte-kind" }, "Type")); card.appendChild(ks);
+  const mi = h("input", { class: "field", id: "cte-min", type: "number", min: "1", max: "600", style: "max-width:140px" }); mi.value = E.minutes; mi.oninput = () => E.minutes = mi.value;
+  card.appendChild(h("label", { class: "f", for: "cte-min" }, "Time limit (minutes)")); card.appendChild(mi);
+  app.appendChild(card);
+  const qc = h("div", { class: "card", id: "cte-questions" }, h("b", {}, "Questions (" + E.qids.length + ")"), h("p", { class: "muted", style: "font-size:13px" }, "Reorder with ↑ ↓, remove with ✕, or add more from chapters below."));
+  E.qids.forEach((id, i) => { const q = QBYID[id];
+    qc.appendChild(h("div", { style: "display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-top:1px solid var(--hair)", id: "cte-q-" + i }, h("span", { style: "flex:1;font-size:13.5px" }, (i + 1) + ". " + (q ? q.q.slice(0, 110) + (q.q.length > 110 ? "…" : "") : id + " (not in this version of the bank)")),
+      h("button", { class: "btn ghost small", "aria-label": "Move question " + (i + 1) + " up", disabled: i ? null : "disabled", onclick: () => { [E.qids[i - 1], E.qids[i]] = [E.qids[i], E.qids[i - 1]]; render(); } }, "↑"),
+      h("button", { class: "btn ghost small", "aria-label": "Move question " + (i + 1) + " down", disabled: i < E.qids.length - 1 ? null : "disabled", onclick: () => { [E.qids[i + 1], E.qids[i]] = [E.qids[i], E.qids[i + 1]]; render(); } }, "↓"),
+      h("button", { class: "btn ghost small", id: "cte-del-" + i, "aria-label": "Remove question " + (i + 1), onclick: () => { E.qids.splice(i, 1); render(); } }, "✕"))); });
+  const chBox = h("div", { style: "max-height:160px;overflow:auto;border:1px solid var(--hair);border-radius:8px;padding:6px;margin:6px 0" });
+  CH().forEach(c => { const id = "cte-ch-" + c.n, cb = h("input", { type: "checkbox", id, onchange: e => E.chs[c.n] = e.target.checked }); cb.checked = !!E.chs[c.n]; chBox.appendChild(h("label", { class: "check", for: id }, cb, h("span", {}, c.title))); });
+  const an = h("input", { class: "field", id: "cte-addn", type: "number", min: "1", max: "50", style: "max-width:90px" }); an.value = E.add; an.oninput = () => E.add = an.value;
+  qc.appendChild(h("details", { id: "cte-adder" }, h("summary", {}, "Add questions"), chBox, h("div", { style: "display:flex;gap:6px;align-items:flex-end" }, h("div", {}, h("label", { class: "f", for: "cte-addn" }, "How many"), an),
+    h("button", { class: "btn sec2 small", id: "cte-add", onclick: () => { const pool = []; CH().forEach(c => { if (E.chs[c.n]) cqs(c).forEach(q => { if (!E.qids.includes(q.id)) pool.push(q); }); });
+      if (!pool.length) { toast("Choose at least one chapter."); return; } E.qids = E.qids.concat(shuffle(pool).slice(0, Math.max(1, Math.min(50, +E.add || 5))).map(q => q.id)); render(); } }, "Add"))));
+  app.appendChild(qc);
+  const out = h("div", { id: "cte-msg", role: "status", "aria-live": "polite", class: "muted" });
+  const doSave = async (taken) => { out.textContent = "Saving…";
+    try { const rows = await DB.patch("tests", "id=eq." + t.id, { title: E.title.trim(), kind: E.kind, minutes: Math.round(+E.minutes), qids: E.qids });
+      const nt = (rows && rows[0]) || Object.assign({}, t, { title: E.title.trim(), kind: E.kind, minutes: Math.round(+E.minutes), qids: E.qids });
+      VIEWS.ctestedit.e = null; LEAVE = null; stack.pop(); const prev = stack[stack.length - 1]; if (prev && prev.view === "ctest") prev.arg = nt; render(); toast("✅ Test saved" + (taken ? " · " + taken + " result" + (taken === 1 ? "" : "s") + " already taken are kept" : "")); }
+    catch (e) { out.textContent = "❌ " + e.message; } };
+  const save = h("button", { class: "btn", id: "cte-save", onclick: async () => {
+    if (!E.title.trim()) { out.textContent = "❌ Give the test a title."; return; }
+    if (!(+E.minutes >= 1 && +E.minutes <= 600)) { out.textContent = "❌ The time limit must be 1 to 600 minutes."; return; }
+    if (!E.qids.length) { out.textContent = "❌ Keep at least one question."; return; }
+    let taken = 0; try { taken = ((await DB.get("test_results", "test_id=eq." + t.id)) || []).length; } catch (e) {}
+    const qChanged = JSON.stringify(E.qids) !== JSON.stringify(t.qids || []);
+    if (taken && qChanged) confirmBox(taken + " student" + (taken === 1 ? " has" : "s have") + " already taken this test", "Their results and rankings are kept. The new questions apply to students who take the test from now on.", () => doSave(taken), "Save changes");
+    else doSave(taken); } }, "Save Changes");
+  const cancel = h("button", { class: "btn ghost", id: "cte-cancel", onclick: () => { const leave = () => { VIEWS.ctestedit.e = null; LEAVE = null; back0(); }; if (LEAVE && LEAVE()) confirmBox("Discard your changes?", "Nothing you changed here will be saved.", leave, "Discard changes"); else leave(); } }, "Cancel");
+  app.appendChild(h("div", { class: "card" }, h("div", { class: "btnrow" }, save, cancel), out));
+};
 VIEWS.ctest = function (t) {
   document.getElementById("title").textContent = t.title;
   app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, t.kind === "group" ? "🤝 Group test" : "📝 Class test"), h("h2", {}, t.title),
     h("div", { class: "muted" }, (t.qids || []).length + " questions · " + t.minutes + " minutes · ranked by score, then time")));
+  if (myClass() && myClass().role === "teacher" && DB && DB.live) app.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ct-edit", onclick: () => go("ctestedit", t) }, "Edit Quiz")));
   const doneMe = S.tdone && S.tdone[t.id];
   const box = h("div", {}); app.appendChild(box); box.appendChild(h("div", { class: "card muted" }, "⏳ Loading results…"));
   const v = cur();
@@ -4056,7 +4140,7 @@ VIEWS.teach = function () {
   if (!DB) { notConnected(); return; }
   if (!DB.live) app.appendChild(h("div", { class: "card", style: "background:var(--chip)" }, h("b", {}, "🧪 Preview mode"), h("div", { class: "muted" }, "In this preview, classes are stored on this device only.")));
   const list = S.tclasses || [];
-  if (DB.live && DB.call) { app.appendChild(coursesCard()); app.appendChild(h("div", { class: "card", id: "open-inbox-card" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap" }, h("b", {}, "📥 Lab report inbox"), h("button", { class: "btn sec2 small", id: "open-inbox", onclick: () => go("labinbox") }, "Open")), h("div", { class: "muted", style: "font-size:13px" }, "All lab reports in your sections, what's missing, and reports students emailed you."))); }
+  if (DB.live && DB.call) { app.appendChild(quickEditCard()); app.appendChild(coursesCard()); app.appendChild(h("div", { class: "card", id: "open-inbox-card" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap" }, h("b", {}, "📥 Lab report inbox"), h("button", { class: "btn sec2 small", id: "open-inbox", onclick: () => go("labinbox") }, "Open")), h("div", { class: "muted", style: "font-size:13px" }, "All lab reports in your sections, what's missing, and reports students emailed you."))); }
   const card = h("div", { class: "card", id: "my-classes", style: DB.live && DB.call ? "display:none" : "" }, h("b", {}, "📚 My classes"));
   if (!list.length) card.appendChild(h("p", { class: "muted" }, "No classes yet. Create your first class below."));
   list.forEach(k => card.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "tc-" + k.code, onclick: () => { S.cls = { code: k.code, name: k.name, role: "teacher" }; save(); CLSTAB = 0; go("cls", k.code); } },
@@ -4794,10 +4878,10 @@ async function loadDeadlines(force) {
   const out = { at: Date.now(), items: [], tz: null, who: isTeacher() ? "t" : "s" };
   try {
     if (isTeacher()) {
-      for (const k of (S.tclasses || []).slice(0, 20)) { const j = await asgCall({ action: "list", class_code: k.code }); out.tz = out.tz || j.tz;
+      for (const k of (S.tclasses || []).slice(0, 20)) { const j = await asgCall({ action: "list", class_code: k.code }, { fresh: true }); out.tz = out.tz || j.tz;
         j.assignments.forEach(a => out.items.push({ id: a.id, cls: k.name, code: k.code, kind: a.kind, title: a.title, open: a.open_at, due: a.due_at, lock: a.lock_at || a.due_at, tz: j.tz || localTz(), teacher: true, submitted: a.submitted, published: a.published })); }
     } else if (S.cls && S.cls.role !== "teacher") {
-      const j = await asgCall({ action: "mine", class_code: S.cls.code }); out.tz = j.tz;
+      const j = await asgCall({ action: "mine", class_code: S.cls.code }, { fresh: true }); out.tz = j.tz;
       j.assignments.forEach(a => out.items.push({ id: a.id, cls: S.cls.name, code: S.cls.code, kind: a.kind, title: a.title, open: a.effective.open_at, due: a.effective.due_at, lock: a.effective.lock_at, tz: j.tz || localTz(),
         ext: a.effective.source !== "base", state: a.state, done: a.submitted > 0 && !a.in_progress, inprog: !!a.in_progress, canvas: !!a.canvas_linked, grade: a.grade_released ? a.grade : null }));
     }
@@ -5040,6 +5124,7 @@ const HELP = [
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
   { id: "examprint", t: "Instructors: print an exam, PDF, Word, versions and answer keys", who: "instructor", kw: "email send recipients print exam pdf word docx export versions answer key bubble sheet email paper test", b: ["Open a quiz, test or assignment in your class and press 🖨️ Print / PDF / Word. Fill in the header (institution, course, date, time limit, instructions), choose how many versions (A–D, with shuffled questions and/or choices) and what to include: the student version, an instructor version with the key, with explanations, or the answer key only.", "Preview shows exactly what prints and what goes into the PDF. Download Word gives an editable .docx. Each version has its own key; student copies can end with a bubble answer sheet.", "Email makes the file and opens a draft in your own email app; ChemFlip doesn't send it. A warning appears before any file with answers is emailed. Save exam settings keeps your choices with the exam in your account.", "Email: tap \u2709\ufe0f Email, add one or more addresses (up to 30) and a message, then Preview email. ChemFlip sends it from notices@mail.chemflip.org with your attached PDF or Word file, and replies go to your verified instructor email. Files with the answer key show a warning and ask once more before sending. Up to 20 exam emails a day. \"Open a draft in my email app\" makes the file and opens your own email app instead; nothing is sent until you press Send there."] },
+  { id: "editing", t: "Instructors: editing quizzes, deadlines and accommodations", who: "instructor", kw: "edit quiz assignment change deadline extend shorten reopen quick edit accommodation extension version regrade publish unpublish", b: ["Every quiz, test, assignment and lab report has its own dates: Available from, Due and Available until, in your class's time zone. Changing one never changes another.", "Edit Quiz or Edit Assignment (on each row, or on the item's page) opens the full editor: title, instructions, questions, choices, correct answers, order, points, versions, time limit, attempts, late work, release dates and publishing. Cancel discards your changes; leaving with unsaved changes asks first.", "Quick edit changes dates, attempts, publishing and (for lab reports) points without opening the editor. The Quick Edit table on your dashboard lists everything in your classes.", "You can extend or shorten a deadline (shortening asks first) and reopen a closed quiz. Submissions, grades and progress are always kept, and each student's own extension keeps its date. Tick \"Email students about the new dates\" to notify students who turned that notice on.", "If students already submitted and you change questions, answers or points, ChemFlip keeps the earlier version and asks whether to regrade their submissions or keep the scores already given. Earlier versions are listed on the item's page and can be opened in the editor.", "Student accommodations (on your dashboard): pick a class, a student and an item, then set a new due date, extra attempts or extra minutes. The list shows every active accommodation and extension in your classes; only you and the student see them.", "Class and group tests (\ud83d\udcdd Tests tab) can be edited too: title, type, time limit, and questions (reorder, remove or add). Results already taken are kept."] },
   { id: "notices", t: "Email notices", who: "all", kw: "email notices notifications reminders unsubscribe code alerts", b: ["Email notices are optional. In Settings → Email notices, enter your address, then enter the 6-digit code ChemFlip emails you. Instructors can use the instructor email they already verified.", "Choose which emails you get: new work, new tests, a reminder a day before work is due, missing work, confirmation when your work is received, returned feedback and class announcements.", "Grades are never sent by email. A feedback email only says your work was returned; open ChemFlip to see the grade.", "Every email has a link to stop all ChemFlip emails. You can also switch emails off or remove your address in Settings at any time. Work placed in Canvas gets Canvas's own due-date reminders instead of ChemFlip's."] },
   { id: "records", t: "Privacy and student records", who: "all", kw: "privacy records ferpa download my data export who opened access log retention delete files", b: ["A student's answers, grades, lab reports and feedback can be seen only by that student and the instructors of the class. Files open only through private links that expire after 10 minutes; there are no public links, and ChemFlip never emails grades.", "Students: Settings → Privacy and my records → Download my data saves everything ChemFlip's server keeps for your device as a file. Who has opened my records lists each time an instructor opened, graded or changed your work.", "Instructors: Students → Class settings → Student files and privacy. Choose how long students' report files are kept after a lab report locks. Nothing is removed automatically: files past the rule are listed, and they're removed only when you type the class code to confirm. Grades, feedback and receipts are always kept."] },
   { id: "rubrics", t: "Instructors: rubrics, markup and returning work", who: "instructor", kw: "rubric criteria levels markup annotate pen highlight draft return feedback attach file partial credit", b: ["Rubrics: on a lab report, open Rubric, start from the lab report template or add your own criteria and levels, then Save rubric. While grading, choose one level per criterion; ChemFlip adds the points and scales them to the report's points, and you can adjust by a few points. A written-answer question in a quiz can have its own rubric (Your own questions → Rubric with levels).", "Draft or return: Save draft keeps the grade to yourself (the student, the gradebook and Canvas see nothing yet). Return to student sends it; Return all drafts sends every draft at once.", "🖍️ Mark up pages: draw, highlight, tick, cross or place a typed note on each page of a scanned report. Saving makes a marked-up PDF for the student; their original stays unchanged, and you can edit your marks later.", "📎 Attach file: add a PDF or a photo (turned into a PDF on your device), up to 5 per submission. On quizzes you can also write overall feedback and attach files. Students see marked-up pages, files, feedback and the rubric levels once the work is returned and the grade is released. Files open only through short-lived private links."] },
@@ -5053,7 +5138,7 @@ const HELP = [
   { id: "privacy", t: "Privacy and your data", who: "all", kw: "privacy data delete ferpa grades", b: ["Your answers stay on your device unless you join a class or sign in to sync. Instructors see only their own classes.", "Settings → Delete my data removes your class records and leaderboard entries from ChemFlip's server."] },
   { id: "contact", t: "Contact", who: "all", kw: "contact email help support bug", b: ["Questions, feedback or a problem? Email chemflipp@gmail.com."] },
 ];
-const HELP_FOR = { classfiles: "records", admin: "records", myasg: "assignments", asgdone: "receipts", calendar: "reminders", exam: "practice", quiz: "answering", asgedit: "builder", asggrade: "rubrics", asgdetail: "grading", canvasSetup: "canvas", canvasLink: "canvas", settings: "sync", progress: "progress", recs: "progress", draw: "structures", teach: "teach", cls: "bulk", classes: "class", search: "access" };
+const HELP_FOR = { accom: "editing", asgedit: "editing", ctestedit: "editing", classfiles: "records", admin: "records", myasg: "assignments", asgdone: "receipts", calendar: "reminders", exam: "practice", quiz: "answering", asggrade: "rubrics", asgdetail: "grading", canvasSetup: "canvas", canvasLink: "canvas", settings: "sync", progress: "progress", recs: "progress", draw: "structures", teach: "teach", cls: "bulk", classes: "class", search: "access" };
 function helpList() { const T = isTeacher(); return HELP.filter(a => a.who === "all" || (T ? a.who === "instructor" : a.who === "student")); }
 VIEWS.help = function (id) {
   document.getElementById("title").textContent = "Help";
@@ -5122,7 +5207,7 @@ function renderCrumbs() {
   nav.style.display = "";
   const ol = h("ol", {});
   stack.forEach((e, i) => { const last = i === stack.length - 1, label = e.t || (e.view === "home" ? "Home" : VIEW_TITLES[e.view] || e.view);
-    ol.appendChild(h("li", {}, last ? h("span", { "aria-current": "page" }, label) : h("button", { class: "crumb", id: "crumb-" + i, onclick: () => { stack = stack.slice(0, i + 1); render(); window.scrollTo(0, 0); focusMain(); } }, label))); });
+    ol.appendChild(h("li", {}, last ? h("span", { "aria-current": "page" }, label) : h("button", { class: "crumb", id: "crumb-" + i, onclick: () => guardLeave(() => { stack = stack.slice(0, i + 1); render(); window.scrollTo(0, 0); focusMain(); }) }, label))); });
   nav.appendChild(ol);
 }
 
@@ -5159,7 +5244,7 @@ function receiptsCard() {
 
 /* ---------- 5.0 Phase E: graded assignments with deadlines, locking and extensions (server-enforced) ---------- */
 const ASG = { off: 0, tz: null };   // off = server clock − device clock (ms); only used to show countdowns
-async function asgCall(body) { if (!DB || !DB.live || !DB.call) throw new Error("Graded assignments need ChemFlip's online service."); const j = await DB.call(Object.assign({ op: "asg" }, body)); if (j && j.now) ASG.off = Date.parse(j.now) - Date.now(); return j; }
+async function asgCall(body, opts) { if (!DB || !DB.live || !DB.call) throw new Error("Graded assignments need ChemFlip's online service."); const j = await DB.call(Object.assign({ op: "asg" }, body), opts); if (j && j.now && !j.__cached) ASG.off = Date.parse(j.now) - Date.now(); return j; }
 const srvNow = () => Date.now() + ASG.off;
 const TZS = ["America/Los_Angeles", "America/Denver", "America/Phoenix", "America/Chicago", "America/New_York", "America/Anchorage", "Pacific/Honolulu", "America/Puerto_Rico", "Europe/London", "Europe/Berlin", "Asia/Tehran", "Asia/Dubai", "Asia/Kolkata", "Asia/Shanghai", "Asia/Tokyo", "Australia/Sydney"];
 function localTz() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Los_Angeles"; } catch (e) { return "America/Los_Angeles"; } }
@@ -5204,6 +5289,10 @@ function teacherAsg(c, done) {
       h("button", { class: "main", id: "asg-" + a.id.slice(0, 8), onclick: () => go("asgdetail", { id: a.id, code: c.code }) },
       h("div", { style: "flex:1" }, h("div", { class: "t" }, KIND[a.kind] + ": " + a.title + (a.published === false ? " (hidden)" : "")), h("div", { class: "meta" }, "Due " + fmtTz(a.due_at, tz) + (a.lock_at && a.lock_at !== a.due_at ? " · locks " + fmtTz(a.lock_at, tz, false) : "") + " · " + a.submitted + " submitted" + (a.extensions ? " · " + a.extensions + " extension" + (a.extensions > 1 ? "s" : "") : "")))))));
     card.appendChild(bar);
+    j.assignments.forEach(a => { const k8 = a.id.slice(0, 8), row = card.querySelector("#asg-" + k8); if (!row || !row.parentElement) return;   // 5.0: Edit and Quick edit on every row
+      row.parentElement.appendChild(h("span", { class: "rowacts", style: "display:flex;gap:4px;flex-wrap:wrap" },
+        h("button", { class: "btn sec2 small", id: "asg-edit-" + k8, "aria-label": "Edit " + a.title, onclick: () => go(a.kind === "lab" ? "asgdetail" : "asgedit", { id: a.id, code: c.code }) }, a.kind === "lab" ? "Open" : a.kind === "assignment" ? "Edit Assignment" : "Edit Quiz"),
+        h("button", { class: "btn ghost small", id: "asg-qe-" + k8, "aria-label": "Quick edit " + a.title, onclick: () => quickSheet(a, c.code, tz, () => render()) }, "Quick edit"))); });
     wrap.appendChild(card); done(wrap);
   }).catch(e => done(h("div", { class: "card muted" }, "❌ " + e.message)));
 }
@@ -5212,7 +5301,7 @@ function teacherAsg(c, done) {
 const AE_STEPS = ["Basics", "Bank questions", "Your questions", "Points", "Versions", "Dates", "Attempts & release", "Review"];
 function aeForm(a, code) {
   const tz = ASG.tz || localTz(), wk = new Date(srvNow() + 7 * 864e5);
-  return { key: a.id || code, step: 1, all: false, title: a.title || "", kind: a.kind || "assignment", chs: [], n: 10, L: 0,
+  return { key: a.id || code, step: 1, all: false, title: a.title || "", kind: a.kind || "assignment", chs: [], n: 10, L: 0, instructions: a.instructions || "", notify: false,
     qids: a.qids ? a.qids.slice() : [], points: Object.assign({}, a.points || {}), items: JSON.parse(JSON.stringify(a.items || [])),
     pool_draw: a.pool_draw || "", shuffle: !!a.shuffle,
     open: isoToZoned(a.open_at, tz), due: a.due_at ? isoToZoned(a.due_at, tz) : isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59", lock: isoToZoned(a.lock_at, tz),
@@ -5248,10 +5337,15 @@ function aeCheck(F, step) {
   return "";
 }
 VIEWS.asgedit = function (arg) {
-  if (!isTeacher()) { back(); return; }
+  if (!isTeacher()) { back0(); return; }
+  if (arg.id && !arg.a) {   // 5.0: Edit from a list row opens the editor directly
+    app.appendChild(h("div", { class: "card muted", id: "ae-loading" }, "⏳ Loading…"));
+    asgCall({ action: "detail", id: arg.id }).then(j => { arg.a = j.assignment; arg.submitted = aeSubmitted(j); ASG.tz = j.assignment.tz || ASG.tz; if (cur().arg === arg) render(); })
+      .catch(e => { const l = document.getElementById("ae-loading"); if (l) l.textContent = "❌ " + e.message; }); return; }
   const a = arg.a || {}, tz = ASG.tz || localTz();
-  if (!VIEWS.asgedit.f || VIEWS.asgedit.f.key !== (a.id || arg.code)) VIEWS.asgedit.f = aeForm(a, arg.code);
+  if (!VIEWS.asgedit.f || VIEWS.asgedit.f.key !== (a.id || arg.code)) { VIEWS.asgedit.f = aeForm(a, arg.code); VIEWS.asgedit.f.orig = aeSnap(VIEWS.asgedit.f); }
   const F = VIEWS.asgedit.f;
+  LEAVE = () => !!VIEWS.asgedit.f && aeSnap(VIEWS.asgedit.f) !== VIEWS.asgedit.f.orig;
   document.getElementById("title").textContent = a.id ? "Edit " + (a.title || "assignment") : "New assignment";
   const nav = h("div", { class: "seg ae-steps", id: "ae-steps", role: "tablist", style: "flex-wrap:wrap" });
   AE_STEPS.forEach((t, i) => nav.appendChild(h("button", { class: F.step === i + 1 && !F.all ? "on" : "", id: "ae-step-" + (i + 1), role: "tab", "aria-selected": F.step === i + 1 ? "true" : "false", onclick: () => { F.step = i + 1; F.all = false; render(); } }, (i + 1) + ". " + t)));
@@ -5264,6 +5358,8 @@ VIEWS.asgedit = function (arg) {
       c.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center;margin:6px 0" }, sel, h("button", { class: "btn sec2 small", id: "ae-tpl-use", onclick: () => { if (sel.value === "") return; aeApplyTemplate(F, tpls[+sel.value]); toast("📋 Template applied — check the dates"); render(); } }, "Use"),
         h("button", { class: "btn ghost small", id: "ae-tpl-del", onclick: () => { if (sel.value === "") return; confirmBox("Delete template " + tpls[+sel.value].name + "?", "Assignments made from it aren't affected.", () => { S.asgTpl.splice(+sel.value, 1); save(); render(); }, "Delete"); } }, "Delete"))); }
     field(c, "ae-title", "Title", "text", "title", { placeholder: "e.g. Homework 3: Stoichiometry" });
+    { const ta = h("textarea", { class: "field", id: "ae-instr", rows: "3", maxlength: "4000", placeholder: "Optional: what students should know before they start", style: "width:100%;font:inherit" }); ta.value = F.instructions || ""; ta.addEventListener("input", () => { F.instructions = ta.value; });
+      c.appendChild(h("label", { class: "f", for: "ae-instr" }, "Instructions or description (students see this)")); c.appendChild(ta); }
     const kind = h("select", { class: "field", id: "ae-kind", onchange: e => F.kind = e.target.value }, Object.entries(KIND).filter(([k]) => k !== "lab").map(([k, t]) => h("option", { value: k, selected: F.kind === k ? "" : null }, t)));
     c.appendChild(h("label", { class: "f", for: "ae-kind" }, "Type")); c.appendChild(kind);
   });
@@ -5325,9 +5421,9 @@ VIEWS.asgedit = function (arg) {
   });
   sec(4, "Points and partial credit", c => {
     const tb = h("table", { class: "t", id: "ae-points" });
-    F.qids.forEach((id, i) => { const q = QBYID[id], inp = h("input", { class: "field", id: "ae-pt-" + id, type: "number", min: "0.5", max: "100", step: "0.5", value: F.points[id] || 1, style: "max-width:90px", oninput: e => { F.points[id] = +e.target.value || 1; tot.textContent = "Total: " + aeTotal(F) + " points"; } });
+    F.qids.forEach((id, i) => { const q = QBYID[id], inp = h("input", { class: "field", id: "ae-pt-" + id, "aria-label": "Points for question " + (i + 1), type: "number", min: "0.5", max: "100", step: "0.5", value: F.points[id] || 1, style: "max-width:90px", oninput: e => { F.points[id] = +e.target.value || 1; tot.textContent = "Total: " + aeTotal(F) + " points"; } });
       tb.appendChild(h("tr", {}, h("td", {}, (i + 1) + ". " + (q ? q.q.slice(0, 70) + "…" : id)), h("td", { class: "n" }, inp))); });
-    F.items.forEach((it, i) => { const inp = h("input", { class: "field", id: "ae-ipt-" + i, type: "number", min: "0.5", max: "100", step: "0.5", value: it.points || 1, style: "max-width:90px", oninput: e => { it.points = +e.target.value || 1; tot.textContent = "Total: " + aeTotal(F) + " points"; } });
+    F.items.forEach((it, i) => { const inp = h("input", { class: "field", id: "ae-ipt-" + i, "aria-label": "Points for your question " + (i + 1), type: "number", min: "0.5", max: "100", step: "0.5", value: it.points || 1, style: "max-width:90px", oninput: e => { it.points = +e.target.value || 1; tot.textContent = "Total: " + aeTotal(F) + " points"; } });
       tb.appendChild(h("tr", {}, h("td", {}, ITYPE[it.type] + ": " + (String(it.stem).slice(0, 60) || "(no text yet)")), h("td", { class: "n" }, inp))); });
     const tot = h("div", { id: "ae-total", style: "margin-top:6px;font-weight:700" }, "Total: " + aeTotal(F) + " points");
     c.appendChild(tb); c.appendChild(tot);
@@ -5343,6 +5439,9 @@ VIEWS.asgedit = function (arg) {
   sec(6, "Dates (" + tz.replace(/_/g, " ") + ")", c => {
     field(c, "ae-open", "Opens (optional)", "datetime-local", "open"); field(c, "ae-due", "Due", "datetime-local", "due");
     field(c, "ae-lock", "Locks — no submissions after this (optional; defaults to the due date)", "datetime-local", "lock");
+    if (a.id) { const nb = h("input", { type: "checkbox", id: "ae-notify", onchange: e => F.notify = e.target.checked }); nb.checked = !!F.notify;
+      c.appendChild(h("label", { class: "check", for: "ae-notify" }, nb, h("span", {}, "Email students about the new dates (only students who turned on \"Changes to due dates\" in Email notices)")));
+      c.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "Changing dates never removes submissions, grades or progress. Students' own extensions keep their dates.")); }
   });
   sec(7, "Attempts, time limit, late work and release", c => {
     field(c, "ae-limit", "Time limit in minutes (optional)", "number", "limit", { min: "1", max: "600" }); field(c, "ae-att", "Maximum attempts (optional)", "number", "att", { min: "1", max: "50" });
@@ -5374,13 +5473,137 @@ VIEWS.asgedit = function (arg) {
       if (o.type === "mc") { const keep = o.options.map((x, k) => [x, k]).filter(([x]) => String(x).trim()); o.answer = Math.max(0, keep.findIndex(([, k]) => k === o.answer)); o.options = keep.map(([x]) => x); } return o; });
     const body = { action: "save", id: a.id, class_code: arg.code, kind: F.kind, title: F.title.trim(), qids: F.qids, answer_key: key, points, items, pool_draw: F.pool_draw ? +F.pool_draw : null, shuffle: F.shuffle,
       open_at: zonedToIso(F.open, tz), due_at: zonedToIso(F.due, tz), lock_at: zonedToIso(F.lock, tz), time_limit_min: F.limit ? +F.limit : null, max_attempts: F.att ? +F.att : null,
-      late_policy: F.late === "penalty" ? { mode: "penalty", pct_per_day: +F.pen, max_pct: +F.penmax } : { mode: F.late }, grade_release_at: zonedToIso(F.grade, tz), solution_release_at: zonedToIso(F.sol, tz), tz };
-    msg.textContent = "Saving…";
-    try { const r = await asgCall(body); VIEWS.asgedit.f = null; toast("✅ " + KIND[r.assignment.kind] + " saved — students see it now"); stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
-    catch (e) { msg.textContent = "❌ " + e.message; } };
+      late_policy: F.late === "penalty" ? { mode: "penalty", pct_per_day: +F.pen, max_pct: +F.penmax } : { mode: F.late }, grade_release_at: zonedToIso(F.grade, tz), solution_release_at: zonedToIso(F.sol, tz), tz,
+      instructions: (F.instructions || "").trim(), notify_dates: !!F.notify };
+    const run = async (regrade) => { msg.textContent = "Saving…";
+      try { const r = await asgCall(body); let extra = "";
+        if (regrade) { const g = await asgCall({ action: "regrade", assignment_id: r.assignment.id }); extra = " · " + g.attempts + " submission" + (g.attempts === 1 ? "" : "s") + " regraded"; }
+        VIEWS.asgedit.f = null; LEAVE = null; toast("✅ " + KIND[r.assignment.kind] + " saved" + (r.version_kept ? " · the earlier version is kept" : "") + extra); stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
+      catch (e) { msg.textContent = "❌ " + e.message; } };
+    // 5.0: warnings before changes that affect students
+    const warn = [];
+    if (a.id && a.due_at && body.due_at && Date.parse(body.due_at) < Date.parse(a.due_at) - 60e3) warn.push("You moved the due date earlier, from " + fmtTz(a.due_at, tz) + " to " + fmtTz(body.due_at, tz) + ". Students who planned on the old date could miss it.");
+    if (a.id && (a.lock_at || a.due_at) && Date.parse(body.lock_at || body.due_at) < Date.parse(a.lock_at || a.due_at) - 60e3 && Date.parse(body.lock_at || body.due_at) < srvNow() + 864e5) warn.push("It will close " + fmtTz(body.lock_at || body.due_at, tz) + ", which is soon.");
+    const contentChanged = a.id && aeContent(body) !== aeContent(Object.assign({}, a, { instructions: a.instructions || "" }));
+    const nsub = arg.submitted || 0;
+    const ask = (i) => { if (i < warn.length) { confirmBox("Shorten the deadline?", warn[i], () => ask(i + 1), "Save anyway"); return; }
+      if (contentChanged && nsub) { aeRegradeBox(nsub, run); return; } run(false); };
+    ask(0); };
   const backB = h("button", { class: "btn ghost", id: "ae-back", disabled: F.all || F.step === 1 ? "disabled" : null, onclick: () => { F.step = Math.max(1, F.step - 1); render(); } }, "‹ Back");
   const nextB = h("button", { class: "btn" + (F.all || F.step === 8 ? " ghost" : ""), id: "ae-next", disabled: F.all || F.step === 8 ? "disabled" : null, onclick: () => { const e = aeCheck(F, F.step); if (e) { msg.textContent = "❌ " + e; return; } F.step++; render(); window.scrollTo(0, 0); } }, "Next ›");
-  app.appendChild(h("div", { class: "card" }, h("div", { class: "btnrow" }, backB, nextB, h("button", { class: "btn" + (F.all || F.step === 8 ? "" : " sec2"), id: "ae-save", onclick: doSave }, a.id ? "Save changes" : "Create and publish")), msg));
+  const cancelB = h("button", { class: "btn ghost", id: "ae-cancel", onclick: () => { const leave = () => { VIEWS.asgedit.f = null; LEAVE = null; back0(); };
+    if (LEAVE && LEAVE()) confirmBox("Discard your changes?", "Nothing you changed here will be saved.", leave, "Discard changes"); else leave(); } }, "Cancel");
+  app.appendChild(h("div", { class: "card" }, h("div", { class: "btnrow" }, backB, nextB, h("button", { class: "btn" + (F.all || F.step === 8 ? "" : " sec2"), id: "ae-save", onclick: doSave }, a.id ? "Save changes" : "Create and publish"), cancelB), msg));
+};
+// 5.0 editing helpers
+function aeSnap(F) { const o = Object.assign({}, F); ["step", "all", "orig", "chs", "n", "L", "key"].forEach(k => delete o[k]); return JSON.stringify(o); }
+function aeContent(b) { return JSON.stringify([b.title || "", b.instructions || "", b.qids || [], (b.items || []).map(it => [it.type, it.stem, it.points, it.answer, it.options, it.value, it.unit, it.smiles]), b.points || {}, b.pool_draw || null, !!b.shuffle]); }
+function aeSubmitted(j) { return (j.roster || []).reduce((n, r) => n + ((r.attempts || []).some(x => x.status !== "in_progress") ? 1 : 0), 0); }
+function aeRegradeBox(n, run) {
+  const m = h("div", { class: "modal", id: "ae-regrade" }, h("div", { class: "box" }, h("h3", { style: "margin-top:0;color:var(--navy)" }, n + " student" + (n === 1 ? " has" : "s have") + " already submitted"),
+    h("p", { class: "muted" }, "Their answers are always kept, and the current version of the questions is saved in the history. Choose how their scores are handled:"),
+    h("div", { class: "btnrow", style: "flex-direction:column;align-items:stretch" },
+      h("button", { class: "btn", id: "ae-regrade-yes", onclick: () => { m.remove(); run(true); } }, "Save and regrade their submissions with the new answers and points"),
+      h("button", { class: "btn sec2", id: "ae-regrade-no", onclick: () => { m.remove(); run(false); } }, "Save without regrading (scores already given stay)"),
+      h("button", { class: "btn ghost", id: "ae-regrade-cancel", onclick: () => m.remove() }, "Cancel"))));
+  document.body.appendChild(m); setTimeout(() => { const b = document.getElementById("ae-regrade-no"); if (b) b.focus(); }, 0);
+}
+// Quick Edit: dates, attempts, publishing and (lab reports) points for one assignment
+function quickSheet(a, code, tz, after) {
+  tz = tz || a.tz || ASG.tz || localTz();
+  sheet("qe-sheet", "Quick edit: " + a.title, (box, close) => {
+    const F = { open: isoToZoned(a.open_at, tz), due: isoToZoned(a.due_at, tz), lock: isoToZoned(a.lock_at, tz), att: a.max_attempts || "", pub: a.published !== false, pts: a.max_points || "", notify: false };
+    const inp = (id, lab, type, key, ex) => { const i = h("input", Object.assign({ class: "field", id, type }, ex || {})); i.value = F[key] ?? ""; i.addEventListener("input", () => F[key] = i.value); box.appendChild(h("label", { class: "f", for: id }, lab)); box.appendChild(i); };
+    box.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Times are in " + tz.replace(/_/g, " ") + ". Submissions, grades and students' own extensions are kept."));
+    inp("qe-open", "Available from (optional)", "datetime-local", "open"); inp("qe-due", "Due", "datetime-local", "due"); inp("qe-lock", "Available until (optional; defaults to the due date)", "datetime-local", "lock");
+    inp("qe-att", "Attempts (empty = unlimited)", "number", "att", { min: "1", max: "50" });
+    if (a.kind === "lab") inp("qe-pts", "Points", "number", "pts", { min: "1", max: "1000", step: "0.5" });
+    const pb = h("input", { type: "checkbox", id: "qe-pub", onchange: e => F.pub = e.target.checked }); pb.checked = F.pub;
+    box.appendChild(h("label", { class: "check", for: "qe-pub" }, pb, h("span", {}, "Published (students can see it)")));
+    const nb = h("input", { type: "checkbox", id: "qe-notify", onchange: e => F.notify = e.target.checked });
+    box.appendChild(h("label", { class: "check", for: "qe-notify" }, nb, h("span", {}, "Email students if the dates change")));
+    const out = h("div", { id: "qe-msg", role: "status", "aria-live": "polite", class: "muted" });
+    const save = h("button", { class: "btn", id: "qe-save", onclick: () => {
+      const body = { action: "quick", id: a.id, open_at: zonedToIso(F.open, tz), due_at: zonedToIso(F.due, tz), lock_at: zonedToIso(F.lock, tz), max_attempts: F.att === "" ? null : +F.att, published: F.pub, notify_dates: F.notify };
+      if (a.kind === "lab") body.max_points = +F.pts;
+      if (!body.due_at) { out.textContent = "❌ Set a due date."; return; }
+      const go1 = async () => { save.disabled = true; out.textContent = "Saving…";
+        try { const r = await asgCall(body); out.textContent = "✅ Saved" + (r.changed.length ? "" : " (nothing changed)") + "."; toast("✅ Saved: " + a.title); setTimeout(() => { close(); if (after) after(r.assignment); else render(); }, 500); }
+        catch (e) { save.disabled = false; out.textContent = "❌ " + e.message; } };
+      if (a.due_at && Date.parse(body.due_at) < Date.parse(a.due_at) - 60e3) confirmBox("Shorten the deadline?", "The due date moves earlier, from " + fmtTz(a.due_at, tz) + " to " + fmtTz(body.due_at, tz) + ". Students who planned on the old date could miss it.", go1, "Save anyway"); else go1(); } }, "Save changes");
+    box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost", id: "qe-cancel", onclick: close }, "Cancel"), save)); box.appendChild(out);
+  });
+}
+const QE_STATE = (a, now) => a.published === false ? ["Hidden", "warn"] : a.open_at && Date.parse(a.open_at) > now ? ["Not open yet", ""] : now >= Date.parse(a.lock_at || a.due_at) ? ["Closed", "bad"] : now > Date.parse(a.due_at) ? ["Late work accepted", "warn"] : ["Open", "ok"];
+// Quick Edit table on the instructor dashboard: every assignment, quiz, test and lab report in your classes
+function quickEditCard() {
+  const card = h("div", { class: "card", id: "qe-card" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap" }, h("b", {}, "Quick Edit"),
+    h("button", { class: "btn sec2 small", id: "open-accom", onclick: () => go("accom") }, "Student accommodations")), h("p", { class: "muted", style: "font-size:13px" }, "Change deadlines, availability, attempts and publishing without opening each item."));
+  const body = h("div", { id: "qe-body" }, h("div", { class: "muted" }, "⏳ Loading…")); card.appendChild(body);
+  asgCall({ action: "ext_all" }).then(j => { body.innerHTML = ""; const now = srvNow();
+    const rows = j.classes.flatMap(k => k.assignments.map(a => Object.assign({ cls: k }, a)));
+    if (!rows.length) { body.appendChild(h("p", { class: "muted" }, "Nothing yet. Assignments you create in your classes appear here.")); return; }
+    const wrap = h("div", { style: "overflow-x:auto" }), t = h("table", { class: "t", id: "qe-table" });
+    t.appendChild(h("thead", {}, h("tr", {}, ...["Title", "Type", "Deadline", "Status", "Actions"].map(x => h("th", { scope: "col" }, x)))));
+    const tb = h("tbody", {}); t.appendChild(tb);
+    rows.forEach(a => { const tz = a.cls.tz || localTz(), st = QE_STATE(a, now), k8 = a.id.slice(0, 8);
+      tb.appendChild(h("tr", { id: "qe-row-" + k8 }, h("td", {}, h("b", {}, a.title), h("div", { class: "muted", style: "font-size:12px" }, a.cls.name + (a.cls.section ? " · " + a.cls.section : ""))), h("td", {}, KIND[a.kind] || a.kind),
+        h("td", {}, fmtTz(a.due_at, tz)), h("td", {}, h("span", { class: "chip " + st[1] }, st[0])),
+        h("td", { style: "white-space:nowrap" }, h("button", { class: "btn sec2 small", id: "qe-edit-" + k8, onclick: () => { S.cls = { code: a.cls.code, name: a.cls.name, role: "teacher" }; save(); go(a.kind === "lab" ? "asgdetail" : "asgedit", a.kind === "lab" ? { id: a.id, code: a.cls.code } : { id: a.id, code: a.cls.code }); } }, "Edit"), " ",
+          h("button", { class: "btn ghost small", id: "qe-quick-" + k8, onclick: () => quickSheet(a, a.cls.code, tz, () => render()) }, "Quick edit")))); });
+    wrap.appendChild(t); body.appendChild(wrap);
+  }).catch(e => { body.innerHTML = ""; body.appendChild(h("div", { class: "muted" }, "❌ " + e.message)); });
+  return card;
+}
+// Student Accommodations / Extensions: pick a student, pick the work, set the deadline and extra attempts; list of all active ones
+VIEWS.accom = function () {
+  if (!isTeacher()) { back0(); return; }
+  document.getElementById("title").textContent = "Student accommodations";
+  const box = h("div", { id: "ac-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  asgCall({ action: "ext_all" }).then(j => { box.innerHTML = "";
+    const F = VIEWS.accom.f = VIEWS.accom.f || { cls: (j.classes[0] || {}).code || "", sid: "", aid: "", due: "", att: "", mins: "", acc: true, note: "" };
+    const K = () => j.classes.find(k => k.code === F.cls) || j.classes[0];
+    const add = h("div", { class: "card", id: "ac-add" }, h("b", {}, "Add an accommodation or extension"), h("p", { class: "muted", style: "font-size:13px" }, "Only you and the student see it. It applies to this student and this item only; everything else stays the same."));
+    if (!j.classes.length) { add.appendChild(h("p", { class: "muted" }, "Create a class first.")); box.appendChild(add); return; }
+    const sel = (id, lab, opts, key, onch) => { const s = h("select", { class: "field", id }, ...opts.map(([v, t]) => h("option", { value: v, selected: String(F[key]) === String(v) ? "" : null }, t))); s.onchange = () => { F[key] = s.value; if (onch) onch(); }; add.appendChild(h("label", { class: "f", for: id }, lab)); add.appendChild(s); return s; };
+    const draw = () => render();
+    sel("ac-class", "1. Class", j.classes.map(k => [k.code, k.name + (k.section ? " · " + k.section : "")]), "cls", () => { F.sid = ""; F.aid = ""; draw(); });
+    const k = K(); if (!F.sid && k.students[0]) F.sid = k.students[0].sid; if (!F.aid && k.assignments[0]) F.aid = k.assignments[0].id;
+    if (!k.students.length) add.appendChild(h("p", { class: "muted" }, "No students in this class yet."));
+    else {
+      sel("ac-student", "2. Student", k.students.map(m => [m.sid, m.name + (m.stu_id ? " (" + m.stu_id + ")" : "")]), "sid");
+      sel("ac-asg", "3. Quiz, test, assignment or lab report", k.assignments.map(a => [a.id, (KIND[a.kind] || a.kind) + ": " + a.title]), "aid", () => { F.due = ""; draw(); });
+      const a = k.assignments.find(x => x.id === F.aid), tz = k.tz || localTz();
+      if (a) { add.appendChild(h("div", { class: "muted", id: "ac-base", style: "font-size:13px;margin-top:4px" }, "Class deadline: " + fmtTz(a.due_at, tz) + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "")));
+        const inp = (id, lab, type, key, ex) => { const i = h("input", Object.assign({ class: "field", id, type }, ex || {})); i.value = F[key] ?? ""; i.addEventListener("input", () => F[key] = i.value); add.appendChild(h("label", { class: "f", for: id }, lab)); add.appendChild(i); };
+        inp("ac-due", "4. New due date for this student (" + tz.replace(/_/g, " ") + ")", "datetime-local", "due");
+        inp("ac-att", "Extra attempts", "number", "att", { min: "0", max: "50", placeholder: "0" });
+        if (a.time_limit_min) inp("ac-mins", "Extra minutes on the time limit", "number", "mins", { min: "0", max: "1440", placeholder: "0" });
+        inp("ac-note", "Note (only you see it)", "text", "note", { maxlength: "300", placeholder: "e.g. DSPS accommodation" });
+        const cb = h("input", { type: "checkbox", id: "ac-acc", onchange: e => F.acc = e.target.checked }); cb.checked = F.acc;
+        add.appendChild(h("label", { class: "check", for: "ac-acc" }, cb, h("span", {}, "This is an accommodation (marked privately for you)")));
+        const out = h("div", { id: "ac-msg", role: "status", "aria-live": "polite", class: "muted" });
+        add.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ac-save", onclick: async () => {
+          const due = zonedToIso(F.due, tz); if (!due && !(+F.att) && !(+F.mins)) { out.textContent = "❌ Set a new due date, extra attempts or extra minutes."; return; }
+          const lock = due && Date.parse(due) > Date.parse(a.lock_at || a.due_at) ? due : null;
+          out.textContent = "Saving…";
+          try { await asgCall({ action: "override", assignment_id: a.id, scope: "student", target: F.sid, due_at: due, lock_at: lock, extra_attempts: +F.att || 0, extra_minutes: +F.mins || 0, accommodation: !!F.acc, note: F.note });
+            VIEWS.accom.f = Object.assign(F, { due: "", att: "", mins: "", note: "" }); toast("✅ Saved for " + (k.students.find(m => m.sid === F.sid) || {}).name); render(); }
+          catch (e) { out.textContent = "❌ " + e.message; } } }, "Save")), out); }
+    }
+    box.appendChild(add);
+    const list = h("div", { class: "card", id: "ac-list" }, h("b", {}, "Active accommodations and extensions (" + j.extensions.length + ")"));
+    if (!j.extensions.length) list.appendChild(h("p", { class: "muted" }, "None yet."));
+    else { const wrap = h("div", { style: "overflow-x:auto" }), t = h("table", { class: "t" }); t.appendChild(h("thead", {}, h("tr", {}, ...["Student", "Item", "Deadline", "Extra", ""].map(x => h("th", { scope: "col" }, x)))));
+      const tb = h("tbody", {}); t.appendChild(tb);
+      j.extensions.forEach(x => { const tz = x.tz || localTz();
+        tb.appendChild(h("tr", { id: "ac-row-" + x.id.slice(0, 8) }, h("td", {}, h("b", {}, x.name), x.stu_id ? h("div", { class: "muted", style: "font-size:12px" }, x.stu_id) : null, x.accommodation ? h("span", { class: "chip" }, "Accommodation") : null),
+          h("td", {}, (KIND[x.kind] || x.kind) + ": " + x.title), h("td", {}, x.due_at ? fmtTz(x.due_at, tz) : "Class deadline (" + fmtTz(x.base_due, tz, false) + ")"),
+          h("td", {}, [x.extra_attempts ? "+" + x.extra_attempts + " attempt" + (x.extra_attempts > 1 ? "s" : "") : "", x.extra_minutes ? "+" + x.extra_minutes + " min" : ""].filter(Boolean).join(", ") || "—", x.note ? h("div", { class: "muted", style: "font-size:12px" }, x.note) : null),
+          h("td", {}, h("button", { class: "btn ghost small", id: "ac-del-" + x.id.slice(0, 8), onclick: () => confirmBox("Remove this extension?", x.name + " goes back to the class deadline for " + x.title + ". Their submissions and grades stay. The change is kept in the history.", async () => { try { await asgCall({ action: "override_remove", id: x.id }); toast("Removed"); render(); } catch (e) { toast("❌ " + e.message); } }, "Remove") }, "Remove")))); });
+      wrap.appendChild(t); list.appendChild(wrap); }
+    box.appendChild(list);
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
 };
 
 /* ----- instructor: one assignment — roster, effective dates, extensions, groups, history ----- */
@@ -5393,11 +5616,23 @@ VIEWS.asgdetail = function (arg) {
       h("div", { class: "muted" }, a.kind === "lab" ? a.max_points + " points · " + (a.expect_pages || 1) + " page" + (a.expect_pages > 1 ? "s" : "") + " expected · " + (a.max_attempts ? a.max_attempts + " upload" + (a.max_attempts > 1 ? "s" : "") : "unlimited uploads") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode]) : (a.qids.length + (a.items || []).length) + " questions" + (a.pool_draw ? " (" + a.pool_draw + " per student)" : "") + (a.shuffle ? " · shuffled" : "") + (a.time_limit_min ? " · " + a.time_limit_min + " min" : "") + (a.max_attempts ? " · " + a.max_attempts + " attempt" + (a.max_attempts > 1 ? "s" : "") : " · unlimited attempts") + " · late: " + ({ accept: "accepted, marked late", reject: "not accepted", penalty: (a.late_policy.pct_per_day || 0) + "%/day off" }[a.late_policy.mode])),
       h("div", { style: "margin-top:6px" }, (a.open_at ? "Opens " + fmtTz(a.open_at, tz) + " · " : "") + "Due " + fmtTz(a.due_at, tz) + " · Locks " + fmtTz(a.lock_at || a.due_at, tz)),
       h("div", { class: "muted", style: "font-size:13px" }, "Grades: " + (a.grade_release_at ? fmtTz(a.grade_release_at, tz) : "right after submitting") + " · Solutions: " + (a.solution_release_at ? fmtTz(a.solution_release_at, tz) : "after the lock date")),
-      h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go(a.kind === "lab" ? "labedit" : "asgedit", { code: arg.code, a }) }, "Edit"),
+      h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "ad-edit", onclick: () => go(a.kind === "lab" ? "labedit" : "asgedit", { code: arg.code, a, submitted: aeSubmitted(j) }) }, a.kind === "assignment" ? "Edit Assignment" : a.kind === "lab" ? "Edit" : "Edit Quiz"),
+        h("button", { class: "btn sec2 small", id: "ad-quick", onclick: () => quickSheet(a, arg.code, tz, () => render()) }, "Quick edit"),
         a.kind !== "lab" ? h("button", { class: "btn sec2 small", id: "ad-print", onclick: () => go("examexport", { id: a.id, code: arg.code }) }, "🖨️ Print / PDF / Word") : null,
         h("button", { class: "btn sec2 small", id: "ad-class-ext", onclick: () => extSheet(a, "class", null, "the whole class", null, j) }, "Extend for whole class"),
         h("button", { class: "btn sec2 small", id: "ad-group", onclick: () => groupSheet(a, j) }, "Groups & group extension"),
         h("button", { class: "btn ghost small", id: "ad-del", onclick: () => confirmBox("Delete " + a.title + "?", "Students won't see it any more. Submissions are kept in the database.", async () => { await asgCall({ action: "delete", id: a.id }); toast("Deleted"); back(); }, "Delete") }, "Delete"))));
+    if (a.kind !== "lab") {   // 5.0: earlier versions of the questions, kept before each change
+      const vb = h("div", { id: "ad-vlist", class: "muted" }, "⏳ Loading…");
+      const det = h("details", { class: "card", id: "ad-versions" }, h("summary", {}, h("b", {}, "Earlier versions")), vb);
+      det.addEventListener("toggle", () => { if (!det.open || det.dataset.loaded) return; det.dataset.loaded = "1";
+        asgCall({ action: "versions", id: a.id }).then(v => { vb.innerHTML = "";
+          if (!v.versions.length) { vb.textContent = "None yet. Before you change this item's questions, answer key, points or title, ChemFlip keeps a copy here."; return; }
+          v.versions.forEach(x => vb.appendChild(h("div", { class: "ch", style: "align-items:center" }, h("div", { style: "flex:1" }, h("b", {}, "Version " + x.n), " · " + (x.title || a.title) + " · " + x.questions + " question" + (x.questions === 1 ? "" : "s"), h("div", { style: "font-size:12.5px" }, "Kept " + fmtTz(x.at, tz))),
+            h("button", { class: "btn sec2 small", id: "ad-v-" + x.n, onclick: async () => { try { const r = await asgCall({ action: "version", id: a.id, n: x.n }); const merged = Object.assign({}, a, r.version.snapshot);
+              const base = aeForm(a, arg.code); VIEWS.asgedit.f = aeForm(merged, arg.code); VIEWS.asgedit.f.orig = aeSnap(base); toast("Version " + x.n + " is in the editor. Check it, then Save changes to use it."); go("asgedit", { code: arg.code, a, submitted: aeSubmitted(j) }); } catch (e) { toast("❌ " + e.message); } } }, "Open in the editor")))); })
+          .catch(e => { vb.textContent = "❌ " + e.message; }); });
+      box.appendChild(det); }
     const live = j.overrides.filter(o => !o.removed_at);
     const accom = j.roster.filter(r => r.effective.accommodation);
     const rc = h("div", { class: "card", id: "ad-roster" }, h("b", {}, "Students (" + j.roster.length + ")" + (accom.length ? " · " + accom.length + " with accommodations" : "")));
@@ -5547,6 +5782,7 @@ VIEWS.myasg = function () {
       const cd = h("span", { class: "cd", "data-due": e.due_at, "data-lock": e.lock_at });
       const card = h("div", { class: "card asgc", id: "ma-" + a.id.slice(0, 8) }, h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, KIND[a.kind] + ": " + a.title), h("span", { class: "chip " + st[1] }, st[0])),
         h("div", {}, "Due " + fmtTz(e.due_at, tz) + (e.source !== "base" ? " (your extension)" : ""), " ", cd),
+        a.instructions && a.kind !== "lab" ? h("div", { class: "muted", id: "ma-instr-" + a.id.slice(0, 8), style: "white-space:pre-wrap;font-size:13.5px;margin-top:4px" }, a.instructions) : null,
         h("div", { class: "muted", style: "font-size:13px" }, [e.open_at && a.state === "not_open" ? "Opens " + fmtTz(e.open_at, tz) : "", e.lock_at !== e.due_at ? "Late work until " + fmtTz(e.lock_at, tz, false) : "", e.time_limit_min ? e.time_limit_min + " min time limit" : "", e.max_attempts ? a.attempts_used + " of " + e.max_attempts + (a.kind === "lab" ? " uploads used" : " attempts used") : a.attempts_used + (a.kind === "lab" ? " upload(s) so far" : " attempt(s) so far"), a.kind === "lab" ? (a.max_points + " points") : (a.questions || a.qids.length) + " questions"].filter(Boolean).join(" · ")),
         a.kind === "lab" && a.grade && a.grade.pending ? h("div", { class: "muted" }, "Submitted. Waiting for grading.") : a.grade ? h("div", { style: "margin-top:4px" }, h("b", {}, "Score: " + a.grade.score + "/" + a.grade.total), a.grade.late ? " (late" + (a.grade.penalty_pct ? ", −" + a.grade.penalty_pct + "%" : "") + ")" : "") : a.submitted && !a.grade_released ? h("div", { class: "muted" }, "Submitted. Your grade is released " + fmtTz(a.grade_release_at, tz) + ".") : null);
       const btns = h("div", { class: "btnrow" });
