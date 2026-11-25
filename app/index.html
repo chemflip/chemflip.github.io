@@ -338,6 +338,20 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 /* 5.0 deadlines */
 .chip.warn{background:#FFF4D6;color:#7A5300}.chip.bad{background:#FBE3E1;color:#9B2C22}.qbo.bad{background:#FBE3E1}
 .asgc .cd{color:var(--teal,#156082);font-weight:600}
+/* 5.0 sign-in screens */
+body.signedout #side, body.signedout #searchbtn, body.signedout #helpbtn, body.signedout #plan, body.signedout #crumbs, body.signedout #musicbtn, body.signedout #sfxbtn { display: none !important; }
+body.signedout .wrap { margin-left: auto !important; }
+.authwrap { max-width: 440px; margin: 24px auto; }
+.authbox { padding: 22px; }
+.authbox h2 { margin: 4px 0 14px; }
+.authlogo { font-size: 34px; }
+.authf { display: block; margin: 0 0 10px; }
+.authf > span { display: block; font-weight: 600; margin-bottom: 4px; }
+.authf small { display: block; margin-top: 3px; }
+.authmsg { background: var(--chip); border-left: 4px solid var(--bad); padding: 8px 10px; border-radius: 6px; }
+.authlinks { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; align-items: flex-start; }
+.linkbtn { background: none; border: 0; padding: 6px 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; }
+.authfoot { font-size: 12.5px; text-align: center; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -372,11 +386,16 @@ const KEY = CFG.key;
 
 /* ---------- storage ---------- */
 let S = { a: {}, w: [], b: [], prem: null, theme: "auto", hist: {}, profile: null, music: false, snd: false, days: [], mech: {}, best: {} };
+const S0 = JSON.stringify(S);   // 5.0 accounts: a new account starts from these defaults
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch (e) {}
 // ChemFlip opens silently (Dr. Mo, 2026-11-20): music never starts by itself and is never resumed from a saved setting;
 // answer sounds are off until the user turns them on (stored as "snd"; the old "sfx" setting, on by default, is ignored).
 S.music = false; if ("sfx" in S) delete S["sfx"]; if (typeof S.snd !== "boolean") S.snd = false;
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+// 5.0 accounts: everything is saved under the signed-in account (several people can use one computer); before sign-in only
+// this device's own settings are kept. AUTH lives in memory only: closing or reloading ChemFlip signs out.
+let AUTH = null;
+const acctKey = () => KEY + "-u-" + AUTH.account.id;
+function save() { try { localStorage.setItem(AUTH ? acctKey() : KEY, JSON.stringify(S)); } catch (e) {} }
 
 /* ---------- course ---------- */
 function isOrg() { const c = course(); return c.subj ? c.subj === "org" : !!CFG.mech; }
@@ -580,11 +599,13 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { bulkacc: "Student accounts", accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 let RENDER_N = 0, RENDER_AT = 0, LAST_INPUT = 0;
 ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { LAST_INPUT = performance.now(); }, true));
 function render() {
   RENDER_N++; RENDER_AT = performance.now(); LEAVE = null; applyTheme(); applyA11y(); syncAudioBtns();
+  document.body.classList.toggle("signedout", !AUTH && authOn());
+  if (!AUTH && authOn()) { renderAuth(); return; }   // 5.0: sign in every time ChemFlip opens
   const v = cur(); app.innerHTML = ""; bottom(null);
   document.getElementById("back").style.display = stack.length > 1 ? "" : "none";
   const prem = isPremium(); const pl = document.getElementById("plan"); pl.textContent = prem ? (trialLeft() > 0 && !S.prem ? "Trial · " + trialLeft() + " days" : "Premium") : "Free"; pl.className = "badge" + (prem ? "" : " free");
@@ -2239,6 +2260,7 @@ function ltiLicensed(cid) {
 }
 async function ltiCall(action, body) {
   if (!LTI) throw new Error("ChemFlip's online service isn't connected in this version.");
+  await signedIn();
   const b = Object.assign({ action }, body || {}); const tok = await acctToken(); if (tok && !b.sb_token) b.sb_token = tok;
   // the device's own key proves which ChemFlip device is asking (same as the cf service); never a Canvas secret
   const dh = DB && DB.live ? { "x-cf-sid": sid(), "x-cf-key": devKey() } : {};
@@ -2717,6 +2739,7 @@ const dateOf = iso => { try { return new Date(iso).toLocaleDateString(undefined,
 // Premium subscriptions have their own service (cf-pay), with the same device identity as the main service.
 async function payFetch(body) {
   if (!DB || !DB.live || !CFG.sb || !CFG.sb.url) throw new Error("Premium plans need an internet connection.");
+  await signedIn();
   let r; try { r = await fetch(CFG.sb.url.replace(/\/$/, "") + "/functions/v1/cf-pay", { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.sb.key, "x-cf-sid": sid(), "x-cf-key": devKey() }, body: JSON.stringify(body) }); }
   catch (e) { throw new Error("ChemFlip couldn't reach the internet. Check your connection and try again."); }
   const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
@@ -3802,9 +3825,266 @@ ${weak.length ? `<h2>Work more on these topics</h2><div class="weak">${weak.map(
   saveFile(CFG.short.replace(/\s+/g, "-") + "-Mistake-Review-" + d.toISOString().slice(0, 10) + ".html", html);
 }
 
+/* ---------- 5.0 accounts: sign in every time ChemFlip opens (online), one device at a time, ID code, Face ID / fingerprint ---------- */
+const authOn = () => !!(CFG.sb && CFG.sb.url && CFG.sb.key) && CFG.auth !== false && !window.__CF_NOAUTH;
+const AUTHV = { screen: "signin", msg: "", busy: false, data: {} };
+const LEG = { sid: S.sid || null, dkey: S.dkey || null };   // this device's identity from before accounts (kept by whoever creates the first account here)
+const DEVICE_ID = (() => { try { let d = localStorage.getItem(KEY + "-device"); if (!d) { d = "d" + Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, "0")).join(""); localStorage.setItem(KEY + "-device", d); } return d; } catch (e) { return "d-unknown"; } })();
+function deviceLabel() {
+  const u = navigator.userAgent || "", app = isDesktopApp() ? "ChemFlip app" : /Edg\//.test(u) ? "Edge" : /Chrome\//.test(u) ? "Chrome" : /Firefox\//.test(u) ? "Firefox" : /Safari\//.test(u) ? "Safari" : "browser";
+  const os = /iPhone/.test(u) ? "iPhone" : /iPad/.test(u) ? "iPad" : /Android/.test(u) ? "Android" : /Windows/.test(u) ? "Windows" : /Mac OS X/.test(u) ? "Mac" : /Linux/.test(u) ? "Linux" : "computer";
+  return app + " on " + os;
+}
+async function authFetch(body) {
+  let r; try { r = await fetch(CFG.sb.url.replace(/\/$/, "") + "/functions/v1/cf-auth", { method: "POST", headers: Object.assign({ "Content-Type": "application/json", apikey: CFG.sb.key }, AUTH ? { "x-cf-sid": AUTH.sid, "x-cf-key": AUTH.token } : {}), body: JSON.stringify(Object.assign({ op: "auth", device: DEVICE_ID, device_label: deviceLabel() }, body)) }); }
+  catch (e) { const er = new Error("You're offline. Connect to the internet to sign in to ChemFlip."); er.offline = true; throw er; }
+  const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
+  if (!r.ok) { const e = new Error((j && j.error) || "Something went wrong (" + r.status + "). Please try again."); e.status = r.status; e.data = j; throw e; }
+  return j;
+}
+const pkOk = async () => { try { return !!(window.PublicKeyCredential && window.isSecureContext && location.protocol !== "file:" && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } };
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+function enterAccount(res, kept) {
+  AUTH = { token: res.token, sid: res.account.sid, account: res.account };
+  const prefs = { theme: S.theme, a11y: S.a11y, textSize: S.textSize, motion: S.motion };
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(acctKey()) || "null"); } catch (e) {}
+  if (saved) S = Object.assign(JSON.parse(S0), saved);
+  else if (kept || (LEG.sid && LEG.sid === res.account.sid)) {   // this device's progress becomes this account's; the device keeps only its settings
+    S = Object.assign(JSON.parse(S0), S); try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {}
+  } else S = Object.assign(JSON.parse(S0), prefs);
+  S.music = false; S.sid = AUTH.sid; delete S.dkey;
+  if (!S.profile && res.account.name) S.pendingName = res.account.name;
+  save(); try { localStorage.setItem(KEY + "-lastuser", res.account.username); } catch (e) {}
+  if (DB && DB.clearCache) DB.clearCache();
+  AUTHV.screen = res.account.must_change ? "newpw" : !res.account.email_verified ? "addemail" : "signin"; AUTHV.msg = ""; AUTHV.data = {};
+  if (AUTHV.screen !== "signin") { const a = AUTH; AUTH = null; AUTHV.pending = a; render(); return; }   // finish the first sign-in steps first
+  finishSignIn();
+}
+function finishSignIn() {
+  if (AUTHV.pending) { AUTH = AUTHV.pending; AUTHV.pending = null; }
+  AUTH_RES(); stack = [{ view: "home" }]; render(); heartbeat();
+  pkOk().then(ok => { if (ok && !localStorage.getItem(KEY + "-pk-" + AUTH.account.id) && !localStorage.getItem(KEY + "-pkno-" + AUTH.account.id)) setTimeout(offerPasskey, 1200); });
+}
+// Is the session still the account's live one? If it was ended (another device, password change), sign out here at once.
+let HB = null, HB_AT = 0;
+async function authCheck() {
+  if (!AUTH || Date.now() - HB_AT < 5000) return; HB_AT = Date.now();
+  try { await authFetch({ action: "check" }); } catch (e) { if (e.status === 401 || e.status === 403) signOut(e.message, true); }
+}
+function heartbeat() { clearInterval(HB); HB = setInterval(authCheck, 60e3); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") authCheck(); });
+async function signOut(msg, already) {
+  if (AUTH && !already) { try { await authFetch({ action: "logout" }); } catch (e) {} }
+  try { sessionStorage.setItem(KEY + "-signout-msg", msg || ""); } catch (e) {}
+  location.reload();   // nothing of the session stays in memory
+}
+function offerPasskey() {
+  if (!AUTH || document.querySelector(".modal")) return;
+  const no = () => { try { localStorage.setItem(KEY + "-pkno-" + AUTH.account.id, "1"); } catch (e) {} m.remove(); };
+  const m = h("div", { class: "modal", id: "pk-offer", role: "dialog", "aria-modal": "true", "aria-labelledby": "pk-h" }, h("div", { class: "box" }, h("h3", { id: "pk-h", style: "margin-top:0;color:var(--navy)" }, "Sign in faster next time?"),
+    h("p", { class: "muted" }, "Use Face ID, your fingerprint or Windows Hello instead of typing your password on this device. Your face or fingerprint never leaves this device."),
+    h("div", { class: "btnrow" }, h("button", { class: "btn ghost", id: "pk-no", onclick: no }, "Not now"), h("button", { class: "btn gold", id: "pk-yes", onclick: () => { m.remove(); setupPasskey(); } }, "Set it up"))));
+  document.body.appendChild(m);
+}
+async function setupPasskey() {
+  try {
+    const { options: o } = await authFetch({ action: "pk_reg_options" });
+    const cred = await navigator.credentials.create({ publicKey: Object.assign({}, o, { challenge: unb64u(o.challenge), user: Object.assign({}, o.user, { id: unb64u(o.user.id) }), excludeCredentials: (o.excludeCredentials || []).map(c => Object.assign({}, c, { id: unb64u(c.id) })) }) });
+    const r = cred.response;
+    await authFetch({ action: "pk_reg_verify", response: { id: cred.id, rawId: b64u(cred.rawId), type: cred.type, clientExtensionResults: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {}, authenticatorAttachment: cred.authenticatorAttachment || undefined,
+      response: { clientDataJSON: b64u(r.clientDataJSON), attestationObject: b64u(r.attestationObject), transports: r.getTransports ? r.getTransports() : undefined } } });
+    try { localStorage.setItem(KEY + "-pk-" + AUTH.account.id, "1"); localStorage.setItem(KEY + "-pkuser-" + AUTH.account.username.toLowerCase(), "1"); } catch (e) {}
+    toast("✅ Next time, sign in with Face ID or your fingerprint."); render();
+  } catch (e) { toast(e.name === "NotAllowedError" ? "Face ID or fingerprint wasn't set up." : "❌ " + (e.message || "Couldn't set it up.")); }
+}
+async function passkeySignIn(username, force) {
+  AUTHV.busy = true; AUTHV.msg = ""; render();
+  try {
+    const o = await authFetch({ action: "pk_auth_options", username });
+    if (!o.available) throw new Error("Face ID or fingerprint isn't set up for this account. Sign in with your password.");
+    const opt = o.options, cred = await navigator.credentials.get({ publicKey: Object.assign({}, opt, { challenge: unb64u(opt.challenge), allowCredentials: (opt.allowCredentials || []).map(c => Object.assign({}, c, { id: unb64u(c.id) })) }) });
+    const r = cred.response, response = { id: cred.id, rawId: b64u(cred.rawId), type: cred.type, clientExtensionResults: {}, response: { clientDataJSON: b64u(r.clientDataJSON), authenticatorData: b64u(r.authenticatorData), signature: b64u(r.signature), userHandle: r.userHandle ? b64u(r.userHandle) : undefined } };
+    AUTHV.data.pkResponse = response;
+    const j = await authFetch({ action: "pk_login", username, response, force: !!force });
+    AUTHV.busy = false; enterAccount(j);
+  } catch (e) { AUTHV.busy = false; if (e.status === 409 && e.data && e.data.elsewhere) { AUTHV.data.elsewhere = Object.assign({ via: "pk", username }, e.data.elsewhere); } else AUTHV.msg = e.name === "NotAllowedError" ? "Face ID or fingerprint was cancelled. Try again or use your password." : e.message; render(); }
+}
+async function passwordSignIn(username, password, force) {
+  AUTHV.busy = true; AUTHV.msg = ""; render();
+  try { const j = await authFetch({ action: "login", username, password, force: !!force }); AUTHV.busy = false; AUTHV.data = {}; enterAccount(j); }
+  catch (e) { AUTHV.busy = false; if (e.status === 409 && e.data && e.data.elsewhere) AUTHV.data.elsewhere = Object.assign({ via: "pw", username, password }, e.data.elsewhere); else AUTHV.msg = e.message; render(); }
+}
+function pwField(id, label, auto) {
+  return h("label", { class: "authf" }, h("span", {}, label), h("input", { class: "field", id, type: "password", inputmode: "numeric", pattern: "[0-9]*", maxlength: "9", autocomplete: auto, "aria-describedby": id + "-hint",
+    oninput: e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9); } }), h("small", { class: "muted", id: id + "-hint" }, "9 digits"));
+}
+function renderAuth() {
+  const app = document.getElementById("app"); app.innerHTML = ""; bottom(null);
+  document.getElementById("back").style.display = "none"; document.getElementById("side").innerHTML = ""; document.getElementById("crumbs").innerHTML = "";
+  const titles = { signin: "Sign in", signup: "Create your account", forgot: "Reset your password", newpw: "Choose your password", addemail: "Add your email" };
+  document.getElementById("title").textContent = titles[AUTHV.screen] || "Sign in"; document.title = (titles[AUTHV.screen] || "Sign in") + " · " + CFG.short;
+  let m0 = ""; try { m0 = sessionStorage.getItem(KEY + "-signout-msg") || ""; sessionStorage.removeItem(KEY + "-signout-msg"); } catch (e) {} if (m0 && !AUTHV.msg) AUTHV.msg = m0;
+  const box = h("div", { class: "card authbox", role: "form", "aria-labelledby": "auth-h" });
+  box.appendChild(h("div", { class: "authlogo", "aria-hidden": "true" }, "⚗️"));
+  box.appendChild(h("h2", { id: "auth-h" }, titles[AUTHV.screen]));
+  const msg = h("p", { id: "auth-msg", role: "alert", class: AUTHV.msg ? "authmsg" : "", style: AUTHV.msg ? "" : "display:none" }, AUTHV.msg || "");
+  if (navigator.onLine === false) box.appendChild(h("p", { class: "authmsg", id: "auth-offline" }, "📡 You're offline. ChemFlip needs the internet to sign in."));
+  const sc = AUTHV.screen;
+  if (AUTHV.data.elsewhere) {   // signed in somewhere else: offer to sign that device out
+    const o = AUTHV.data.elsewhere;
+    box.appendChild(h("p", { id: "auth-elsewhere" }, "Your account is signed in on " + o.device + ". ChemFlip can be used on one device at a time."));
+    box.appendChild(h("p", { class: "muted" }, "Sign out the other device and continue here? Anything not yet saved there may be lost."));
+    box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn gold", id: "auth-force", onclick: () => { AUTHV.data.elsewhere = null; o.via === "pk" ? passkeySignIn(o.username, true) : passwordSignIn(o.username, o.password, true); } }, "Sign out the other device"),
+      h("button", { class: "btn ghost", id: "auth-cancel", onclick: () => { AUTHV.data = {}; render(); } }, "Cancel")));
+  } else if (sc === "signin") {
+    const last = (() => { try { return localStorage.getItem(KEY + "-lastuser") || ""; } catch (e) { return ""; } })();
+    const u = h("input", { class: "field", id: "auth-user", autocomplete: "username", autocapitalize: "none", spellcheck: "false", value: AUTHV.data.user || last });
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Username"), u));
+    box.appendChild(pwField("auth-pw", "Password", "current-password"));
+    const go = () => { const p = document.getElementById("auth-pw").value; AUTHV.data.user = u.value.trim(); if (!u.value.trim() || p.length !== 9) { AUTHV.msg = "Enter your username and your 9-digit password."; render(); return; } passwordSignIn(u.value.trim(), p); };
+    box.appendChild(msg);
+    box.appendChild(h("button", { class: "btn gold wide", id: "auth-go", disabled: AUTHV.busy, onclick: go }, AUTHV.busy ? "Signing in…" : "Sign in"));
+    const pkBtn = h("button", { class: "btn sec2 wide", id: "auth-pk", style: "display:none;margin-top:8px", onclick: () => { const n = u.value.trim(); if (!n) { AUTHV.msg = "Enter your username first."; render(); return; } AUTHV.data.user = n; passkeySignIn(n); } }, "Sign in with Face ID or fingerprint");
+    box.appendChild(pkBtn);
+    const showPk = () => pkOk().then(ok => { let has = false; try { has = !!localStorage.getItem(KEY + "-pkuser-" + u.value.trim().toLowerCase()); } catch (e) {} pkBtn.style.display = ok && has ? "" : "none"; });
+    u.addEventListener("input", showPk); showPk();
+    box.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+    box.appendChild(h("div", { class: "authlinks" }, h("button", { class: "linkbtn", id: "auth-forgot", onclick: () => { AUTHV.screen = "forgot"; AUTHV.msg = ""; AUTHV.data = { who: u.value.trim() }; render(); } }, "Forgot your password?"),
+      h("button", { class: "linkbtn", id: "auth-new", onclick: () => { AUTHV.screen = "signup"; AUTHV.msg = ""; AUTHV.data = {}; render(); } }, "New to ChemFlip? Create an account")));
+    if (LEG.sid && !last) box.appendChild(h("p", { class: "muted", id: "auth-keep", style: "font-size:13px" }, "Used ChemFlip on this device before? Create an account here and your progress, classes and grades stay with you."));
+  } else if (sc === "signup") {
+    const d = AUTHV.data;
+    const name = h("input", { class: "field", id: "su-name", autocomplete: "name", value: d.name || "" });
+    const u = h("input", { class: "field", id: "su-user", autocomplete: "username", autocapitalize: "none", spellcheck: "false", value: d.user || "", "aria-describedby": "su-user-hint" });
+    const uh = h("small", { class: "muted", id: "su-user-hint" }, "3 to 24 letters or numbers, starting with a letter. Others may see it.");
+    let ut = null; u.addEventListener("input", () => { clearTimeout(ut); ut = setTimeout(async () => { if (u.value.trim().length < 3) return; try { const j = await authFetch({ action: "username", username: u.value.trim() }); uh.textContent = j.ok ? "✅ Available" : "❌ " + j.why; } catch (e) {} }, 400); });
+    const em = h("input", { class: "field", id: "su-email", type: "email", autocomplete: "email", value: d.email || "" });
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Your name"), name));
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Username"), u, uh));
+    box.appendChild(pwField("su-pw", "Password (choose 9 digits)", "new-password"));
+    box.appendChild(pwField("su-pw2", "Type the password again", "new-password"));
+    box.appendChild(h("p", { class: "muted", style: "font-size:12.5px;margin:2px 0 8px" }, "Avoid easy ones like 123456789 or repeated digits; ChemFlip won't accept them."));
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Email (for your code and to reset your password)"), em));
+    const keep = () => { d.name = name.value.trim(); d.user = u.value.trim(); d.email = em.value.trim(); d.pw = document.getElementById("su-pw").value; d.pw2 = document.getElementById("su-pw2").value; };
+    if (!d.sent) {
+      box.appendChild(msg);
+      box.appendChild(h("button", { class: "btn gold wide", id: "su-send", disabled: AUTHV.busy, onclick: async () => { keep();
+        if (!d.name || !d.user || !d.email) { AUTHV.msg = "Fill in your name, a username and your email."; render(); return; }
+        if (!/^\d{9}$/.test(d.pw) || d.pw !== d.pw2) { AUTHV.msg = d.pw !== d.pw2 ? "The two passwords don't match." : "The password must be exactly 9 digits."; render(); return; }
+        AUTHV.busy = true; render();
+        try { await authFetch({ action: "signup_code", email: d.email }); d.sent = true; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } AUTHV.busy = false; render(); } }, AUTHV.busy ? "Sending…" : "Email me a code"));
+    } else {
+      setTimeout(() => { const a = document.getElementById("su-pw"), b2 = document.getElementById("su-pw2"); if (a) a.value = d.pw || ""; if (b2) b2.value = d.pw2 || ""; }, 0);
+      const code = h("input", { class: "field code", id: "su-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
+      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code sent to " + d.email), code)); box.appendChild(msg);
+      box.appendChild(h("button", { class: "btn gold wide", id: "su-go", disabled: AUTHV.busy, onclick: async () => { keep();
+        if (d.pw !== d.pw2) { AUTHV.msg = "The two passwords don't match."; render(); return; }
+        AUTHV.busy = true; render();
+        try { const j = await authFetch({ action: "signup", name: d.name, username: d.user, password: d.pw, email: d.email, code: code.value.trim(), legacy_sid: LEG.sid || undefined, legacy_key: LEG.dkey || undefined });
+          AUTHV.busy = false; AUTHV.data = {}; toast("🎉 Welcome to ChemFlip, " + d.name.split(" ")[0] + "! Your ID code is " + j.account.id_code + "."); enterAccount(j, j.kept); }
+        catch (e) { AUTHV.busy = false; AUTHV.msg = e.message; render(); } } }, AUTHV.busy ? "Creating…" : "Create my account"));
+      box.appendChild(h("button", { class: "linkbtn", id: "su-resend", onclick: () => { d.sent = false; keep(); render(); } }, "Change the email or send a new code"));
+    }
+    box.appendChild(h("div", { class: "authlinks" }, h("button", { class: "linkbtn", id: "su-back", onclick: () => { AUTHV.screen = "signin"; AUTHV.msg = ""; AUTHV.data = {}; render(); } }, "I already have an account")));
+  } else if (sc === "forgot") {
+    const d = AUTHV.data, w = h("input", { class: "field", id: "fg-who", autocomplete: "username", value: d.who || "" });
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Your username or email"), w));
+    if (!d.sent) {
+      box.appendChild(msg);
+      box.appendChild(h("button", { class: "btn gold wide", id: "fg-send", disabled: AUTHV.busy, onclick: async () => { d.who = w.value.trim(); if (!d.who) return; AUTHV.busy = true; render();
+        try { const j = await authFetch({ action: "reset_code", who: d.who }); d.sent = true; d.to = j.sent_to; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } AUTHV.busy = false; render(); } }, "Email me a code"));
+    } else {
+      box.appendChild(h("p", { class: "muted", id: "fg-sent" }, d.to ? "We sent a code to " + d.to + "." : "If that account has a confirmed email, we sent it a code. No email? Ask your instructor or write to chemflipp@gmail.com."));
+      const code = h("input", { class: "field code", id: "fg-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
+      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code"), code));
+      box.appendChild(pwField("fg-pw", "New password (9 digits)", "new-password")); box.appendChild(pwField("fg-pw2", "Type it again", "new-password")); box.appendChild(msg);
+      box.appendChild(h("button", { class: "btn gold wide", id: "fg-go", disabled: AUTHV.busy, onclick: async () => { const p = document.getElementById("fg-pw").value, p2 = document.getElementById("fg-pw2").value;
+        if (p !== p2) { AUTHV.msg = "The two passwords don't match."; render(); return; }
+        AUTHV.busy = true; render();
+        try { const j = await authFetch({ action: "reset", who: d.who, code: code.value.trim(), password: p }); AUTHV.busy = false; AUTHV.screen = "signin"; AUTHV.data = { user: j.username }; AUTHV.msg = ""; toast("✅ Password changed. Sign in with the new one."); render(); }
+        catch (e) { AUTHV.busy = false; AUTHV.msg = e.message; render(); } } }, "Save the new password"));
+    }
+    box.appendChild(h("div", { class: "authlinks" }, h("button", { class: "linkbtn", id: "fg-back", onclick: () => { AUTHV.screen = "signin"; AUTHV.msg = ""; AUTHV.data = {}; render(); } }, "Back to sign in")));
+  } else if (sc === "newpw") {   // first sign-in with a temporary password from the instructor
+    box.appendChild(h("p", { class: "muted" }, "Your instructor made this account with a temporary password. Choose your own 9-digit password; only you will know it."));
+    box.appendChild(pwField("np-pw", "New password (9 digits)", "new-password")); box.appendChild(pwField("np-pw2", "Type it again", "new-password")); box.appendChild(msg);
+    box.appendChild(h("button", { class: "btn gold wide", id: "np-go", disabled: AUTHV.busy, onclick: async () => { const p = document.getElementById("np-pw").value, p2 = document.getElementById("np-pw2").value;
+      if (p !== p2) { AUTHV.msg = "The two passwords don't match."; render(); return; }
+      AUTHV.busy = true; render(); const a = AUTHV.pending; AUTH = a;
+      try { await authFetch({ action: "change_password", password: p }); AUTH = null; a.account.must_change = false; AUTHV.busy = false; AUTHV.msg = ""; AUTHV.screen = a.account.email_verified ? "signin" : "addemail"; if (AUTHV.screen === "signin") finishSignIn(); else render(); }
+      catch (e) { AUTH = null; AUTHV.busy = false; AUTHV.msg = e.message; render(); } } }, "Save my password"));
+  } else if (sc === "addemail") {
+    const d = AUTHV.data, em = h("input", { class: "field", id: "ae-email", type: "email", autocomplete: "email", value: d.email || "" });
+    box.appendChild(h("p", { class: "muted" }, "Add an email so you can reset your password if you forget it."));
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Email"), em));
+    const withAuth = async (f) => { const a = AUTHV.pending; AUTH = a; try { return await f(); } finally { AUTH = null; } };
+    if (!d.sent) { box.appendChild(msg); box.appendChild(h("button", { class: "btn gold wide", id: "ae-send", onclick: async () => { d.email = em.value.trim(); try { await withAuth(() => authFetch({ action: "email_code", email: d.email })); d.sent = true; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } render(); } }, "Email me a code")); }
+    else { const code = h("input", { class: "field code", id: "ae-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
+      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code sent to " + d.email), code)); box.appendChild(msg);
+      box.appendChild(h("button", { class: "btn gold wide", id: "ae-go", onclick: async () => { try { const j = await withAuth(() => authFetch({ action: "email_verify", email: d.email, code: code.value.trim() })); AUTHV.pending.account = Object.assign(AUTHV.pending.account, j.account); AUTHV.data = {}; AUTHV.msg = ""; finishSignIn(); } catch (e) { AUTHV.msg = e.message; render(); } } }, "Confirm")); }
+  }
+  app.appendChild(h("div", { class: "authwrap" }, box, h("p", { class: "muted authfoot" }, "ChemFlip works on one device at a time. Signing in here signs out your other device. Nothing is remembered after you close ChemFlip.")));
+  const first = app.querySelector("input:not([value]), input[value='']") || app.querySelector("input"); if (first && !AUTHV.busy) setTimeout(() => { try { first.focus(); } catch (e) {} }, 0);
+}
+// Settings → Your account
+function accountCard() {
+  if (!AUTH) return h("div");
+  const a = AUTH.account, c = h("div", { class: "card", id: "acct-card" }, h("b", {}, "👤 Your account"));
+  c.appendChild(h("div", { class: "kv", id: "acct-info" }, h("div", {}, "Username: ", h("b", {}, a.username)), h("div", {}, "ID code: ", h("b", { id: "acct-id" }, a.id_code), h("span", { class: "muted" }, " (give this to your instructor if asked)")),
+    h("div", {}, "Email: ", a.email || "none", a.email_verified ? " ✓" : "")));
+  const row = h("div", { class: "btnrow" },
+    h("button", { class: "btn sec2 small", id: "acct-pw", onclick: () => pwSheet() }, "Change password"),
+    h("button", { class: "btn ghost small", id: "acct-out", onclick: () => signOut("You signed out.") }, "Sign out"));
+  c.appendChild(row);
+  const pk = h("div", { id: "acct-pk", style: "margin-top:8px" }); c.appendChild(pk);
+  pkOk().then(ok => { if (!ok) { pk.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "Face ID and fingerprint sign-in work in ChemFlip on chemflip.org in a browser that supports them.")); return; }
+    authFetch({ action: "pk_list" }).then(j => { pk.innerHTML = "";
+      pk.appendChild(h("div", { class: "muted", style: "font-size:13px" }, j.passkeys.length ? "Face ID / fingerprint sign-in is on for: " + j.passkeys.map(p => p.device_label || "a device").join(", ") : "Face ID / fingerprint sign-in is off."));
+      const r2 = h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "acct-pk-add", onclick: setupPasskey }, "Use Face ID or fingerprint on this device"));
+      j.passkeys.forEach(p => r2.appendChild(h("button", { class: "btn ghost small", onclick: async () => { await authFetch({ action: "pk_remove", id: p.id }); try { localStorage.removeItem(KEY + "-pk-" + AUTH.account.id); localStorage.removeItem(KEY + "-pkuser-" + AUTH.account.username.toLowerCase()); } catch (e) {} toast("Removed."); render(); } }, "Remove (" + (p.device_label || "device") + ")")));
+      pk.appendChild(r2); }).catch(() => {}); });
+  return c;
+}
+function pwSheet() {
+  const o = h("input", { class: "field", id: "cp-old", type: "password", inputmode: "numeric", maxlength: "9", autocomplete: "current-password", "aria-label": "Current password" });
+  const n = h("input", { class: "field", id: "cp-new", type: "password", inputmode: "numeric", maxlength: "9", autocomplete: "new-password", "aria-label": "New password" });
+  const m = h("p", { class: "muted", id: "cp-msg", role: "status" });
+  const wrap = h("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "cp-h" }, h("div", { class: "card" }, h("h3", { id: "cp-h" }, "Change password"), h("label", { class: "authf" }, h("span", {}, "Current password"), o), h("label", { class: "authf" }, h("span", {}, "New password (9 digits)"), n), m,
+    h("div", { class: "btnrow" }, h("button", { class: "btn gold", id: "cp-go", onclick: async () => { try { await authFetch({ action: "change_password", old: o.value, password: n.value }); wrap.remove(); toast("✅ Password changed. Your other devices are signed out."); } catch (e) { m.textContent = "❌ " + e.message; } } }, "Change"),
+      h("button", { class: "btn ghost", onclick: () => wrap.remove() }, "Cancel"))));
+  document.body.appendChild(wrap); setTimeout(() => o.focus(), 0);
+}
+// Instructors: accounts for students who don't have one yet (temporary passwords; each student picks their own at first sign-in)
+VIEWS.bulkacc = function (c) {
+  document.getElementById("title").textContent = "Student accounts";
+  const box = h("div", { class: "card" }, h("b", {}, "🔑 Create accounts for " + c.name),
+    h("p", { class: "muted" }, "One student per line: name, then (optional) email and student ID, separated by commas. Each student gets a username and a temporary 9-digit password, and chooses their own password the first time they sign in. Students who already have an account can join with the class code instead."));
+  const ta = h("textarea", { class: "field", id: "ba-list", rows: "8", "aria-label": "Students, one per line", placeholder: "María Pérez, maria@school.edu, A1234\nLee Chen" });
+  const out = h("div", { id: "ba-out" }), msg = h("p", { class: "muted", id: "ba-msg", role: "status" });
+  box.appendChild(ta); box.appendChild(msg);
+  box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn gold", id: "ba-go", onclick: async (e) => {
+    const students = ta.value.split(/\n/).map(l => l.split(",").map(x => x.trim())).filter(x => x[0]).map(x => ({ name: x[0], email: x[1] || "", stu_id: x[2] || "" }));
+    if (!students.length) { msg.textContent = "Add at least one name."; return; } if (students.length > 200) { msg.textContent = "Up to 200 students at a time."; return; }
+    e.target.disabled = true; msg.textContent = "Creating " + students.length + " account" + (students.length > 1 ? "s" : "") + "…";
+    try { const j = await authFetch({ action: "bulk_create", class_code: c.code, students }); msg.textContent = "✅ Done. Give each student their username and temporary password. They're shown only now, so download or print the list.";
+      const rows = j.accounts; out.innerHTML = "";
+      out.appendChild(h("div", { style: "overflow-x:auto" }, h("table", { class: "t", id: "ba-table" }, h("caption", { class: "sr-only" }, "New student accounts"), h("tr", {}, ...["Student", "Username", "Temporary password", "ID code"].map(t => h("th", { scope: "col" }, t))),
+        ...rows.map(r => h("tr", {}, h("td", {}, r.name), h("td", {}, r.username || "—"), h("td", { style: "font-family:monospace" }, r.password || r.error || ""), h("td", {}, r.id_code || ""))))));
+      const csv = "Student,Username,Temporary password,ID code\n" + rows.map(r => [r.name, r.username || "", r.password || "", r.id_code || ""].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
+      out.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "ba-csv", onclick: () => saveFile("ChemFlip accounts " + c.name + ".csv", csv, "text/csv") }, "Download the list (CSV)"), h("button", { class: "btn ghost", onclick: () => window.print() }, "Print")));
+      DB.clearCache && DB.clearCache();
+    } catch (err) { msg.textContent = "❌ " + err.message; } e.target.disabled = false; } }, "Create accounts")));
+  app.appendChild(box); app.appendChild(out);
+};
+
 /* ---------- class backend (Supabase REST; local demo when not configured) ---------- */
-function devKey() { if (!S.dkey) { const b = new Uint8Array(24); crypto.getRandomValues(b); S.dkey = Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); save(); } return S.dkey; }
-function sid() { if (!S.sid) { S.sid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); save(); } return S.sid; }
+// 5.0: once signed in, the account's ChemFlip identity and its session token are what every service sees.
+function devKey() { if (AUTH) return AUTH.token; if (!S.dkey) { const b = new Uint8Array(24); crypto.getRandomValues(b); S.dkey = Array.from(b, x => x.toString(16).padStart(2, "0")).join(""); save(); } return S.dkey; }
+function sid() { if (AUTH) return AUTH.sid; if (!S.sid) { S.sid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); save(); } return S.sid; }
+// Requests made before sign-in (start-up checks, links opened from email or Canvas) wait until the person signs in.
+let AUTH_RES = null, AUTH_WAIT = new Promise(r => AUTH_RES = r);
+const signedIn = () => (AUTH || !authOn()) ? Promise.resolve() : AUTH_WAIT;   // builds without sign-in (tests) never wait
 const DB = (() => {
   if (CFG.sb && CFG.sb.url && CFG.sb.key) {
     // 4.2.1: every class, game, leaderboard and code request goes through the ChemFlip service (edge function "cf"),
@@ -3814,10 +4094,11 @@ const DB = (() => {
     const REG = CFG.sb.region === false ? "" : "?forceFunctionRegion=" + (CFG.sb.region || "us-west-2");
     let regOk = true;
     const raw = async (body) => {
+      await signedIn();
       const send = (q) => fetch(CF + q, { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.sb.key, "x-cf-sid": sid(), "x-cf-key": devKey() }, body: JSON.stringify(body) });
       let r; try { r = await send(regOk ? REG : ""); } catch (e) { if (!regOk || !REG) throw e; regOk = false; r = await send(""); }
       const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
-      if (!r.ok) { const e = new Error((j && j.error) || t || r.status); e.status = r.status; throw e; }
+      if (!r.ok) { if (r.status === 401 && AUTH) authCheck(); const e = new Error((j && j.error) || t || r.status); e.status = r.status; throw e; }
       return j;
     };
     // 5.0 speed: screens that only read show the last answer at once and refresh it in the background (stale-while-revalidate).
@@ -4487,19 +4768,21 @@ function coursesCard() {
     const live = (j.courses || []).filter(c => !c.archived_at), arch = (j.courses || []).filter(c => c.archived_at);
     live.forEach(c => { const secs = j.sections.filter(k => k.course_id === c.id);
       body.appendChild(h("div", { class: "crs", id: "crs-" + c.id, style: "margin:10px 0 4px" }, h("div", { style: "display:flex;align-items:center;gap:8px" }, h("b", { style: "flex:1" }, "📘 " + c.name + (c.term ? " · " + c.term : "")),
-        h("button", { class: "btn ghost small", id: "crs-edit-" + c.id, onclick: () => courseSheet(c) }, "Edit")),
+        h("button", { class: "btn ghost small", id: "crs-edit-" + c.id, onclick: () => courseEditSheet(c) }, "Edit")),
         secs.length ? secs.sort((a, b) => String(a.section || a.name).localeCompare(String(b.section || b.name))).map(secRow) : h("div", { class: "muted" }, "No sections yet. Open a class below and choose this course in its settings."))); });
     const loose = j.sections.filter(k => !k.course_id || !live.some(c => c.id === k.course_id));
     if (loose.length) body.appendChild(h("div", { style: "margin-top:10px" }, h("b", {}, live.length ? "Classes not in a course" : "Your classes"), loose.map(secRow)));
     if (!j.sections.length && !live.length) body.appendChild(h("p", { class: "muted" }, "No classes yet. Create your first class below."));
     if (arch.length) body.appendChild(h("details", { style: "margin-top:8px" }, h("summary", { class: "muted" }, "Archived courses (" + arch.length + ")"), arch.map(c => h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:6px" }, h("span", { style: "flex:1" }, c.name + (c.term ? " · " + c.term : "")),
       h("button", { class: "btn ghost small", id: "crs-restore-" + c.id, onclick: async () => { await courseCall({ action: "course_archive", id: c.id, restore: true }); render(); } }, "Restore")))));
-    body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "new-course", onclick: () => courseSheet(null) }, "➕ New course")));
+    body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "new-course", onclick: () => courseEditSheet(null) }, "➕ New course")));
   }).catch(e => { body.innerHTML = ""; body.appendChild(h("div", { class: "muted" }, e.status === 0 ? e.message : "❌ Couldn't load your courses. Check your connection. Your classes on this device are listed below."));
     const mc = document.getElementById("my-classes"); if (mc) mc.style.display = ""; });
   return card;
 }
-function courseSheet(c) {
+// Instructor: create or edit a course (a group of sections). Not the chemistry subject picker (courseSheet), which this
+// function used to override by sharing its name: "Change course" opened Save / Archive instead of the subjects (fixed 5.0).
+function courseEditSheet(c) {
   sheet("course-sheet", c ? "Edit course" : "New course", (box, close) => {
     const nm = h("input", { class: "field", id: "course-name", placeholder: "Course, e.g. CHEM 120 — Introductory Chemistry", maxlength: "120", "aria-label": "Course name" }); nm.value = c ? c.name : "";
     const tm = h("input", { class: "field", id: "course-term", placeholder: "Term, e.g. Spring 2027 (optional)", maxlength: "60", style: "margin-top:8px", "aria-label": "Term" }); tm.value = c && c.term ? c.term : "";
@@ -4516,6 +4799,8 @@ function classAdminCards(c) {
   const wrap = h("div", { id: "class-admin" });
   if (!DB || !DB.live || !DB.call) return wrap;
   const req = h("div", { class: "card", id: "join-requests", style: "display:none" }); wrap.appendChild(req);
+  if (AUTH) wrap.appendChild(h("div", { class: "card", id: "acct-make" }, h("b", {}, "🔑 Student accounts"), h("p", { class: "muted", style: "margin:4px 0" }, "Students need a ChemFlip account. They can create their own, or you can create accounts for the whole class."),
+    h("button", { class: "btn sec2 small", id: "open-bulkacc", onclick: () => go("bulkacc", c) }, "Create accounts for students")));
   const set = h("details", { class: "card", id: "class-settings" }, h("summary", { style: "cursor:pointer" }, h("b", {}, "⚙️ Class settings, course and invite link")));
   wrap.appendChild(set);
   const drawReq = () => courseCall({ action: "requests", class_code: c.code }).then(j => {
@@ -6984,6 +7269,7 @@ async function noticesHistory() {
   try { if (location.hash === "#notices") { history.replaceState(null, "", location.pathname + location.search); setTimeout(() => { if (S.profile) { go("settings"); setTimeout(() => { const c = document.getElementById("notices-card"); if (c) c.scrollIntoView({ block: "start" }); }, 150); } }, 160); } } catch (e) {}
 })();
 VIEWS.settings = function () {
+  if (AUTH) app.appendChild(accountCard());
   { const rc = remSettingsCard(); if (rc) app.appendChild(rc); }
   { const nc = noticesCard(); if (nc) app.appendChild(nc); }
   app.appendChild(h("div", { class: "card", id: "sync-card" }, h("b", {}, "☁️ Sync across devices"), h("p", { class: "muted" }, S.acct && S.acct.email ? "Signed in as " + S.acct.email + (S.syncAt ? " · last synced " + new Date(S.syncAt).toLocaleString() : "") : "Sign in with your e-mail to continue on any device (Windows, Mac, iPhone, Android, web)."), h("button", { class: "btn small", id: "sync-btn", onclick: acctSheet }, S.acct && S.acct.email ? "Manage sync" : "☁️ Turn on sync")));
