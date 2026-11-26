@@ -342,6 +342,21 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 body.signedout #side, body.signedout #searchbtn, body.signedout #helpbtn, body.signedout #plan, body.signedout #crumbs, body.signedout #musicbtn, body.signedout #sfxbtn { display: none !important; }
 body.signedout .wrap { margin-left: auto !important; }
 .authwrap { max-width: 440px; margin: 24px auto; }
+.stpick { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; align-items: end; }
+.stpick-row { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; min-width: 0; }
+.stpick-row select { width: 100%; }
+#study-switch { margin-bottom: 10px; }
+.fc-wrap { max-width: 720px; margin: 0 auto; }
+.fc-count { font-size: 13px; color: var(--grey); margin: 2px 0 6px; }
+.fcard { min-height: 240px; border-radius: 16px; border: 1px solid var(--hair); background: var(--card); padding: 22px 24px; cursor: pointer; box-shadow: 0 2px 10px rgba(14,40,65,.06); display: flex; flex-direction: column; justify-content: center; }
+.fcard.flipped { border-color: var(--teal); }
+.fc-lab { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--grey); margin-bottom: 8px; }
+.fc-q { font-size: 18px; line-height: 1.5; }
+.fc-ans { font-size: 20px; font-weight: 700; color: var(--teal); margin-bottom: 8px; }
+.fc-why { line-height: 1.5; }
+.fc-tip { font-size: 12.5px; margin-top: 14px; }
+.fc-nav { justify-content: center; }
+@media (prefers-reduced-motion: no-preference) { .fcard.flipped { animation: fcflip .28s ease-out; } @keyframes fcflip { from { transform: rotateY(90deg); } to { transform: none; } } }
 .mailst { font-size: 13.5px; line-height: 1.45; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--hair); margin: 4px 0 10px; }
 .mailst.ok { border-color: var(--ok); }
 .mailst.warn { border-color: var(--gold, #b8860b); }
@@ -604,7 +619,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { bulkacc: "Student accounts", accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { flash: "Flashcards", practice: "Practice Questions", bulkacc: "Student accounts", accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 let RENDER_N = 0, RENDER_AT = 0, LAST_INPUT = 0;
 ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { LAST_INPUT = performance.now(); }, true));
 function render() {
@@ -700,6 +715,8 @@ function renderSide() {
     side.appendChild(g2);
   } else {
   g1.appendChild(navItem("home", "home", "Home", reset("home"), { on: v === "home" }));
+  g1.appendChild(navItem("flash", "book", "Flashcards", reset("flash"), { on: v === "flash" }));
+  g1.appendChild(navItem("practice", "pen", "Practice Questions", reset("practice"), { on: v === "practice" || v === "chapter" }));
   g1.appendChild(navItem("exam", "exam", "Practice exam", reset("exam"), { on: v === "exam" }));
   g1.appendChild(navItem("progress", "chart", "My progress", reset("progress"), { on: v === "progress" }));
   g1.appendChild(navItem("calendar", "cal", "Calendar", reset("calendar"), { on: v === "calendar" }));
@@ -921,7 +938,8 @@ VIEWS.chapter = function (n) {
     h("button", { class: "btn sec2", id: "start-new", disabled: !unanswered.length, onclick: () => startQuiz(o.shuffle ? shuffle(unanswered) : unanswered, c.title, { ch: n }) }, "✨ Only new (" + unanswered.length + ")")));
   card.appendChild(h("div", { class: "btnrow" },
     h("button", { class: "btn sec2", id: "rev-" + n, disabled: !wrong.length, onclick: () => startQuiz(wrong.map(id => QBYID[id]), "Mistakes · " + c.title, { ch: n, review: true }) }, "🔁 Review mistakes (" + wrong.length + ")"),
-    h("button", { class: "btn ghost", id: "res-" + n, disabled: !s.done, onclick: () => go("results", { ch: n, all: true }) }, "📊 Chapter results")));
+    h("button", { class: "btn ghost", id: "res-" + n, disabled: !s.done, onclick: () => go("results", { ch: n, all: true }) }, "📊 Chapter results"),
+    h("button", { class: "btn ghost", id: "ch-flash-" + n, onclick: () => { const so = studySel(); so.ch = n; so.tp = ""; save(); go("flash"); } }, "🃏 Flashcards")));
   app.appendChild(card);
   if (!prem && !freeChapters().includes(n)) app.appendChild(lockCard(cqs(c).length - avail.length));
   const tc = h("div", { class: "card" }, h("b", {}, "🧩 Topics in this chapter"));
@@ -938,6 +956,126 @@ function lockCard(nLocked) {
     h("p", { class: "muted" }, "Free: the first " + CFG.freeChapters + " chapters of your course in full, plus the " + CFG.freePer + " easiest questions of every other chapter."),
     h("button", { class: "btn gold", onclick: () => go("premium") }, "💎 Unlock Premium"));
 }
+
+/* ---------- 5.0: Flashcards and Practice Questions (separate sections; the same subject, chapter and topic in both) ----------
+   Flashcards are made from the question bank: the question on the front, the correct answer with its explanation on the back.
+   Mechanism-drawing questions stay in Practice. Flashcard study never changes scores or mastery (only Practice does). */
+function studySel() {   // this course's chosen chapter and topic, remembered per course (and per account, since S is)
+  const cid = course().id; S.study = S.study || {}; const chs = CH();
+  let o = S.study[cid]; if (!o || !chs.some(c => c.n === o.ch)) { const lc = lastChapter(chs) || chs[0]; o = S.study[cid] = { ch: lc ? lc.n : null, tp: "" }; }
+  const c = CHBYN[o.ch]; if (o.tp && !(c && c.topics.includes(o.tp))) o.tp = "";
+  return o;
+}
+function studyPicker(onChange) {   // subject · chapter · topic, shared by both sections
+  const o = studySel(), chs = CH(), c = CHBYN[o.ch];
+  const subj = CFG.courses.length > 1 ? h("button", { class: "btn sec2 small", id: "st-course", onclick: courseSheet, "aria-label": "Chemistry subject: " + course().name + ". Change" }, course().name + " ▾") : h("b", {}, course().name);
+  const chSel = h("select", { class: "field", id: "st-ch", "aria-label": "Chapter", onchange: e => { o.ch = +e.target.value || e.target.value; o.tp = ""; save(); onChange(); } },
+    ...chs.map((x, i) => h("option", { value: x.n, selected: x.n === o.ch }, "Ch " + (i + 1) + " · " + x.title)));
+  const tpSel = h("select", { class: "field", id: "st-tp", "aria-label": "Topic", onchange: e => { o.tp = e.target.value; save(); onChange(); } },
+    h("option", { value: "" }, "All topics"), ...(c ? c.topics.filter(tp => cqs(c).some(q => q.tp === tp)).map(tp => h("option", { value: tp, selected: tp === o.tp }, tp)) : []));
+  return h("div", { class: "card stpick", id: "study-pick" },
+    h("div", { class: "stpick-row" }, h("span", { class: "muted" }, "Subject"), subj),
+    h("label", { class: "stpick-row" }, h("span", { class: "muted" }, "Chapter"), chSel),
+    h("label", { class: "stpick-row" }, h("span", { class: "muted" }, "Topic"), tpSel));
+}
+function studyQs(o) { const c = CHBYN[o.ch]; return c ? cqs(c).filter(q => !o.tp || q.tp === o.tp) : []; }
+function studySwitch(to) {   // Flashcards <-> Practice Questions, keeping subject, chapter and topic
+  return h("div", { class: "seg", id: "study-switch", role: "tablist", "aria-label": "Study mode" },
+    h("button", { role: "tab", class: to === "flash" ? "on" : "", "aria-selected": String(to === "flash"), id: "sw-flash", onclick: () => { if (cur().view !== "flash") { stack[stack.length - 1] = { view: "flash" }; render(); } } }, "Flashcards"),
+    h("button", { role: "tab", class: to === "practice" ? "on" : "", "aria-selected": String(to === "practice"), id: "sw-practice", onclick: () => { if (cur().view !== "practice") { stack[stack.length - 1] = { view: "practice" }; render(); } } }, "Practice Questions"));
+}
+const FC = { flipped: false };
+function fcState(o, mode, shuf) {   // the deck for this subject/chapter/topic/mode, kept so studying resumes where it stopped
+  S.fcDeck = S.fcDeck || {}; S.fc = S.fc || {}; S.fcHard = S.fcHard || [];
+  const key = course().id + "|" + o.ch + "|" + (o.tp || "*") + "|" + mode;
+  let all = studyQs(o).filter(q => !q.mk && !q.custom && canUse(q) && Array.isArray(q.o) && q.o[q.a] != null);
+  if (mode === "hard") all = all.filter(q => S.fcHard.includes(q.id));
+  else if (mode === "new") all = all.filter(q => !S.fc[q.id]);
+  else if (mode === "studied") all = all.filter(q => S.fc[q.id]);
+  const ids = all.map(q => q.id); let d = S.fcDeck[key];
+  const same = d && d.ids.length === ids.length && d.ids.every(id => ids.includes(id));
+  if (!same || d.shuf !== !!shuf) { d = S.fcDeck[key] = { ids: shuf ? shuffle(ids) : ids, i: d && same ? Math.min(d.i, ids.length - 1) : 0, shuf: !!shuf }; }
+  if (d.i >= d.ids.length) d.i = Math.max(0, d.ids.length - 1);
+  const keys = Object.keys(S.fcDeck); if (keys.length > 60) keys.slice(0, keys.length - 60).forEach(k => delete S.fcDeck[k]);
+  return { key, d, locked: studyQs(o).filter(q => !q.mk && !canUse(q)).length };
+}
+VIEWS.flash = function () {
+  const o = studySel(); S.fcOpt = Object.assign({ mode: "all", shuf: false }, S.fcOpt || {}); const opt = S.fcOpt;
+  document.getElementById("title").textContent = "Flashcards";
+  app.appendChild(studySwitch("flash"));
+  app.appendChild(studyPicker(() => { FC.flipped = false; render(); }));
+  const st = fcState(o, opt.mode, opt.shuf), d = st.d, n = d.ids.length;
+  const studiedN = studyQs(o).filter(q => S.fc[q.id]).length, hardN = studyQs(o).filter(q => S.fcHard.includes(q.id)).length;
+  const modes = h("div", { class: "seg", id: "fc-modes", role: "group", "aria-label": "Which cards" });
+  [["all", "All cards"], ["new", "Not studied yet"], ["hard", "Difficult (" + hardN + ")"], ["studied", "Studied (" + studiedN + ")"]].forEach(([m, t]) =>
+    modes.appendChild(h("button", { class: opt.mode === m ? "on" : "", id: "fcm-" + m, "aria-pressed": String(opt.mode === m), onclick: () => { opt.mode = m; FC.flipped = false; save(); render(); } }, t)));
+  const ctl = h("div", { class: "card", id: "fc-ctl" }, modes, h("div", { class: "btnrow" },
+    h("button", { class: "btn sec2 small", id: "fc-shuffle", "aria-pressed": String(opt.shuf), onclick: () => { opt.shuf = !opt.shuf; delete S.fcDeck[st.key]; FC.flipped = false; save(); render(); } }, opt.shuf ? "🔀 Shuffled · put back in order" : "🔀 Shuffle"),
+    h("span", { class: "muted", id: "fc-count", style: "align-self:center" }, studiedN + " of " + studyQs(o).filter(q => !q.mk && !q.custom).length + " cards studied in this " + (o.tp ? "topic" : "chapter"))));
+  app.appendChild(ctl);
+  if (!n) {
+    app.appendChild(h("div", { class: "card", id: "fc-empty" }, h("b", {}, opt.mode === "hard" ? "No difficult cards here yet." : opt.mode === "studied" ? "You haven't studied any cards here yet." : opt.mode === "new" ? "You've studied every card here. 🎉" : "No flashcards here yet."),
+      h("p", { class: "muted" }, opt.mode === "hard" ? "Mark a card as difficult while studying and it will appear here." : "Pick another chapter or topic, or choose All cards."),
+      opt.mode !== "all" ? h("button", { class: "btn", id: "fc-all", onclick: () => { opt.mode = "all"; save(); render(); } }, "Show all cards") : null));
+    if (st.locked) app.appendChild(lockCard(st.locked));
+    return;
+  }
+  const q = QBYID[d.ids[d.i]]; const hard = S.fcHard.includes(q.id), seen = S.fc[q.id];
+  const back = h("div", { class: "fc-back", id: "fc-back", "aria-hidden": String(!FC.flipped) }, h("div", { class: "fc-lab" }, "Answer"), h("div", { class: "fc-ans", id: "fc-ans" }, q.o[q.a]), q.s ? h("div", { class: "fc-why" }, q.s) : null, FC.flipped ? workedSolution(q) : null);
+  const front = h("div", { class: "fc-front", "aria-hidden": String(FC.flipped) }, h("div", { class: "fc-lab" }, "Question · " + q.tp), q.im && FIGS[q.im] ? h("div", { class: "fig", html: FIGS[q.im] }) : null, h("div", { class: "fc-q", id: "fc-q" }, q.q),
+    h("div", { class: "muted fc-tip" }, "Tap the card, press Flip or press Space to see the answer"));
+  const flip = () => { FC.flipped = !FC.flipped; if (FC.flipped && !S.fc[q.id]) { S.fc[q.id] = { t: Date.now(), k: 0 }; save(); } sfx("tap"); render(); setTimeout(() => { const c2 = document.getElementById("fc-flip"); if (c2 && document.activeElement === document.body) c2.focus(); }, 0); };
+  app.appendChild(h("div", { class: "fc-wrap" }, h("div", { class: "fc-count", id: "fc-pos", role: "status" }, "Card " + (d.i + 1) + " of " + n + (seen ? " · studied" : "") + (hard ? " · marked difficult" : "")),
+    h("div", { class: "fcard" + (FC.flipped ? " flipped" : ""), id: "fc-card", "aria-live": "polite", onclick: e => { if (!e.target.closest("button,a,summary")) flip(); } },
+      FC.flipped ? back : front)));
+  const step = k => { d.i = (d.i + k + n) % n; FC.flipped = false; save(); render(); };
+  const mark = known => { S.fc[q.id] = { t: Date.now(), k: known ? 1 : 0 }; if (!known && !S.fcHard.includes(q.id)) S.fcHard.push(q.id); if (known && opt.mode !== "hard") { const i = S.fcHard.indexOf(q.id); if (i >= 0) S.fcHard.splice(i, 1); } save(); step(1); };
+  app.appendChild(h("div", { class: "btnrow fc-nav" },
+    h("button", { class: "btn ghost", id: "fc-prev", onclick: () => step(-1), "aria-label": "Previous card" }, "← Previous"),
+    h("button", { class: "btn", id: "fc-flip", onclick: flip }, FC.flipped ? "Show question" : "Flip"),
+    h("button", { class: "btn ghost", id: "fc-next", onclick: () => step(1), "aria-label": "Next card" }, "Next →")));
+  app.appendChild(h("div", { class: "btnrow fc-nav" },
+    h("button", { class: "btn sec2 small", id: "fc-hard", "aria-pressed": String(hard), onclick: () => { const i = S.fcHard.indexOf(q.id); if (i >= 0) S.fcHard.splice(i, 1); else S.fcHard.push(q.id); save(); render(); } }, hard ? "★ Difficult · unmark" : "☆ Mark difficult"),
+    FC.flipped ? h("button", { class: "btn sec2 small", id: "fc-again", onclick: () => mark(false) }, "Still learning") : null,
+    FC.flipped ? h("button", { class: "btn sec2 small", id: "fc-know", onclick: () => mark(true) }, "I knew it") : null));
+  app.appendChild(h("div", { class: "card", id: "fc-topractice", style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("span", { style: "flex:1 1 220px" }, "Ready to test yourself on this " + (o.tp ? "topic" : "chapter") + "? Practice questions are scored and count toward your progress."),
+    h("button", { class: "btn sec2", id: "fc-go-practice", onclick: () => { stack[stack.length - 1] = { view: "practice" }; render(); } }, "Practice these questions")));
+  if (st.locked) app.appendChild(lockCard(st.locked));
+};
+document.addEventListener("keydown", e => {   // Space/Enter flips; ← → move between cards (not while typing in a field)
+  if (cur().view !== "flash" || e.target.closest("input,select,textarea,[contenteditable]") || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === " " && e.target.closest("button,a,summary,[role=button]")) return;   // Space presses the focused button itself
+  const b = { " ": "fc-flip", ArrowLeft: "fc-prev", ArrowRight: "fc-next" }[e.key] || null;
+  const el = b && document.getElementById(b); if (el) { e.preventDefault(); el.click(); }
+});
+VIEWS.practice = function () {
+  const o = studySel(); document.getElementById("title").textContent = "Practice Questions";
+  app.appendChild(studySwitch("practice"));
+  app.appendChild(studyPicker(() => render()));
+  const c = CHBYN[o.ch]; if (!c) return;
+  const all = studyQs(o), avail = all.filter(canUse), unanswered = avail.filter(q => !S.a[q.id]);
+  const done = all.filter(q => S.a[q.id]), ok = done.filter(q => S.a[q.id].r);
+  const wrong = S.w.filter(id => QBYID[id] && QBYID[id].ch === o.ch && (!o.tp || QBYID[id].tp === o.tp) && canUse(QBYID[id]) && inCourse(QBYID[id]));
+  const label = o.tp || c.title;
+  app.appendChild(h("div", { class: "card", id: "pr-score" }, h("b", {}, label),
+    h("div", { class: "muted" }, done.length + " of " + all.length + " answered" + (done.length ? " · " + pct(ok.length, done.length) + "% correct" : "") + " · " + wrong.length + " to retry"),
+    h("div", { class: "bar", role: "progressbar", "aria-label": "Answered", "aria-valuenow": String(pct(done.length, all.length)), "aria-valuemin": "0", "aria-valuemax": "100" }, h("i", { style: "width:" + pct(done.length, all.length) + "%" })),
+    h("div", { class: "btnrow" },
+      h("button", { class: "btn", id: "pr-start", disabled: !avail.length, onclick: () => startQuiz(avail, label, { ch: o.ch }) }, "Practice all (" + avail.length + ")"),
+      h("button", { class: "btn sec2", id: "pr-new", disabled: !unanswered.length, onclick: () => startQuiz(unanswered, label, { ch: o.ch }) }, "Only new (" + unanswered.length + ")"),
+      h("button", { class: "btn sec2", id: "pr-retry", disabled: !wrong.length, onclick: () => startQuiz(wrong.map(id => QBYID[id]), "Retry · " + label, { ch: o.ch, review: true }) }, "Retry incorrect (" + wrong.length + ")")),
+    h("p", { class: "muted", style: "font-size:13px;margin:8px 0 0" }, "Every question gives instant feedback with an explanation and a worked solution. Your score and progress update as you go.")));
+  if (avail.length < all.length) app.appendChild(lockCard(all.length - avail.length));
+  const tc = h("div", { class: "card", id: "pr-topics" }, h("b", {}, o.tp ? "Score in this topic" : "Scores by topic"));
+  const tb = h("table", { class: "t" }); tb.appendChild(h("caption", { class: "sr-only" }, "Scores by topic"));
+  tb.appendChild(h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Topic"), h("th", { scope: "col", class: "n" }, "Correct"), h("th", { scope: "col", class: "n" }, "Answered"))));
+  const body = h("tbody");
+  c.topics.filter(tp => !o.tp || tp === o.tp).forEach(tp => { const qs = cqs(c).filter(q => q.tp === tp); if (!qs.length) return; const ans = qs.filter(q => S.a[q.id]), k = ans.filter(q => S.a[q.id].r).length;
+    body.appendChild(h("tr", {}, h("td", {}, h("button", { class: "linkbtn", onclick: () => { o.tp = tp; save(); render(); } }, tp)), h("td", { class: "n" }, ans.length ? pct(k, ans.length) + "%" : "–"), h("td", { class: "n" }, ans.length + " / " + qs.length))); });
+  tb.appendChild(body); tc.appendChild(tb); app.appendChild(tc);
+  app.appendChild(h("div", { class: "card", id: "pr-toflash", style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("span", { style: "flex:1 1 220px" }, "Want to review first? Flashcards show each question with its answer, without scoring."),
+    h("button", { class: "btn sec2", id: "pr-go-flash", onclick: () => { stack[stack.length - 1] = { view: "flash" }; render(); } }, "Study these as flashcards")));
+};
 
 /* ---------- quiz ---------- */
 let QUIZ = null;
@@ -5325,7 +5463,9 @@ function studentDash(T) {
   const tests = dashCard("tests", "exam", "Upcoming tests", S.cls ? "Class and team tests from " + S.cls.name : "Join your class to see its tests", () => { if (S.cls) { CLSTAB = 1; go("classes"); } else go("classes"); });
   if (DB && S.cls && S.cls.role !== "teacher") DB.get("tests", "class_code=eq." + S.cls.code).then(ts => { const open = (ts || []).filter(t => !(S.tdone && S.tdone[t.id])).length; if (open) { const b = tests.querySelector("b"); b.appendChild(h("span", { class: "dbadge" }, String(open))); } }).catch(() => {});
   const weak = myStats().weak;
-  [dashCard("assign", "pen", "My assignments", S.cls ? "Graded work, deadlines and scores" + (nA ? " · " + nA + " practice chapter" + (nA > 1 ? "s" : "") : "") : "Join your class with its code", () => go(S.cls ? "myasg" : "classes"), S.asgCount || null),
+  [dashCard("flash", "book", "Flashcards", "Flip cards, shuffle, mark difficult ones, resume where you stopped", () => go("flash")),
+   dashCard("pq", "pen", "Practice Questions", "Answer, get instant feedback and explanations, retry mistakes", () => go("practice")),
+   dashCard("assign", "pen", "My assignments", S.cls ? "Graded work, deadlines and scores" + (nA ? " · " + nA + " practice chapter" + (nA > 1 ? "s" : "") : "") : "Join your class with its code", () => go(S.cls ? "myasg" : "classes"), S.asgCount || null),
    tests,
    dashCard("practice", "exam", "Practice tests", "Build a test from any chapters and topics", () => go("exam")),
    dashCard("progress", "chart", "My progress", "Activity, chapters, topics, test history", () => go("progress")),
