@@ -372,12 +372,19 @@ body.signedout .wrap { margin-left: auto !important; }
 .authlinks { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; align-items: flex-start; }
 .linkbtn { background: none; border: 0; padding: 6px 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; }
 .authfoot { font-size: 12.5px; text-align: center; margin-top: 10px; }
+.toplogo { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 8px; }
+.toplogo svg { width: 28px; height: 28px; }
+.toplogo:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#side a.brand { text-decoration: none; border-radius: 8px; }
+#side a.brand:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+@media (min-width: 1000px) { body.shell .toplogo { display: none; } }
 </style>
 </head>
 <body>
 <a class="skip" href="#app" id="skip">Skip to main content</a>
 <nav id="side" aria-label="Main"></nav>
 <header class="top"><div class="row">
+  <a class="toplogo" id="top-logo" href="https://chemflip.org/" target="_blank" rel="noopener" title="chemflip.org (opens in a new tab)" aria-label="ChemFlip website, chemflip.org (opens in a new tab)"></a>
   <button class="iconbtn" id="back" style="display:none" aria-label="Back">‹</button>
   <h1 id="title"></h1>
   <button class="hbtn" id="searchbtn" aria-label="Search (Ctrl+K)" title="Search (Ctrl+K)"></button>
@@ -580,6 +587,7 @@ function today() { const d = new Date(); return d.getFullYear() + "-" + (d.getMo
 function markDay() { const t = today(); if (S.days[S.days.length - 1] !== t) { S.days.push(t); if (S.days.length > 400) S.days.shift(); } }
 function streak() { let n = 0; const d = new Date(); for (;;) { const k = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); if (S.days.includes(k)) { n++; d.setDate(d.getDate() - 1); } else if (n === 0 && k === today()) { d.setDate(d.getDate() - 1); } else break; } return n; }
 function record(q, correct, ms) {
+  if (typeof QUIZ !== "undefined" && QUIZ && QUIZ.preview) return;   // an instructor's preview never counts as practice
   const r = S.a[q.id] || { n: 0, c: 0 }; r.n++; if (correct) r.c++; r.r = correct; r.t = Date.now(); S.a[q.id] = r;
   { S.daily = S.daily || {}; const d = S.daily[today()] = S.daily[today()] || { n: 0, ok: 0 }; d.n++; if (correct) d.ok++; }   // Phase J: answers per day
   ms = Math.max(1000, Math.min(ms || 30000, 180000));
@@ -683,6 +691,7 @@ const ICO = {
 };
 function ico(name, size) { const s = size || 18; const span = document.createElement("span"); span.style.display = "inline-flex"; span.setAttribute("aria-hidden", "true");
   span.innerHTML = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (ICO[name] || "") + '</svg>'; return span; }
+setTimeout(() => { const t = document.getElementById("top-logo"); if (t && !t.firstChild) t.innerHTML = LOGO_SVG; }, 0);
 const LOGO_SVG = '<svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 11a10 10 0 0 1 16-5" fill="none" stroke="#F2C14E" stroke-width="2.6" stroke-linecap="round"/><path d="M25 21a10 10 0 0 1-16 5" fill="none" stroke="#F2C14E" stroke-width="2.6" stroke-linecap="round"/><path d="M13 8h6M14 8v6l-5 9h14l-5-9V8" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M11.3 19h9.4l2.3 4H9z" fill="#36A9D3"/></svg>';
 // Games keep their playful emoji; everywhere else, decorative leading emoji are removed from interface text.
 const PLAY_VIEWS = new Set(["games", "ghostsetup", "ghost", "gjoin", "gteam", "gplay", "gduel", "arcade", "quest", "qarrange", "qsubjects", "qlevels", "qplay", "qrace", "qracing", "qshop", "qach", "qboard", "qsettings", "features", "onboard"]);
@@ -707,7 +716,7 @@ function renderSide() {
   if (!S.profile || v === "onboard") { document.body.classList.remove("shell"); return; }
   document.body.classList.add("shell");
   const reset = (view, arg) => () => guardLeave(() => { stack = [{ view: "home" }]; if (view !== "home") stack.push({ view, arg }); render(); window.scrollTo(0, 0); });
-  const brand = h("div", { class: "brand" }); brand.innerHTML = LOGO_SVG + "<span>" + CFG.short + "</span>"; side.appendChild(brand);
+  const brand = h("a", { class: "brand", id: "brand-home", href: "https://chemflip.org/", target: "_blank", rel: "noopener", title: "chemflip.org (opens in a new tab)", "aria-label": "ChemFlip website, chemflip.org (opens in a new tab)" }); brand.innerHTML = LOGO_SVG + "<span>" + CFG.short + "</span>"; side.appendChild(brand);
   if (CFG.courses.length > 1) { const c = course(); side.appendChild(h("button", { class: "crs", id: "side-course", onclick: courseSheet }, h("span", {}, h("small", {}, "Course"), h("b", {}, c.name)), ico("chev", 16))); }
   const g1 = h("div", { class: "grp" }); const T0 = isTeacher();
   if (T0) {   // 5.0: instructors get their own navigation
@@ -7149,7 +7158,28 @@ function labEmailSheet(a, last, mi, tz, reload) {
     box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost", onclick: close }, "Cancel"), send)); box.appendChild(out);
   });
 }
+// 5.0 fix ("Not allowed" when an instructor opened their own homework from Student mode): the class's instructor gets a
+// preview (every question, nothing submitted or graded); students get a plain reason instead of "Not allowed".
+function iTeachClass(code) { return !!code && (((S.tclasses || []).some(k => k.code === code)) || !!(S.cls && S.cls.code === code && S.cls.role === "teacher")); }
+async function asgPreview(a) {
+  try { const j = await asgCall({ action: "detail", id: a.id }, { fresh: true }); const A = j.assignment || {};
+    const own = {}; (A.items || []).forEach(it => own[it.id] = it);
+    const ids = (A.qids || []).concat((A.items || []).map(it => it.id).filter(id => !(A.qids || []).includes(id)));
+    const list = ids.map(id => QBYID[id] || (own[id] ? asgPseudo(own[id]) : null)).filter(Boolean);
+    if (!list.length) { toast("This " + (KIND[a.kind] || "activity").toLowerCase() + " has no questions yet."); return; }
+    startQuiz(list, "Preview · " + a.title, { preview: true }); toast("👀 Instructor preview: answers here aren't submitted or graded.");
+  } catch (e) { toast("❌ " + e.message); } }
+function asgDenied(a, e, tz) {
+  const what = KIND[a.kind] || "activity", W = what === "Assignment" ? "Homework" : what;
+  if (a.state === "not_open" && a.effective && a.effective.open_at) { const d = a.effective.open_at, y = new Date(d).getUTCFullYear();
+    return "This " + W + " will become available on " + fmtTz(d, tz) + (y !== new Date().getUTCFullYear() && !fmtTz(d, tz).includes(String(y)) ? ", " + y : "") + "."; }
+  if (a.state === "closed") return "The submission deadline has passed. Contact your instructor if you need an extension.";
+  if (e && e.status === 403) return /join/i.test(e.message) ? "You must join this class before opening its " + W + "." : "This " + W + " isn't available to you yet. If you joined this class on another account or device, join it again with the class code, or contact your instructor.";
+  return e ? e.message : "";
+}
 async function asgStart(a, tz) {
+  if (iTeachClass(a.class_code)) { asgPreview(a); return; }
+  if (a.state === "not_open" || a.state === "closed") { toast("⏳ " + asgDenied(a, null, tz)); return; }
   const go1 = async () => {
     try { const r = await asgCall({ action: "start", assignment_id: a.id });
       const own = {}; (r.items || []).forEach(it => own[it.id] = it);
@@ -7161,7 +7191,7 @@ async function asgStart(a, tz) {
       if (dr && r.resumed) { const merged = Object.assign({}, r.answers || {}, dr.a); if (JSON.stringify(merged) !== JSON.stringify(r.answers || {})) { QUIZ.ans = merged; QUIZ.asg.saved = ""; setTimeout(() => asgAutosave(true), 300); } }
       QUIZ.picked = QUIZ.ans[list[0] && list[0].id] ?? null;
       go("quiz"); if (r.resumed) toast("↩️ Resumed — your saved answers are back");
-    } catch (e) { toast("❌ " + e.message); render(); } };
+    } catch (e) { toast("❌ " + asgDenied(a, e, tz)); render(); } };
   if (a.effective.time_limit_min && !a.in_progress) confirmBox("Start " + a.title + "?", "You'll have " + a.effective.time_limit_min + " minutes once you start (the timer keeps running if you leave). " + (a.effective.max_attempts ? "Attempts: " + (a.attempts_used + 1) + " of " + a.effective.max_attempts + "." : ""), go1, "Start now");
   else go1();
 }
