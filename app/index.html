@@ -342,6 +342,11 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 body.signedout #side, body.signedout #searchbtn, body.signedout #helpbtn, body.signedout #plan, body.signedout #crumbs, body.signedout #musicbtn, body.signedout #sfxbtn { display: none !important; }
 body.signedout .wrap { margin-left: auto !important; }
 .authwrap { max-width: 440px; margin: 24px auto; }
+.mailst { font-size: 13.5px; line-height: 1.45; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--hair); margin: 4px 0 10px; }
+.mailst.ok { border-color: var(--ok); }
+.mailst.warn { border-color: var(--gold, #b8860b); }
+.mailst.bad { border-color: var(--bad); }
+.mailst b { font-weight: 700; }
 .authbox { padding: 22px; }
 .authbox h2 { margin: 4px 0 14px; }
 .authlogo { font-size: 34px; }
@@ -3919,6 +3924,34 @@ function pwField(id, label, auto) {
   return h("label", { class: "authf" }, h("span", {}, label), h("input", { class: "field", id, type: "password", inputmode: "numeric", pattern: "[0-9]*", maxlength: "9", autocomplete: auto, "aria-describedby": id + "-hint",
     oninput: e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9); } }), h("small", { class: "muted", id: id + "-hint" }, "9 digits"));
 }
+// What really happened to a code email: Resend's acceptance first, then the receiving server's answer (via the webhook).
+const MAILW = {};   // tracking id -> { status, reason, at, tracking, t0, timer }
+function mailTracker(mail, email, onBad) {
+  const el = h("div", { class: "mailst", id: "mail-status", role: "status", "aria-live": "polite" });
+  if (!mail || !mail.id) { el.textContent = "📨 Sent to the email service. ChemFlip can't confirm delivery for this email."; return el; }
+  const w = MAILW[mail.id] || (MAILW[mail.id] = { status: mail.status || "accepted", t0: Date.now() });
+  const dom = (email.split("@")[1] || "your email provider");
+  const show = () => {
+    const st = w.status, waited = (Date.now() - w.t0) / 1000;
+    el.className = "mailst " + (st === "delivered" ? "ok" : ["bounced", "complained", "failed", "suppressed", "rejected"].includes(st) ? "bad" : st === "delayed" ? "warn" : "");
+    el.innerHTML = "";
+    if (st === "delivered") el.append(h("b", {}, "✅ Delivered to " + email + "."), " " + dom + "'s mail server accepted it" + (w.at ? " at " + new Date(w.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "") + ". Not in your inbox? Look in Junk or Spam. School and work accounts (Microsoft 365) may hold it in Quarantine or under Other; ask your school's IT to release it, or use a personal email.");
+    else if (st === "delayed") el.append(h("b", {}, "⏳ Not delivered yet."), " " + dom + "'s mail server is holding the email. School mail systems sometimes delay new senders; the email service keeps trying. You can wait, or use a different email (for example Gmail or Outlook.com).");
+    else if (["bounced", "complained", "failed", "suppressed", "rejected"].includes(st)) { el.append(h("b", {}, "❌ Not delivered."), " " + (w.reason || "The email was rejected.") + " Check the address or use a different email."); if (onBad) onBad(); }
+    else el.append(h("b", {}, "📨 The email service accepted the email."), " " + (w.tracking === false ? "ChemFlip can't confirm delivery yet." : waited > 90 ? "There's no delivery report from " + dom + " yet. Check Junk or Spam, or use a different email." : "Waiting for " + dom + "'s mail server to confirm delivery…"));
+  };
+  show();
+  if (!w.timer && !["delivered", "bounced", "complained", "failed", "suppressed", "rejected"].includes(w.status)) {
+    w.timer = setInterval(async () => {
+      if (Date.now() - w.t0 > 180e3) { clearInterval(w.timer); w.timer = null; w.tracking = w.tracking !== false; }
+      try { const r = await authFetch({ action: "mail_status", mail: mail.id }); w.status = r.status; w.reason = r.reason; w.at = r.at; w.tracking = r.tracking; } catch (e) {}
+      if (["delivered", "bounced", "complained", "failed", "suppressed", "rejected"].includes(w.status)) { clearInterval(w.timer); w.timer = null; }
+      const cur = document.getElementById("mail-status"); if (cur && cur.dataset.mail === mail.id) { const n = mailTracker(mail, email, onBad); cur.replaceWith(n); }
+    }, 3000);
+  }
+  el.dataset.mail = mail.id;
+  return el;
+}
 function renderAuth() {
   const app = document.getElementById("app"); app.innerHTML = ""; bottom(null);
   document.getElementById("back").style.display = "none"; document.getElementById("side").innerHTML = ""; document.getElementById("crumbs").innerHTML = "";
@@ -3965,7 +3998,7 @@ function renderAuth() {
     box.appendChild(pwField("su-pw", "Password (choose 9 digits)", "new-password"));
     box.appendChild(pwField("su-pw2", "Type the password again", "new-password"));
     box.appendChild(h("p", { class: "muted", style: "font-size:12.5px;margin:2px 0 8px" }, "Avoid easy ones like 123456789 or repeated digits; ChemFlip won't accept them."));
-    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Email (for your code and to reset your password)"), em));
+    box.appendChild(h("label", { class: "authf" }, h("span", {}, "Email (for your code and to reset your password)"), em, h("small", { class: "muted" }, "Any email you can open. School systems sometimes hold mail from new senders; a personal email works too.")));
     const keep = () => { d.name = name.value.trim(); d.user = u.value.trim(); d.email = em.value.trim(); d.pw = document.getElementById("su-pw").value; d.pw2 = document.getElementById("su-pw2").value; };
     if (!d.sent) {
       box.appendChild(msg);
@@ -3973,11 +4006,12 @@ function renderAuth() {
         if (!d.name || !d.user || !d.email) { AUTHV.msg = "Fill in your name, a username and your email."; render(); return; }
         if (!/^\d{9}$/.test(d.pw) || d.pw !== d.pw2) { AUTHV.msg = d.pw !== d.pw2 ? "The two passwords don't match." : "The password must be exactly 9 digits."; render(); return; }
         AUTHV.busy = true; render();
-        try { await authFetch({ action: "signup_code", email: d.email }); d.sent = true; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } AUTHV.busy = false; render(); } }, AUTHV.busy ? "Sending…" : "Email me a code"));
+        try { const j = await authFetch({ action: "signup_code", email: d.email }); d.sent = true; d.mail = j.mail; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } AUTHV.busy = false; render(); } }, AUTHV.busy ? "Sending…" : "Email me a code"));
     } else {
       setTimeout(() => { const a = document.getElementById("su-pw"), b2 = document.getElementById("su-pw2"); if (a) a.value = d.pw || ""; if (b2) b2.value = d.pw2 || ""; }, 0);
       const code = h("input", { class: "field code", id: "su-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
-      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code sent to " + d.email), code)); box.appendChild(msg);
+      box.appendChild(mailTracker(d.mail, d.email));
+      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code from the email to " + d.email), code)); box.appendChild(msg);
       box.appendChild(h("button", { class: "btn gold wide", id: "su-go", disabled: AUTHV.busy, onclick: async () => { keep();
         if (d.pw !== d.pw2) { AUTHV.msg = "The two passwords don't match."; render(); return; }
         AUTHV.busy = true; render();
@@ -3993,9 +4027,10 @@ function renderAuth() {
     if (!d.sent) {
       box.appendChild(msg);
       box.appendChild(h("button", { class: "btn gold wide", id: "fg-send", disabled: AUTHV.busy, onclick: async () => { d.who = w.value.trim(); if (!d.who) return; AUTHV.busy = true; render();
-        try { const j = await authFetch({ action: "reset_code", who: d.who }); d.sent = true; d.to = j.sent_to; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } AUTHV.busy = false; render(); } }, "Email me a code"));
+        try { const j = await authFetch({ action: "reset_code", who: d.who }); d.sent = true; d.to = j.sent_to; d.mail = j.mail; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } AUTHV.busy = false; render(); } }, "Email me a code"));
     } else {
-      box.appendChild(h("p", { class: "muted", id: "fg-sent" }, d.to ? "We sent a code to " + d.to + "." : "If that account has a confirmed email, we sent it a code. No email? Ask your instructor or write to chemflipp@gmail.com."));
+      box.appendChild(h("p", { class: "muted", id: "fg-sent" }, d.to ? "The code is going to " + d.to + "." : "If that account has a confirmed email, a code is on its way to it. No email? Ask your instructor or write to chemflipp@gmail.com."));
+      if (d.to && d.mail) box.appendChild(mailTracker(d.mail, d.to));
       const code = h("input", { class: "field code", id: "fg-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
       box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code"), code));
       box.appendChild(pwField("fg-pw", "New password (9 digits)", "new-password")); box.appendChild(pwField("fg-pw2", "Type it again", "new-password")); box.appendChild(msg);
@@ -4019,9 +4054,11 @@ function renderAuth() {
     box.appendChild(h("p", { class: "muted" }, "Add an email so you can reset your password if you forget it."));
     box.appendChild(h("label", { class: "authf" }, h("span", {}, "Email"), em));
     const withAuth = async (f) => { const a = AUTHV.pending; AUTH = a; try { return await f(); } finally { AUTH = null; } };
-    if (!d.sent) { box.appendChild(msg); box.appendChild(h("button", { class: "btn gold wide", id: "ae-send", onclick: async () => { d.email = em.value.trim(); try { await withAuth(() => authFetch({ action: "email_code", email: d.email })); d.sent = true; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } render(); } }, "Email me a code")); }
+    if (!d.sent) { box.appendChild(msg); box.appendChild(h("button", { class: "btn gold wide", id: "ae-send", onclick: async () => { d.email = em.value.trim(); try { const j = await withAuth(() => authFetch({ action: "email_code", email: d.email })); d.sent = true; d.mail = j.mail; AUTHV.msg = ""; } catch (e) { AUTHV.msg = e.message; } render(); } }, "Email me a code")); }
     else { const code = h("input", { class: "field code", id: "ae-code", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
-      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code sent to " + d.email), code)); box.appendChild(msg);
+      box.appendChild(mailTracker(d.mail, d.email));
+      box.appendChild(h("label", { class: "authf" }, h("span", {}, "6-digit code from the email to " + d.email), code)); box.appendChild(msg);
+      box.appendChild(h("button", { class: "btn ghost small", id: "ae-change", onclick: () => { d.sent = false; render(); } }, "Use a different email"));
       box.appendChild(h("button", { class: "btn gold wide", id: "ae-go", onclick: async () => { try { const j = await withAuth(() => authFetch({ action: "email_verify", email: d.email, code: code.value.trim() })); AUTHV.pending.account = Object.assign(AUTHV.pending.account, j.account); AUTHV.data = {}; AUTHV.msg = ""; finishSignIn(); } catch (e) { AUTHV.msg = e.message; render(); } } }, "Confirm")); }
   }
   app.appendChild(h("div", { class: "authwrap" }, box, h("p", { class: "muted authfoot" }, "ChemFlip works on one device at a time. Signing in here signs out your other device. Nothing is remembered after you close ChemFlip.")));
@@ -7187,6 +7224,26 @@ function adminDash(call, box) {
       h("tbody", {}, ...j.recent.slice(0, 20).map(r => h("tr", { style: "border-top:1px solid var(--hair)" }, h("td", {}, new Date(r.created_at).toLocaleDateString()), h("td", {}, r.email || "—"), h("td", {}, r.plan), h("td", {}, r.provider === "paypal" ? "PayPal" : "Card"), h("td", {}, r.status + (r.cancel_at_period_end ? " (ending)" : "")), h("td", {}, r.current_period_end ? new Date(r.current_period_end).toLocaleDateString() : "—")))))));
   };
   acctToken().then(t => payFetch({ op: "admin", token: t, action: "pay" })).then(payShow).catch(e => { pc.innerHTML = ""; pc.appendChild(h("b", {}, "💎 Premium subscriptions")); pc.appendChild(h("p", { class: "muted" }, "❌ " + e.message)); });
+  // 5.0 Email Delivery Dashboard: what Resend accepted and what the receiving servers did with it (no codes, passwords or keys)
+  const mc = h("div", { class: "card", id: "admin-mail" }, h("b", {}, "📧 Email delivery"), h("div", { class: "muted" }, "⏳ Loading…")); box.appendChild(mc);
+  const ST = { accepted: "📨 accepted, no report yet", sent: "📨 sent", delivered: "✅ delivered", delayed: "⏳ delayed", bounced: "❌ bounced", complained: "⚠️ marked as spam", failed: "❌ failed", suppressed: "⛔ blocked (earlier bounce)", rejected: "❌ refused by the email service" };
+  const mailShow = j => { mc.innerHTML = ""; mc.appendChild(h("b", {}, "📧 Email delivery"));
+    const sv = j.service, c = j.week.counts;
+    mc.appendChild(h("div", { id: "mail-service", style: "font-size:13.5px;margin-top:4px" }, "Email service (Resend): " + (sv.key ? "connected" : "NOT connected") + " · sender " + sv.from + " · delivery reports: " + (sv.tracking ? "on (last report " + new Date(sv.last_event_at).toLocaleString() + ")" : "NOT received yet")));
+    mc.appendChild(h("div", { id: "mail-week", class: "muted", style: "font-size:13px" }, "Last 7 days: " + j.week.total + " emails · " + Object.keys(ST).filter(k => c[k]).map(k => c[k] + " " + ST[k].replace(/^\S+ /, "")).join(" · ")));
+    if (j.problems.length) mc.appendChild(h("ul", { id: "mail-problems", style: "font-size:13px;color:var(--bad);padding-left:18px" }, ...j.problems.map(p => h("li", {}, p))));
+    else mc.appendChild(h("div", { id: "mail-problems", style: "font-size:13px" }, "✅ No configuration problems found."));
+    const rows = j.recent.slice(0, 40);
+    if (rows.length) mc.appendChild(h("details", { open: j.recent.some(r => ["bounced", "failed", "rejected", "complained", "suppressed", "delayed"].includes(r.status)) }, h("summary", { style: "padding:6px 0;cursor:pointer" }, "Latest " + rows.length + " emails"),
+      h("div", { style: "overflow-x:auto", tabindex: "0", role: "region", "aria-label": "Latest emails" }, h("table", { id: "mail-table", style: "width:100%;border-collapse:collapse;font-size:12.5px" }, h("caption", { class: "sr-only" }, "Latest emails and their delivery status"),
+        h("thead", {}, h("tr", {}, ...["Sent", "To", "What", "Status", "Reason"].map(t => h("th", { scope: "col", style: "text-align:left;padding:3px 6px" }, t)))),
+        h("tbody", {}, ...rows.map(r => h("tr", { style: "border-top:1px solid var(--hair)" }, h("td", { style: "padding:3px 6px;white-space:nowrap" }, new Date(r.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })),
+          h("td", { style: "padding:3px 6px" }, r.email), h("td", { style: "padding:3px 6px" }, { verify: "sign-up / email code", reset: "password reset", notice: "notice" }[r.kind] || r.subject || r.kind),
+          h("td", { style: "padding:3px 6px;white-space:nowrap" }, ST[r.status] || r.status), h("td", { style: "padding:3px 6px" }, r.reason || "")))))))) ;
+    mc.appendChild(h("button", { class: "btn ghost small", id: "mail-refresh", onclick: loadMail }, "Refresh"));
+  };
+  const loadMail = () => acctToken().then(t => authFetch({ action: "mail_admin", token: t })).then(mailShow).catch(e => { mc.innerHTML = ""; mc.appendChild(h("b", {}, "📧 Email delivery")); mc.appendChild(h("p", { class: "muted" }, "❌ " + e.message)); });
+  loadMail();
   const ac = h("details", { class: "card", id: "admin-audit" }, h("summary", {}, h("b", {}, "📜 History of changes")));
   const fc = h("input", { class: "field", id: "aud-class", placeholder: "Class code", maxlength: "6", style: "max-width:130px;text-transform:uppercase", "aria-label": "Class code" });
   const fa = h("input", { class: "field", id: "aud-what", placeholder: "Action, e.g. lab_grade", maxlength: "40", style: "max-width:200px", "aria-label": "Action" });
