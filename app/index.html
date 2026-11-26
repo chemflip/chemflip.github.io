@@ -189,6 +189,7 @@ textarea.field{font:inherit}
 .bulkbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;padding:10px;border-radius:10px;background:var(--chip)}tr.hit td{background:var(--okbg)}
 .receipt{border:2px dashed var(--hair)}.receipt .rc-code{font:700 22px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.06em;margin:4px 0 8px}.rc{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0}.rc dt{color:var(--grey)}.rc dd{margin:0}
 html.rm *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media print{body.print-gb>*:not(#app),body.print-gb header,body.print-gb #side{display:none!important}body.print-gb #app>*:not(#gb-box){display:none!important}body.print-gb #gb-box>*:not(:has(#gb-wrap)){display:none!important}body.print-gb #gb-box .btnrow,body.print-gb #gb-box input,body.print-gb #gb-box button{display:none!important}body.print-gb #gb-table{font-size:9pt}}
 @media print{body.print-receipt>*:not(#app){display:none!important}body.print-receipt #app>*:not(#receipt){display:none!important}body.print-receipt #receipt .btnrow{display:none}}
 body.has-rem{padding-bottom:120px}body:has(.bottombar) .updbar.rembar{bottom:calc(84px + env(safe-area-inset-bottom))}body.has-rem:has(.bottombar){padding-bottom:190px}.updbar.rembar{top:auto;bottom:calc(18px + env(safe-area-inset-bottom));background:var(--teal,#156082)}@media (min-width:900px){.updbar.rembar{left:auto;right:20px;transform:none;width:380px}}.rembar span{display:inline-flex;gap:6px;align-items:flex-start}
 .avimg{width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle}.avimg.big{width:56px;height:56px;border:3px solid var(--card)}
@@ -295,6 +296,13 @@ h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.005em}
 .sech{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin:28px 0 12px}.sech .sec{margin:0}
 @media (max-width:520px){.h5 .av{display:none}.ptab{grid-template-columns:repeat(3,minmax(0,1fr))}.cell{min-height:84px}.cell .nm{font-size:12.5px}.h5 h2{font-size:25px}.h5 dl{gap:18px}.h5 dd{font-size:20px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* 5.0 Upcoming Assignments & Tests: right column on wide screens, near the top on phones */
+.asgc.flash{outline:3px solid var(--teal);outline-offset:2px}
+.hgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}.hgrid>.hside{order:-1}.hgrid>.hmain{min-width:0}
+@media (min-width:1100px){.hgrid{grid-template-columns:minmax(0,1fr) 330px;align-items:start}.hgrid>.hside{order:0;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}}
+.upp .upg{margin:10px 0 4px;font-size:12.5px;font-weight:700;letter-spacing:.02em}.upp .upg.bad{color:var(--red,#b42318)}.upp .upg.warn{color:#9a5b00}.upp .upg.ok{color:var(--teal)}
+.upp .upi{border:1px solid var(--hair);border-radius:10px;padding:8px 10px;margin:6px 0}.upp .upi.od{border-left:4px solid #b42318}.upp .upi.today{border-left:4px solid #c77700}.upp .upi.soon{border-left:4px solid #d9a400}.upp .upi.done{opacity:.85}
+.upp .upi .t{font-weight:650}.upp .upi .m{font-size:12.5px;color:var(--muted)}.upp .upi .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
 
 /* 5.0 camera & photo capture */
 .cam .cam-box{max-width:720px;width:min(96vw,720px)}
@@ -722,6 +730,7 @@ function renderSide() {
   if (T0) {   // 5.0: instructors get their own navigation
     g1.appendChild(navItem("home", "home", "Dashboard", reset("home"), { on: v === "home" }));
     g1.appendChild(navItem("teach", "teach", "My classes", reset("teach"), { on: ["teach", "cls", "newtest", "ctest", "student"].includes(v) }));
+    g1.appendChild(navItem("grades", "chart", "Grades", reset("grades"), { on: ["grades", "gradebook", "asggrade"].includes(v), count: S.grBadge || "", hot: !!S.grBadge }));
     g1.appendChild(navItem("qbank", "book", "Question bank", reset("qbank"), { on: v === "qbank" }));
     g1.appendChild(navItem("calendar", "cal", "Calendar", reset("calendar"), { on: v === "calendar" }));
     g1.appendChild(navItem("canvas", "canvas", "Canvas", reset("canvasSetup"), { on: v === "canvasSetup" }));
@@ -741,6 +750,8 @@ function renderSide() {
   g1.appendChild(navItem("exam", "exam", "Practice exam", reset("exam"), { on: v === "exam" }));
   g1.appendChild(navItem("progress", "chart", "My progress", reset("progress"), { on: v === "progress" }));
   g1.appendChild(navItem("calendar", "cal", "Calendar", reset("calendar"), { on: v === "calendar" }));
+  g1.appendChild(navItem("myasg", "exam", "My assignments", reset("myasg"), { on: v === "myasg" }));
+  g1.appendChild(navItem("mygrades", "chart", "My grades", reset("mygrades"), { on: v === "mygrades" }));
   g1.appendChild(navItem("wrong", "redo", "Review mistakes", () => { stack = [{ view: "home" }]; startList("wrong"); }, { count: S.w.length || "" }));
   g1.appendChild(navItem("bm", "mark", "Bookmarks", () => { stack = [{ view: "home" }]; startList("bm"); }, { count: S.b.length || "" }));
   if (isOrg()) g1.appendChild(navItem("mechs", "pen", "Mechanisms", reset("mechs"), { on: v === "mechs" || v === "mech" }));
@@ -868,7 +879,6 @@ VIEWS.home = function () {
     h("div", { class: "muted" }, "All " + total + " questions in " + course().name + ", with worked solutions.")), h("button", { class: "btn gold", id: "go-premium", onclick: () => go("premium") }, (S.trial && !storeFlavor()) ? "See Premium" : "Start free trial")));
   { const cvc = typeof canvasCard === "function" ? canvasCard() : null; if (cvc) app.appendChild(cvc); }
   { const rc = pqResumeCard(); if (rc) app.appendChild(rc); }
-  { const cu = comingUpCard(); if (cu) app.appendChild(cu); }
   if (S.profile.role === "instructor" && !eduOk()) app.appendChild(h("div", { class: "card", id: "edu-card" }, h("b", {}, "Verify your instructor account"),
     h("p", { class: "muted" }, "Confirm your .edu email to use classes, student progress and class codes."), h("div", { class: "btnrow" }, h("button", { class: "btn", id: "edu-open", onclick: eduSheet }, "Verify with my .edu email"))));
   if (CFG.notice) app.appendChild(h("div", { class: "card", id: "global-notice" }, h("b", {}, "From ChemFlip"), h("div", { style: "white-space:pre-wrap;margin-top:4px" }, CFG.notice)));
@@ -929,6 +939,13 @@ VIEWS.home = function () {
   app.appendChild(h("div", { class: "h-desk", style: "gap:8px;flex-wrap:wrap;margin-top:8px" }, h("button", { class: "btn ghost small", id: "share-btn2", onclick: () => shareProgress() }, "Share progress"), h("button", { class: "btn ghost small", id: "schools-btn2", onclick: () => go("schools") }, "Compare schools"),
       h("button", { class: "btn ghost small", id: "review-btn2", onclick: () => reviewSheet() }, "Rate & review"), h("button", { class: "btn ghost small", id: "tour-btn2", onclick: () => startTour() }, "App tour")));
   app.appendChild(h("p", { class: "muted", style: "text-align:center;margin-top:22px" }, "Questions go from easy to hard, and every answer has a worked solution. Made by Dr. Vahid Rezaei, Chemistry Lecturer."));
+  if (!T) {   // 5.0: Upcoming Assignments & Tests on the right (top on phones); kept current by upStart()
+    const grid = h("div", { class: "hgrid", id: "home-grid" }), main = h("div", { class: "hmain" }), side = h("div", { class: "hside" });
+    while (app.firstChild) main.appendChild(app.firstChild);
+    const up = upcomingPanel(); if (up) side.appendChild(up); grid.appendChild(main); grid.appendChild(side); app.appendChild(grid);
+    if (!S.dlCache || S.dlCache.who !== "s" || Date.now() - S.dlCache.at > 60e3) loadDeadlines(true).then(() => upRedraw());
+    upStart();
+  }
 };
 
 const CH_OPTS = {};
@@ -5438,6 +5455,132 @@ function pickClass(then) {
   sheet("pick-class", "Choose a class", (box, close) => list.forEach(k => box.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "pick-" + k.code, onclick: () => { close(); open(k); } }, h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), h("div", { class: "meta" }, "Class code " + k.code)))))));
 }
 const toTab = (tab) => (k) => { CLSTAB = { students: 0, board: 1, tests: 2, feed: 3, assign: 4, graded: 5 }[tab] || 0; go("cls", k.code); };
+/* ----- 5.0 Grades (instructors): Submissions to review · Gradebook · Analytics · Alerts ----- */
+async function gradesLoad(fresh) {
+  const ks = (S.tclasses || []).slice(0, 20), o = fresh ? { fresh: true } : undefined;
+  const per = await Promise.all(ks.map(k => Promise.all([asgCall({ action: "gb", class_code: k.code }, o), asgCall({ action: "list", class_code: k.code }, o)]).then(([gb, list]) => ({ k, gb, list })).catch(e => ({ k, err: e.message }))));
+  let rev = []; try { rev = (await xCall({ op: "grades", action: "meta", codes: ks.map(k => k.code) })).reviewed || []; } catch (e) {}
+  const reviewed = new Set(rev.map(r => r.assignment_id + "|" + r.sid)), now = srvNow(), rows = [];
+  per.forEach(p => { if (!p.gb) return; const A = new Map(p.list.assignments.map(a => [a.id, a])), names = new Map(p.gb.roster.map(m => [m.sid, m.name]));
+    p.gb.cols.forEach(c => { const a = A.get(c.id) || {}, g0 = p.gb.grades[c.id] || {}, rel = a.grade_release_at ? Date.parse(a.grade_release_at) : 0;
+      Object.entries(g0).forEach(([sid, g]) => { if (g.status !== "pending" && g.status !== "graded") return;
+        rows.push({ code: p.k.code, cname: p.gb.class_name || p.k.name, aid: c.id, title: c.title, kind: c.kind, sid, name: names.get(sid) || "Student", at: g.at, score: g.score, total: g.total || c.max, late: g.late, attempts: g.attempts,
+          pending: g.status === "pending", reviewed: reviewed.has(c.id + "|" + sid), released: !rel || rel <= now, held: rel > now + 365 * 864e5 * 20, rel_at: a.grade_release_at || null, published: a.published !== false }); }); }); });
+  rows.sort((x, y) => Date.parse(y.at || 0) - Date.parse(x.at || 0));
+  return { per, rows, at: Date.now() };
+}
+function grStatus(r) { return r.pending ? ["Pending manual grading", "warn"] : r.reviewed ? ["Reviewed", "ok"] : r.kind === "lab" ? ["Graded", ""] : ["Auto-graded", ""]; }
+const GR_TABS = [["review", "Submissions to review"], ["book", "Gradebook"], ["stats", "Analytics"], ["alerts", "Alerts"]];
+VIEWS.grades = function (arg) {
+  if (!isTeacher()) { back0(); return; }
+  document.getElementById("title").textContent = "Grades";
+  const tab = (arg && arg.tab) || VIEWS.grades.tab || "review"; VIEWS.grades.tab = tab;
+  const nav = h("div", { class: "seg", id: "gr-tabs", role: "tablist", style: "flex-wrap:wrap;margin-bottom:10px" });
+  GR_TABS.forEach(([k, t]) => nav.appendChild(h("button", { class: k === tab ? "on" : "", id: "gr-tab-" + k, role: "tab", "aria-selected": k === tab ? "true" : "false", onclick: () => { VIEWS.grades.tab = k; render(); } }, t)));
+  app.appendChild(nav);
+  if (!(S.tclasses || []).length) { app.appendChild(h("div", { class: "card muted" }, "Create a class first. Grades from every class you teach appear here.")); return; }
+  const box = h("div", { id: "gr-box" }, h("div", { class: "card muted", id: "gr-loading" }, "⏳ Loading grades from " + S.tclasses.length + " class" + (S.tclasses.length > 1 ? "es" : "") + "…")); app.appendChild(box);
+  if (tab === "alerts") { grAlerts(box); return; }
+  if (tab === "book") { box.innerHTML = ""; const c = h("div", { class: "card", id: "gr-book" }, h("b", {}, "Gradebook by class"), h("p", { class: "muted", style: "font-size:13px" }, "Every Homework, Quiz, Test and Lab report is added to its class's gradebook automatically, with columns you add for exams on paper, participation or extra credit. Weights, drops, late penalties, CSV, Excel and PDF are in each gradebook."));
+    S.tclasses.forEach(k => c.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "gr-gb-" + k.code, onclick: () => go("gradebook", { code: k.code }) }, h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), h("div", { class: "meta" }, "Class code " + k.code)))))); box.appendChild(c); return; }
+  gradesLoad(VIEWS.grades.fresh).then(M => { VIEWS.grades.fresh = false; box.innerHTML = ""; S.grBadge = M.rows.filter(r => r.pending || !r.reviewed).length; save();
+    const errs = M.per.filter(p => p.err); if (errs.length) box.appendChild(h("p", { class: "muted", id: "gr-errs" }, "❌ Couldn't load " + errs.map(p => p.k.name).join(", ") + ": " + errs[0].err));
+    if (tab === "stats") grStats(box, M); else grReview(box, M);
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card muted" }, "❌ " + e.message)); });
+};
+function grReview(box, M) {
+  const F = VIEWS.grades.f = VIEWS.grades.f || { st: "todo", code: "" }, pick = new Set(), now = srvNow();
+  const card = h("div", { class: "card", id: "gr-review" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap" }, h("b", {}, "Submissions to review"),
+    h("button", { class: "btn ghost small", id: "gr-refresh", onclick: () => { VIEWS.grades.fresh = true; DB.clearCache(); render(); } }, "Refresh")),
+    h("p", { class: "muted", style: "font-size:13px" }, "Work arrives here as soon as a student submits it, already scored where ChemFlip can grade it (multiple choice, numbers with your tolerances, units and significant figures, structures). Questions that need your judgment stay “Pending manual grading” and are never counted as zero before you grade them."));
+  const st = h("select", { class: "field", id: "gr-f-st", "aria-label": "Show", onchange: e => { F.st = e.target.value; draw(); } }, [["todo", "Needs review"], ["pending", "Pending manual grading"], ["auto", "Auto-graded, not reviewed"], ["reviewed", "Reviewed"], ["held", "Grades not released"], ["late", "Late"], ["all", "All submissions"]].map(([v, t]) => h("option", { value: v, selected: F.st === v ? "" : null }, t)));
+  const cl = h("select", { class: "field", id: "gr-f-cls", "aria-label": "Class", onchange: e => { F.code = e.target.value; draw(); } }, [["", "All classes"]].concat(S.tclasses.map(k => [k.code, k.name])).map(([v, t]) => h("option", { value: v, selected: F.code === v ? "" : null }, t)));
+  card.appendChild(h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin:6px 0" }, st, cl));
+  const bar = h("div", { class: "bulkbar", id: "gr-bulk", style: "display:none", role: "region", "aria-label": "Actions for selected submissions" }), list = h("div", { id: "gr-list" });
+  card.appendChild(bar); card.appendChild(list); box.appendChild(card);
+  const pass = r => (!F.code || r.code === F.code) && (F.st === "all" || (F.st === "todo" ? r.pending || !r.reviewed : F.st === "pending" ? r.pending : F.st === "auto" ? !r.pending && !r.reviewed : F.st === "reviewed" ? r.reviewed : F.st === "held" ? !r.released : r.late));
+  const sel = () => M.rows.filter(r => pick.has(r.aid + "|" + r.sid));
+  const run = async (fn, msg) => { try { await fn(); toast("✅ " + msg); VIEWS.grades.fresh = true; DB.clearCache(); render(); } catch (e) { toast("❌ " + e.message); } };
+  const byClass = rs => { const m = new Map(); rs.forEach(r => { if (!m.has(r.code)) m.set(r.code, []); m.get(r.code).push(r); }); return m; };
+  function drawBar() { bar.innerHTML = ""; bar.style.display = pick.size ? "" : "none"; if (!pick.size) return; const rs = sel(), acts = [...new Set(rs.map(r => r.aid))];
+    bar.appendChild(h("b", {}, rs.length + " selected"));
+    bar.appendChild(h("button", { class: "btn sec2 small", id: "gr-mark", onclick: () => run(async () => { for (const [code, l] of byClass(rs)) await xCall({ op: "grades", action: "mark", class_code: code, items: l.map(r => ({ assignment_id: r.aid, sid: r.sid })), on: true }); }, "Marked " + rs.length + " reviewed") }, "Mark reviewed"));
+    bar.appendChild(h("button", { class: "btn sec2 small", id: "gr-release", onclick: () => confirmBox("Release grades now?", "Students in " + acts.length + " activit" + (acts.length > 1 ? "ies" : "y") + " see their grades right away (everyone in those activities, not only the ones selected).", () => run(async () => { for (const [code, l] of byClass(rs)) await xCall({ op: "grades", action: "release", class_code: code, ids: [...new Set(l.map(r => r.aid))], mode: "now" }); }, "Grades released"), "Release") }, "Release grades"));
+    bar.appendChild(h("button", { class: "btn ghost small", id: "gr-hold", onclick: () => confirmBox("Hold grades until you release them?", "Students in " + acts.length + " activit" + (acts.length > 1 ? "ies" : "y") + " won't see scores until you press Release grades. Use this to check automatic scores first.", () => run(async () => { for (const [code, l] of byClass(rs)) await xCall({ op: "grades", action: "release", class_code: code, ids: [...new Set(l.map(r => r.aid))], mode: "hold" }); }, "Grades held"), "Hold") }, "Hold grades"));
+    const redo = rs.filter(r => r.kind !== "lab");
+    if (redo.length) bar.appendChild(h("button", { class: "btn ghost small", id: "gr-return", onclick: () => confirmBox("Return for revision?", redo.length + " student" + (redo.length > 1 ? "s get" : " gets") + " one more attempt, open until the activity's lock date. Their current score is kept; the best attempt counts.", () => run(async () => {
+      const byA = new Map(); redo.forEach(r => { if (!byA.has(r.aid)) byA.set(r.aid, []); byA.get(r.aid).push(r.sid); });
+      for (const [aid, sids] of byA) await asgCall({ action: "override_many", assignment_id: aid, targets: sids, due_at: null, lock_at: null, extra_minutes: 0, extra_attempts: 1, accommodation: false, note: "Returned for revision" }); }, "Returned for revision"), "Return") }, "Return for revision")); }
+  function draw() { list.innerHTML = ""; pick.clear(); drawBar(); const rs = M.rows.filter(pass);
+    if (!rs.length) { list.appendChild(h("p", { class: "muted", id: "gr-none" }, F.st === "todo" ? "Nothing waiting. New submissions appear here as students submit." : "No submissions match.")); return; }
+    const wrap = h("div", { style: "overflow-x:auto" }), t = h("table", { class: "t", id: "gr-table" }), tb = h("tbody", {});
+    const all = h("input", { type: "checkbox", id: "gr-all", "aria-label": "Select all shown", onchange: e => { rs.forEach(r => { const k = r.aid + "|" + r.sid, cb = document.getElementById("gr-cb-" + r.aid.slice(0, 8) + "-" + r.sid); e.target.checked ? pick.add(k) : pick.delete(k); if (cb) cb.checked = e.target.checked; }); drawBar(); } });
+    t.appendChild(h("thead", {}, h("tr", {}, h("th", { scope: "col" }, all), ...["Student", "Class", "Assessment", "Submitted", "Score", "Status", ""].map(x => h("th", { scope: "col" }, x)))));
+    rs.slice(0, 300).forEach(r => { const k8 = r.aid.slice(0, 8), [lab, tone] = grStatus(r), id = "gr-cb-" + k8 + "-" + r.sid;
+      tb.appendChild(h("tr", { id: "gr-r-" + k8 + "-" + r.sid },
+        h("td", {}, h("input", { type: "checkbox", id, "aria-label": "Select " + r.name + ", " + r.title, onchange: e => { e.target.checked ? pick.add(r.aid + "|" + r.sid) : pick.delete(r.aid + "|" + r.sid); drawBar(); } })),
+        h("td", {}, r.name), h("td", {}, r.cname), h("td", {}, (r.kind === "assignment" ? "Homework" : KIND[r.kind]) + ": " + r.title),
+        h("td", {}, r.at ? fmtTz(r.at, localTz(), false) : "—", r.late ? h("span", { class: "chip warn", style: "margin-left:4px" }, "late") : null),
+        h("td", {}, r.pending ? "Pending" : Math.round(r.score * 100) / 100 + " / " + r.total),
+        h("td", {}, h("span", { class: "chip " + tone }, lab), " ", h("span", { class: "chip " + (r.released ? "ok" : "") }, r.released ? "Released" : r.held ? "Held" : "Releases " + fmtTz(r.rel_at, localTz(), false))),
+        h("td", {}, h("button", { class: "btn sec2 small", id: "gr-open-" + k8 + "-" + r.sid, "aria-label": (r.pending ? "Grade " : "Open ") + r.name + "'s " + r.title, onclick: () => grOpen(r) }, r.pending ? "Grade" : "Open")))); });
+    t.appendChild(tb); wrap.appendChild(t); list.appendChild(wrap);
+    if (rs.length > 300) list.appendChild(h("p", { class: "muted" }, "Showing the newest 300 of " + rs.length + ". Filter by class to see the rest.")); }
+  draw();
+}
+// Opens the student's latest submitted attempt in the grading screen (lab reports open in the activity's page).
+async function grOpen(r) {
+  S.cls = { code: r.code, name: r.cname, role: "teacher" }; save();
+  if (r.kind === "lab") { go("asgdetail", { id: r.aid, code: r.code }); return; }
+  try { const j = await asgCall({ action: "detail", id: r.aid }, { fresh: true }); const m = (j.roster || []).find(x => x.sid === r.sid);
+    const at = m && (m.attempts || []).filter(x => x.status !== "in_progress").sort((a, b) => Date.parse(b.submitted_at || 0) - Date.parse(a.submitted_at || 0))[0];
+    if (!at) { go("asgdetail", { id: r.aid, code: r.code }); return; } go("asggrade", { attempt_id: at.id }); } catch (e) { toast("❌ " + e.message); } }
+function median(v) { if (!v.length) return null; const s = v.slice().sort((a, b) => a - b), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function grStats(box, M) {
+  const ok = M.per.filter(p => p.gb); if (!ok.length) return;
+  const code = VIEWS.grades.sc && ok.some(p => p.k.code === VIEWS.grades.sc) ? VIEWS.grades.sc : ok[0].k.code, P = ok.find(p => p.k.code === code);
+  const R = S.riskCfg = Object.assign({ on: false, below: 70, missing: 2 }, S.riskCfg || {});
+  const card = h("div", { class: "card", id: "gr-stats" }, h("b", {}, "Analytics"));
+  card.appendChild(h("select", { class: "field", id: "gr-s-cls", "aria-label": "Class", style: "margin:6px 0", onchange: e => { VIEWS.grades.sc = e.target.value; render(); } }, ok.map(p => h("option", { value: p.k.code, selected: p.k.code === code ? "" : null }, p.k.name))));
+  const G = gbCompute(P.gb, P.gb.settings), n = G.rows.length, r1 = x => x == null ? "—" : Math.round(x * 10) / 10;
+  const tot = G.rows.map(x => x.total).filter(x => x != null);
+  card.appendChild(h("p", { id: "gr-s-sum" }, n + " students · class average " + r1(G.classAvg) + "% · median " + r1(median(tot)) + "% · highest " + (tot.length ? r1(Math.max(...tot)) : "—") + "% · lowest " + (tot.length ? r1(Math.min(...tot)) : "—") + "%"));
+  const bins = [["A (90+)", 90, 101], ["B (80–89)", 80, 90], ["C (70–79)", 70, 80], ["D (60–69)", 60, 70], ["F (below 60)", -1, 60]].map(([l, lo, hi]) => [l, tot.filter(v => v >= lo && v < hi).length]);
+  const mx = Math.max(1, ...bins.map(b => b[1])), dist = h("div", { id: "gr-dist", role: "img", "aria-label": "Grade distribution: " + bins.map(b => b[0] + " " + b[1]).join(", ") });
+  bins.forEach(([l, c]) => dist.appendChild(h("div", { style: "display:flex;align-items:center;gap:8px;margin:3px 0", "aria-hidden": "true" }, h("span", { style: "width:110px;font-size:13px" }, l), h("span", { style: "height:14px;border-radius:4px;background:var(--teal);width:" + Math.round(c / mx * 220) + "px" }), h("span", { style: "font-size:13px" }, String(c)))));
+  card.appendChild(h("b", { style: "display:block;margin-top:8px" }, "Grade distribution (course total)")); card.appendChild(dist);
+  const wrap = h("div", { style: "overflow-x:auto;margin-top:10px" }), t = h("table", { class: "t", id: "gr-s-table" }), tb = h("tbody", {});
+  t.appendChild(h("thead", {}, h("tr", {}, ...["Activity", "Submitted", "Average", "Median", "High", "Low", "Missing"].map(x => h("th", { scope: "col" }, x)))));
+  G.cols.forEach(c => { const v = G.rows.map(x => x.cells[c.id]).filter(Boolean), got = v.filter(x => x.pts != null && x.max > 0 && x.st !== "excused" && x.st !== "missing").map(x => x.pts / x.max * 100), miss = v.filter(x => x.st === "missing").length;
+    tb.appendChild(h("tr", {}, h("td", {}, c.title), h("td", {}, got.length + " / " + n + (n ? " (" + Math.round(got.length / n * 100) + "%)" : "")), h("td", {}, got.length ? r1(got.reduce((a, b) => a + b, 0) / got.length) + "%" : "—"), h("td", {}, got.length ? r1(median(got)) + "%" : "—"),
+      h("td", {}, got.length ? r1(Math.max(...got)) + "%" : "—"), h("td", {}, got.length ? r1(Math.min(...got)) + "%" : "—"), h("td", {}, String(miss)))); });
+  t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap);
+  // optional indicator, on the instructor's own thresholds; worded as a prompt to check in, never a verdict
+  const rc = h("div", { class: "card", id: "gr-risk" }, h("b", {}, "Students who may need support (optional)"));
+  const on = h("input", { type: "checkbox", id: "gr-risk-on", onchange: e => { R.on = e.target.checked; save(); render(); } }); on.checked = R.on;
+  rc.appendChild(h("label", { class: "check", for: "gr-risk-on" }, on, h("span", {}, "Show students below a course total or with missing work")));
+  if (R.on) { const below = h("input", { class: "field", id: "gr-risk-below", type: "number", min: "1", max: "100", value: R.below, style: "width:80px", onchange: e => { R.below = Math.max(1, Math.min(100, +e.target.value || 70)); save(); render(); } });
+    const miss = h("input", { class: "field", id: "gr-risk-miss", type: "number", min: "1", max: "50", value: R.missing, style: "width:80px", onchange: e => { R.missing = Math.max(1, Math.min(50, +e.target.value || 2)); save(); render(); } });
+    rc.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, h("label", { for: "gr-risk-below" }, "Course total below (%)"), below, h("label", { for: "gr-risk-miss" }, "or missing at least"), miss));
+    const hit = G.rows.filter(x => (x.total != null && x.total < R.below) || x.missing >= R.missing);
+    rc.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Based only on the numbers above and your settings. It's a prompt to check in with a student, not a judgment about them."));
+    rc.appendChild(hit.length ? h("ul", { id: "gr-risk-list" }, hit.map(x => h("li", {}, x.m.name + ": " + (x.total != null ? r1(x.total) + "%" : "no grades yet") + (x.missing ? ", " + x.missing + " missing" : "")))) : h("p", { id: "gr-risk-none" }, "No students match these settings.")); }
+  box.appendChild(card); box.appendChild(rc);
+}
+function grAlerts(box) {
+  xCall({ op: "grades", action: "alerts_get" }).then(j => { box.innerHTML = ""; const A = j.alerts || { mode: "off", late: true };
+    const c = h("div", { class: "card", id: "gr-alerts" }, h("b", {}, "Alerts about new submissions"),
+      h("p", { class: "muted", style: "font-size:13px" }, "New submissions always show in Submissions to review and on the Grades link. Email is optional" + (j.email ? " and goes to " + j.email + "." : ". It needs your verified instructor email.")));
+    const opts = [["off", "No emails (default)"], ["immediate", "Email me new submissions (about every 10 minutes, grouped)"], ["daily", "One summary a day"], ["manual", "Only work that needs my grading"]];
+    opts.forEach(([v, t]) => { const r = h("input", { type: "radio", name: "gr-al", id: "gr-al-" + v, value: v }); r.checked = A.mode === v; c.appendChild(h("label", { class: "check", for: "gr-al-" + v }, r, h("span", {}, t))); });
+    const late = h("input", { type: "checkbox", id: "gr-al-late" }); late.checked = A.late !== false;
+    c.appendChild(h("label", { class: "check", for: "gr-al-late" }, late, h("span", {}, "Include late submissions (with “Only work that needs my grading”)")));
+    const out = h("div", { id: "gr-al-msg", role: "status", "aria-live": "polite", class: "muted" });
+    c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "gr-al-save", disabled: !j.email ? "" : null, onclick: async () => { const v = (c.querySelector("input[name=gr-al]:checked") || {}).value || "off";
+      try { await xCall({ op: "grades", action: "alerts_set", mode: v, late: late.checked }); out.textContent = "✅ Saved."; toast("✅ Alerts saved"); } catch (e) { out.textContent = "❌ " + e.message; } } }, "Save")));
+    c.appendChild(out); box.appendChild(c);
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card muted" }, "❌ " + e.message)); });
+}
 VIEWS.ihome = function () {
   const p = S.profile, first = (p.name || "").trim().split(/\s+/)[0];
   document.body.classList.add("ihome");
@@ -5455,7 +5598,8 @@ VIEWS.ihome = function () {
     if (DB) DB.get("members", "class_code=eq." + k.code).then(m => { const n = (m || []).filter(x => x.sid !== sid()).length; cnt.textContent = "Class code " + k.code + " · " + n + " student" + (n === 1 ? "" : "s"); }).catch(() => {}); });
   app.appendChild(mc);
   const g = h("div", { class: "dash", id: "inst-dash", role: "list" });
-  [dashCard("assign", "pen", "Create assignment", "Graded work with open, due and lock dates", () => pickClass(toTab("graded"))),
+  [dashCard("grades", "chart", "Grades", "Submissions to review, gradebooks, analytics", () => go("grades"), S.grBadge || null),
+   dashCard("assign", "pen", "Create assignment", "Graded work with open, due and lock dates", () => pickClass(toTab("graded"))),
    dashCard("deadlines", "exam", "Deadlines & extensions", "Extend for a student, a group or the class", () => pickClass(toTab("graded"))),
    dashCard("calendar", "cal", "Calendar", "Every class's due, lock and opening dates", () => go("calendar")),
    dashCard("chapters", "book", "Assign chapters", "Practice chapters and a due note", () => pickClass(toTab("assign"))),
@@ -5468,6 +5612,8 @@ VIEWS.ihome = function () {
    dashCard("games", "game", "Live class games", "Host a quiz game on the projector", () => go("games")),
    dashCard("settings", "gear", "Settings", "Sync, sound, theme, privacy", () => go("settings"))].forEach(x => g.appendChild(x));
   app.appendChild(h("h3", { class: "dh" }, "Teaching tools")); app.appendChild(g);
+  if ((S.tclasses || []).length && DB && DB.live && (!VIEWS.ihome.gAt || Date.now() - VIEWS.ihome.gAt > 120e3)) { VIEWS.ihome.gAt = Date.now();
+    gradesLoad().then(M => { const n = M.rows.filter(r => r.pending || !r.reviewed).length; if (n !== (S.grBadge || 0)) { S.grBadge = n; save(); if (cur().view === "home") renderSide(); } }).catch(() => {}); }
 };
 VIEWS.qbank = function () {
   if (!isTeacher()) { toast("The question bank with answers is for verified instructors."); back(); return; }
@@ -5534,10 +5680,13 @@ async function loadDeadlines(force) {
     if (isTeacher()) {
       for (const k of (S.tclasses || []).slice(0, 20)) { const j = await asgCall({ action: "list", class_code: k.code }, { fresh: true }); out.tz = out.tz || j.tz;
         j.assignments.forEach(a => out.items.push({ id: a.id, cls: k.name, code: k.code, kind: a.kind, title: a.title, open: a.open_at, due: a.due_at, lock: a.lock_at || a.due_at, tz: j.tz || localTz(), teacher: true, submitted: a.submitted, published: a.published })); }
-    } else if (S.cls && S.cls.role !== "teacher") {
-      const j = await asgCall({ action: "mine", class_code: S.cls.code }, { fresh: true }); out.tz = j.tz;
-      j.assignments.forEach(a => out.items.push({ id: a.id, cls: S.cls.name, code: S.cls.code, kind: a.kind, title: a.title, open: a.effective.open_at, due: a.effective.due_at, lock: a.effective.lock_at, tz: j.tz || localTz(),
-        ext: a.effective.source !== "base", state: a.state, done: a.submitted > 0 && !a.in_progress, inprog: !!a.in_progress, canvas: !!a.canvas_linked, grade: a.grade_released ? a.grade : null }));
+    } else {
+      // 5.0: every class the student has joined (the Upcoming panel and My Grades cover all of them)
+      const ks = await myClasses();
+      for (const k of ks.slice(0, 12)) { let j; try { j = await asgCall({ action: "mine", class_code: k.code }, { fresh: true }); } catch (e) { continue; } out.tz = out.tz || j.tz;
+        j.assignments.forEach(a => out.items.push({ id: a.id, cls: k.name, code: k.code, course: k.course || null, kind: a.kind, title: a.title, open: a.effective.open_at, due: a.effective.due_at, lock: a.effective.lock_at, tz: j.tz || localTz(),
+          ext: a.effective.source !== "base", state: a.state, done: a.submitted > 0 && !a.in_progress, inprog: !!a.in_progress, canvas: !!a.canvas_linked, grade: a.grade_released ? a.grade : null,
+          released: !!a.grade_released, used: a.attempts_used || 0, max: a.effective.max_attempts || a.max_attempts || null, rel_at: a.grade_release_at || null })); }
     }
     S.dlCache = out; save(); return out;
   } catch (e) { return c || null; }
@@ -5609,6 +5758,114 @@ function remLine(it) {
   if (it.canvas && !P.canvas) return "Canvas sends the reminders for this one";
   return P.on ? "Reminders 3 days, 1 day and 2 hours before" : "Reminders are off";
 }
+// 5.0: the classes this student has joined (server list, so it is the same on every device); falls back to the current class.
+async function myClasses(force) {
+  const C = S.myCls, withCur = l => (S.cls && S.cls.role !== "teacher" && !l.some(k => k.code === S.cls.code)) ? [{ code: S.cls.code, name: S.cls.name }].concat(l) : l;
+  if (!force && C && Date.now() - C.at < 2 * 60e3) return withCur(C.list);   // the current class is always included, even if joined a moment ago
+  let list = null; try { const j = await xCall({ op: "me", action: "classes" }); list = j.classes || []; } catch (e) {}
+  if (!list) list = C ? C.list : [];
+  S.myCls = { at: Date.now(), list }; save(); return withCur(list);
+}
+const UP_ICON = { assignment: "📘", quiz: "📝", test: "📋", lab: "🧪" };
+const UP_FILTERS = [["all", "All"], ["assignment", "Homework"], ["quiz", "Quizzes"], ["test", "Tests and exams"], ["lab", "Lab reports"], ["week", "Due this week"], ["done", "Completed"]];
+// Status and the button a student sees for one item (Phase 10 of the Grades spec).
+function upStatus(it, now) {
+  const due = Date.parse(it.due), lock = Date.parse(it.lock || it.due), open = it.open ? Date.parse(it.open) : 0;
+  if (it.done) { if (it.released && it.grade) return it.grade.pending ? ["Pending instructor review", "done", "View submission"] : ["Grade released: " + Math.round(it.grade.score * 100) / 100 + "/" + it.grade.total, "done", "View grade"];
+    return [it.rel_at && Date.parse(it.rel_at) > now ? "Submitted · grade released " + fmtTz(it.rel_at, localTz(), false) : "Submitted", "done", "View submission"]; }
+  if (open && now < open) return ["Available " + fmtTz(it.open, localTz(), false), "up", "View details"];
+  if (it.inprog) return ["In progress", now > due ? "od" : "", "Continue"];
+  if (now >= lock) return ["Closed · not submitted", "od", "View details"];
+  if (now > due) return ["Overdue · late work accepted until " + fmtTz(it.lock, localTz(), false), "od", it.kind === "lab" ? "Open lab report" : "Start"];
+  return ["Not started", "", it.kind === "lab" ? "Open lab report" : "Start"];
+}
+function upGroup(it, now) {
+  if (it.done) return "done"; const due = Date.parse(it.due), lock = Date.parse(it.lock || it.due);
+  if (now > due) return now >= lock && now - lock > 14 * 864e5 ? null : "od";
+  const d = new Date(now), t = new Date(due); if (t.toDateString() === d.toDateString()) return "today";
+  return due - now <= 48 * 36e5 ? "soon" : "up";
+}
+const UP_GROUPS = [["od", "Overdue", "bad"], ["today", "Due today", "warn"], ["soon", "Due soon (48 hours)", "warn"], ["up", "Upcoming", ""], ["done", "Completed", "ok"]];
+// Opens the item in My assignments (switching class if needed) and presses its Start / Continue button where that applies.
+function upOpen(it, label) {
+  if (!S.cls || S.cls.code !== it.code) { S.cls = { code: it.code, name: it.cls, role: "student" }; save(); }
+  go("myasg"); const k8 = it.id.slice(0, 8);
+  let n = 0; const t = setInterval(() => { n++; const card = document.getElementById("ma-" + k8); if (!card && n < 40) return; clearInterval(t); if (!card) return;
+    const btn = (label === "Start" || label === "Continue") && document.getElementById("ma-start-" + k8);
+    if (btn) btn.click(); else { card.scrollIntoView({ block: "center" }); card.setAttribute("tabindex", "-1"); card.focus(); card.classList.add("flash"); } }, 150);
+}
+function upcomingPanel() {
+  if (isTeacher()) return null;
+  const c = S.dlCache, now = srvNow(), f = S.upF || "all", cf = S.upC || "";
+  const box = h("aside", { class: "card upp", id: "up-panel", "aria-labelledby": "up-h" });
+  box.appendChild(h("h2", { id: "up-h", style: "font-size:17px;margin:0 0 6px" }, "Upcoming Assignments & Tests"));
+  if (!c || c.who !== "s") { box.appendChild(h("p", { class: "muted", id: "up-loading" }, S.cls || (S.myCls && S.myCls.list.length) ? "⏳ Loading your deadlines…" : "Join your class with its code to see its Homework, Quizzes, Tests and Lab reports here."));
+    if (!S.cls) box.appendChild(h("button", { class: "btn small", id: "up-join", onclick: () => go("classes") }, "Join a class")); return box; }
+  const classes = [...new Map(c.items.map(it => [it.code, it.cls])).entries()];
+  const ctl = h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
+    h("select", { class: "field", id: "up-filter", "aria-label": "Show", style: "flex:1 1 140px", onchange: e => { S.upF = e.target.value; save(); upRedraw(); } }, UP_FILTERS.map(([v, t]) => h("option", { value: v, selected: v === f ? "" : null }, t))),
+    classes.length > 1 ? h("select", { class: "field", id: "up-course", "aria-label": "Course", style: "flex:1 1 140px", onchange: e => { S.upC = e.target.value; save(); upRedraw(); } }, [["", "All courses"]].concat(classes).map(([v, t]) => h("option", { value: v, selected: v === cf ? "" : null }, t))) : null);
+  box.appendChild(ctl);
+  const pass = it => (!cf || it.code === cf) && (f === "all" || (f === "done" ? it.done : f === "week" ? !it.done && Date.parse(it.due) - now < 7 * 864e5 : it.kind === f));
+  const items = c.items.filter(pass).map(it => [it, upGroup(it, now)]).filter(([, g]) => g);
+  const tzL = localTz(); let shown = 0;
+  UP_GROUPS.forEach(([g, label, tone]) => { let list = items.filter(x => x[1] === g).map(x => x[0]).sort((a, b) => Date.parse(a.due) - Date.parse(b.due));
+    if (g === "done") list = list.reverse().slice(0, f === "done" ? 50 : 5);
+    if (!list.length) return; box.appendChild(h("div", { class: "upg " + tone, id: "up-g-" + g }, label + " (" + list.length + ")"));
+    list.forEach(it => { shown++; const [st, cls, btn] = upStatus(it, now), k8 = it.id.slice(0, 8), d = Date.parse(it.due) - now;
+      const cname = (it.course && CFG.courses.find(x => x.id === it.course) || {}).name;
+      const other = it.tz && it.tz !== tzL ? " (class time " + fmtTz(it.due, it.tz) + ")" : "";
+      box.appendChild(h("div", { class: "upi " + (g === "od" ? "od" : g === "today" ? "today" : g === "soon" ? "soon" : g === "done" ? "done" : ""), id: "up-" + k8 },
+        h("div", { class: "t" }, (UP_ICON[it.kind] || "•") + " " + it.title),
+        h("div", { class: "m" }, [cname, it.cls].filter(Boolean).join(" · ") + " · " + (it.kind === "assignment" ? "Homework" : KIND[it.kind])),
+        h("div", { class: "m" }, "Due " + fmtTz(it.due, tzL) + other + (it.ext ? " · your extension" : "")),
+        !it.done && d > 0 ? h("div", { class: "m" }, "Time remaining: ", h("span", { class: "upcd", "data-due": it.due }, left(d))) : null,
+        h("div", { class: "row" }, h("span", { class: "chip " + (cls === "od" ? "bad" : cls === "done" ? "ok" : "") }, st),
+          h("button", { class: "btn small" + (btn === "Start" || btn === "Continue" || btn === "Open lab report" ? "" : " sec2"), id: "up-go-" + k8, "aria-label": btn + ": " + it.title, onclick: () => upOpen(it, btn) }, btn)))); }); });
+  if (!shown) box.appendChild(h("p", { class: "muted", id: "up-none" }, f === "all" && !cf ? "Nothing due right now. New Homework, Quizzes, Tests and Lab reports from your instructors appear here." : "Nothing matches this filter."));
+  box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "up-join-more", onclick: () => { S.cls = null; save(); go("classes"); } }, "+ Join another class")));
+  box.appendChild(h("p", { class: "muted", style: "font-size:12px;margin-top:8px" }, "Times are in your time zone (" + tzL.replace(/_/g, " ") + "). Updated " + new Date(c.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + "; it refreshes by itself every minute."));
+  return box;
+}
+function upRedraw() { const old = document.getElementById("up-panel"); if (!old) return; const nw = upcomingPanel(); if (nw) old.replaceWith(nw); }
+// Keeps the panel current while the dashboard is open: countdowns every 30 s, the server list every minute and when the app comes back.
+let UP_T = null;
+function upStart() {
+  if (UP_T) return;
+  const pull = async () => { if (!document.getElementById("up-panel") || document.visibilityState === "hidden") return; const before = JSON.stringify((S.dlCache || {}).items || []);
+    const c = await loadDeadlines(!S.dlCache || Date.now() - S.dlCache.at > 55e3); if (c && JSON.stringify(c.items) !== before) upRedraw(); };
+  UP_T = setInterval(() => { document.querySelectorAll(".upcd").forEach(e => { e.textContent = left(Date.parse(e.dataset.due) - srvNow()); }); }, 30e3);
+  setInterval(pull, 60e3); document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pull(); }); window.addEventListener("focus", pull);
+}
+
+/* ----- 5.0 My Grades: the student's own released grades, class by class ----- */
+VIEWS.mygrades = function () {
+  document.getElementById("title").textContent = "My grades";
+  if (isTeacher()) { back0(); return; }
+  const c = S.dlCache, box = h("div", { id: "mg-box" }); app.appendChild(box);
+  if (!c || c.who !== "s" || Date.now() - c.at > 60e3) loadDeadlines(true).then(n => { if (n && cur().view === "mygrades" && !VIEWS.mygrades.once) { VIEWS.mygrades.once = true; render(); } });
+  if (!c || c.who !== "s") { box.appendChild(h("div", { class: "card muted", id: "mg-loading" }, S.cls ? "⏳ Loading your grades…" : "Join your class to see your grades here.")); return; }
+  VIEWS.mygrades.once = false;
+  box.appendChild(h("p", { class: "muted", id: "mg-note" }, "Only grades your instructor has released are shown. Only you and your instructors can see them."));
+  const byCls = new Map(); c.items.forEach(it => { if (!byCls.has(it.code)) byCls.set(it.code, []); byCls.get(it.code).push(it); });
+  if (!byCls.size) box.appendChild(h("div", { class: "card muted" }, "No graded work yet."));
+  byCls.forEach((list, code) => { const rel = list.filter(it => it.released && it.grade && !it.grade.pending);
+    const pts = rel.reduce((t, it) => t + it.grade.score * (1 - (it.grade.penalty_pct || 0) / 100), 0), tot = rel.reduce((t, it) => t + (Number(it.grade.total) || 0), 0);
+    const card = h("div", { class: "card", id: "mg-" + code }, h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, list[0].cls),
+      h("span", { class: "chip ok", id: "mg-avg-" + code }, tot ? "Released so far: " + Math.round(pts * 100) / 100 + " / " + tot + " points (" + Math.round(pts / tot * 1000) / 10 + "%)" : "No released grades yet")));
+    const wrap = h("div", { style: "overflow-x:auto" }), t = h("table", { class: "t", id: "mg-t-" + code });
+    t.appendChild(h("thead", {}, h("tr", {}, ...["Activity", "Type", "Due", "Status", "Grade"].map(x => h("th", { scope: "col" }, x)))));
+    const tb = h("tbody", {}); t.appendChild(tb);
+    list.slice().sort((a, b) => Date.parse(a.due) - Date.parse(b.due)).forEach(it => { const g = it.released && it.grade ? it.grade : null, now = srvNow();
+      const st = it.done ? (g ? (g.pending ? "Being graded" : "Grade released") : "Submitted, not released yet") : now > Date.parse(it.lock || it.due) ? "Missing" : now > Date.parse(it.due) ? "Overdue" : "Not submitted";
+      const sc = g && !g.pending ? Math.round(g.score * (1 - (g.penalty_pct || 0) / 100) * 100) / 100 + " / " + g.total + (g.penalty_pct ? " (late −" + g.penalty_pct + "%)" : "") : "—";
+      tb.appendChild(h("tr", { id: "mg-r-" + it.id.slice(0, 8) }, h("td", {}, it.title), h("td", {}, it.kind === "assignment" ? "Homework" : KIND[it.kind]), h("td", {}, fmtTz(it.due, localTz(), false)), h("td", {}, st), h("td", {}, sc))); });
+    wrap.appendChild(t); card.appendChild(wrap);
+    card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "mg-open-" + code, onclick: () => { if (!S.cls || S.cls.code !== code) { S.cls = { code, name: list[0].cls, role: "student" }; save(); } go("myasg"); } }, "Open assignments and feedback")));
+    box.appendChild(card); });
+  box.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "The percentage is points earned out of points possible in released work. Your instructor's gradebook may weight categories, drop scores or add extra credit, so your official course grade can differ."));
+};
+
 function comingUpCard() {
   if (isTeacher() || !S.cls) return null;
   const list = upcoming(S.dlCache, 3); if (!list.length) return null;
@@ -6693,6 +6950,14 @@ function gbCompute(d, S0) {
   const tv = R.map(x => x.total).filter(x => x != null);
   return { s, cols, cats: cats.filter(k => cols.some(c => c.cat === k)), rows: R, avg, classAvg: tv.length ? Math.round(10 * tv.reduce((a, b) => a + b, 0) / tv.length) / 10 : null };
 }
+// PDF: the gradebook table on its own, through the system print dialog ("Save as PDF"). Nothing leaves the device.
+function gbPrint(name) {
+  const w = document.getElementById("gb-wrap"); if (!w) return;
+  const old = { mh: w.style.maxHeight, ov: w.style.overflow }; w.style.maxHeight = "none"; w.style.overflow = "visible";
+  document.body.classList.add("print-gb"); document.title = (name || "Gradebook") + " gradebook " + new Date().toISOString().slice(0, 10);
+  const done = () => { document.body.classList.remove("print-gb"); w.style.maxHeight = old.mh; w.style.overflow = old.ov; document.title = "ChemFlip"; window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done); setTimeout(() => { try { window.print(); } catch (e) {} setTimeout(done, 1500); }, 50);
+}
 function gbCellText(v) { return v.st === "excused" ? "Excused" : v.st === "missing" ? (v.pts != null ? "0 (missing)" : "Missing") : v.st === "pending" ? "To grade" : v.st === "in_progress" ? "In progress" : v.pts != null ? String(v.pts) : ""; }
 function gbTable(G) {   // header row + data rows, shared by CSV and Excel
   const head = ["Student", "Student ID"].concat(G.cols.map(c => c.title + " (" + c.max + ")"), G.cats.map(k => k + " %"), ["Total %", "Letter", "Missing", "Late"]);
@@ -6747,7 +7012,8 @@ VIEWS.gradebook = function (arg) {
       h("div", { class: "muted", style: "font-size:13px" }, d.roster.length + " students · " + G.cols.length + " columns · " + (s.mode === "weighted" ? "weighted by category" : "total points") + (G.classAvg != null ? " · class average " + G.classAvg + "%" : "") + ". Scores come from ChemFlip work (best attempt, late penalties applied); add columns for paper exams or anything graded elsewhere."),
       h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "gb-add", onclick: () => gbItemSheet(code, null, reload) }, "+ Add column"),
         h("button", { class: "btn ghost small", id: "gb-csv", onclick: () => { labDownload(new Blob(["﻿" + gbCsv(G)], { type: "text/csv" }), fname("csv")); toast("⬇️ " + fname("csv")); } }, "⬇️ CSV"),
-        h("button", { class: "btn ghost small", id: "gb-xlsx", onclick: () => { labDownload(new Blob([gbXlsx(G, d.class_name)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fname("xlsx")); toast("⬇️ " + fname("xlsx")); } }, "⬇️ Excel")),
+        h("button", { class: "btn ghost small", id: "gb-xlsx", onclick: () => { labDownload(new Blob([gbXlsx(G, d.class_name)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fname("xlsx")); toast("⬇️ " + fname("xlsx")); } }, "⬇️ Excel"),
+        h("button", { class: "btn ghost small", id: "gb-pdf", onclick: () => gbPrint(d.class_name) }, "⬇️ PDF")),
       h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0 0" }, "Grades shown here are ChemFlip's. Canvas-linked assignments show 🔗; check Canvas Integration Settings for what has actually reached Canvas.")));
     // grading scheme
     const sc = JSON.parse(JSON.stringify(s)), schemeMsg = h("div", { class: "muted", role: "status", id: "gb-scheme-msg" });
