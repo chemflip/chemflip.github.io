@@ -2911,6 +2911,17 @@ async function payFetch(body) {
   return j;
 }
 async function payCall(body) { return await payFetch(Object.assign({ op: "pay" }, body)); }
+// 5.0: smaller services beside the main one (cf-x), with the same device identity: activity archive.
+async function xCall(body) {
+  if (!DB || !DB.live || !CFG.sb || !CFG.sb.url) throw new Error("This needs ChemFlip's online service.");
+  await signedIn();
+  let r; try { r = await fnFetch(CFG.sb.url.replace(/\/$/, "") + "/functions/v1/cf-x", { method: "POST", headers: { "Content-Type": "application/json", apikey: CFG.sb.key, "x-cf-sid": sid(), "x-cf-key": devKey() }, body: JSON.stringify(body) }); }
+  catch (e) { throw new Error("ChemFlip couldn't reach the internet. Check your connection and try again."); }
+  const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
+  if (!r.ok) { const e = new Error((j && j.error) || "Something went wrong (" + r.status + "). Nothing was changed; please try again."); e.status = r.status; throw e; }
+  if (body.action !== "archived" && DB.clearCache) DB.clearCache();
+  return j;
+}
 function applyPay(j) {
   if (!j) return;
   const was = isPremium();
@@ -5907,11 +5918,13 @@ const STATE = { open: ["Open", "ok"], late: ["Late — still accepted", "warn"],
 
 /* ----- instructor: list in the class screen ----- */
 function teacherAsg(c, done) {
-  asgCall({ action: "list", class_code: c.code }).then(j => {
+  Promise.all([asgCall({ action: "list", class_code: c.code }), xCall({ op: "act", action: "archived", class_code: c.code }).catch(() => null)]).then(([j, ar]) => {
+    const archIds = new Set(((ar && ar.archived) || []).map(x => x.id)); const archived = j.assignments.filter(a => archIds.has(a.id));
+    j = Object.assign({}, j, { assignments: j.assignments.filter(a => !archIds.has(a.id)) });
     ASG.tz = j.tz || null; const tz = j.tz || localTz();
     const wrap = h("div", { id: "asg-wrap" });
     const tzc = h("div", { class: "card", id: "asg-tz" }, h("b", {}, "Time zone for deadlines"), h("p", { class: "muted" }, "Students see every date in this time zone, whatever their device says."));
-    const sel = h("select", { class: "field", id: "asg-tz-sel" }, [...new Set([tz].concat(TZS))].map(z => h("option", { value: z, selected: z === tz ? "" : null }, z.replace(/_/g, " "))));
+    const sel = h("select", { class: "field", id: "asg-tz-sel", "aria-label": "Time zone for deadlines" }, [...new Set([tz].concat(TZS))].map(z => h("option", { value: z, selected: z === tz ? "" : null }, z.replace(/_/g, " "))));
     tzc.appendChild(sel); tzc.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: "asg-tz-save", onclick: async () => { try { await asgCall({ action: "tz", class_code: c.code, tz: sel.value }); toast("Time zone saved"); render(); } catch (e) { toast("❌ " + e.message); } } }, j.tz ? "Change time zone" : "Use this time zone")));
     if (!j.tz) tzc.style.borderLeft = "5px solid var(--gold)";
     wrap.appendChild(tzc);
@@ -5935,8 +5948,11 @@ function teacherAsg(c, done) {
     card.appendChild(bar);
     j.assignments.forEach(a => { const k8 = a.id.slice(0, 8), row = card.querySelector("#asg-" + k8); if (!row || !row.parentElement) return;   // 5.0: Edit and Quick edit on every row
       row.parentElement.appendChild(h("span", { class: "rowacts", style: "display:flex;gap:4px;flex-wrap:wrap" },
-        h("button", { class: "btn sec2 small", id: "asg-edit-" + k8, "aria-label": "Edit " + a.title, onclick: () => go(a.kind === "lab" ? "asgdetail" : "asgedit", { id: a.id, code: c.code }) }, a.kind === "lab" ? "Open" : a.kind === "assignment" ? "Edit Assignment" : "Edit Quiz"),
-        h("button", { class: "btn ghost small", id: "asg-qe-" + k8, "aria-label": "Quick edit " + a.title, onclick: () => quickSheet(a, c.code, tz, () => render()) }, "Quick edit"))); });
+        h("button", { class: "btn sec2 small", id: "asg-edit-" + k8, "aria-label": (a.kind === "lab" ? "Open " : a.kind === "assignment" ? "Edit Assignment " : "Edit Quiz ") + a.title, onclick: () => go(a.kind === "lab" ? "asgdetail" : "asgedit", { id: a.id, code: c.code }) }, a.kind === "lab" ? "Open" : a.kind === "assignment" ? "Edit Assignment" : "Edit Quiz"),
+        h("button", { class: "btn ghost small", id: "asg-qe-" + k8, "aria-label": "Quick edit " + a.title, onclick: () => quickSheet(a, c.code, tz, () => render()) }, "Quick edit"),
+        ...actButtons(a, c, tz))); });
+    if (archived.length) card.appendChild(archivedBox(archived, c, tz));
+    if (!ar) card.appendChild(h("p", { class: "muted", id: "asg-arch-off", style: "font-size:13px" }, "Archived activities couldn't be loaded right now, so they may appear in this list."));
     wrap.appendChild(card); done(wrap);
   }).catch(e => done(h("div", { class: "card muted" }, "❌ " + e.message)));
 }
@@ -6178,6 +6194,111 @@ function quickSheet(a, code, tz, after) {
         catch (e) { save.disabled = false; out.textContent = "❌ " + e.message; } };
       if (a.due_at && Date.parse(body.due_at) < Date.parse(a.due_at) - 60e3) confirmBox("Shorten the deadline?", "The due date moves earlier, from " + fmtTz(a.due_at, tz) + " to " + fmtTz(body.due_at, tz) + ". Students who planned on the old date could miss it.", go1, "Save anyway"); else go1(); } }, "Save changes");
     box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost", id: "qe-cancel", onclick: close }, "Cancel"), save)); box.appendChild(out);
+  });
+}
+/* ----- 5.0 activity management: View | Edit | Assign | Duplicate | Preview | Publish/Unpublish | Archive ----- */
+const W_OF = a => a.kind === "assignment" ? "Homework" : (KIND[a.kind] || "activity");
+function actButtons(a, c, tz) { const k8 = a.id.slice(0, 8), hidden = a.published === false;
+  const pub = async (on) => { try { await asgCall({ action: "bulk_asg", class_code: c.code, ids: [a.id], what: on ? "publish" : "unpublish" }); toast((on ? "✅ Published: " : "🙈 Hidden from students: ") + a.title); render(); } catch (e) { toast("❌ " + e.message); } };
+  return [
+    h("button", { class: "btn ghost small", id: "asg-view-" + k8, "aria-label": "View " + a.title, onclick: () => go("asgdetail", { id: a.id, code: c.code }) }, "View"),
+    h("button", { class: "btn ghost small", id: "asg-assign-" + k8, "aria-label": "Assign " + a.title, onclick: () => assignSheet(a, c, tz) }, "Assign"),
+    h("button", { class: "btn ghost small", id: "asg-dup-" + k8, "aria-label": "Duplicate " + a.title, onclick: () => dupSheet(a, c, tz) }, "Duplicate"),
+    a.kind === "lab" ? null : h("button", { class: "btn ghost small", id: "asg-prev-" + k8, "aria-label": "Preview " + a.title, onclick: () => asgPreview(a) }, "Preview"),
+    h("button", { class: "btn ghost small", id: "asg-pub-" + k8, "aria-label": (hidden ? "Publish " : "Unpublish ") + a.title, onclick: () => hidden ? pub(true)
+      : confirmBox("Hide " + a.title + " from students?", "Students won't see it until you publish it again. Submissions and grades are kept.", () => pub(false), "Unpublish") }, hidden ? "Publish" : "Unpublish"),
+    h("button", { class: "btn ghost small", id: "asg-arch-" + k8, "aria-label": "Archive " + a.title, onclick: () => confirmBox("Archive " + a.title + "?", "It's hidden from students and moves to Archived at the bottom of this list. Submissions, grades and the Gradebook column are kept. You can restore it any time.", async () => {
+      try { await xCall({ op: "act", action: "archive", class_code: c.code, ids: [a.id], on: true }); toast("📦 Archived: " + a.title); render(); } catch (e) { toast("❌ " + e.message); } }, "Archive") }, "Archive")].filter(Boolean); }
+function archivedBox(list, c, tz) {
+  const box = h("details", { id: "asg-archived", style: "margin-top:10px" }, h("summary", { class: "muted" }, "Archived (" + list.length + ")"));
+  list.forEach(a => { const k8 = a.id.slice(0, 8);
+    box.appendChild(h("div", { class: "ch", style: "align-items:center;gap:6px;margin-top:6px", id: "asg-archrow-" + k8 }, h("div", { style: "flex:1" }, h("div", { class: "t" }, KIND[a.kind] + ": " + a.title), h("div", { class: "meta" }, "Due " + fmtTz(a.due_at, tz) + " · " + (a.submitted || 0) + " submitted")),
+      h("button", { class: "btn ghost small", id: "asg-archview-" + k8, onclick: () => go("asgdetail", { id: a.id, code: c.code }) }, "View"),
+      h("button", { class: "btn sec2 small", id: "asg-restore-" + k8, onclick: async () => { try { await xCall({ op: "act", action: "archive", class_code: c.code, ids: [a.id], on: false }); toast("↩️ Restored (hidden until you publish it): " + a.title); render(); } catch (e) { toast("❌ " + e.message); } } }, "Restore"))); });
+  return box; }
+// Duplicate: a copy in this class or another of your sections, hidden until you publish it. Dates move with the new due date.
+function dupSheet(a, c, tz) {
+  const secs = (S.tclasses || []).filter(k => k && k.code); if (!secs.some(k => k.code === c.code)) secs.unshift({ code: c.code, name: c.name || c.code });
+  sheet("dup-sheet", "Duplicate: " + a.title, (box, close) => {
+    const title = h("input", { class: "field", id: "dup-title", maxlength: "120" }); title.value = ("Copy of " + a.title).slice(0, 120);
+    const to = h("select", { class: "field", id: "dup-class" }, secs.map(k => h("option", { value: k.code, selected: k.code === c.code ? "" : null }, (k.name || k.code) + (k.code === c.code ? " (this class)" : "") + " · " + k.code)));
+    const wk = new Date(srvNow() + 7 * 864e5), oldDue = Date.parse(a.due_at), past = !(oldDue > srvNow());
+    const due = h("input", { class: "field", id: "dup-due", type: "datetime-local" }); due.value = past ? isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59" : isoToZoned(a.due_at, tz);
+    const pub = h("input", { type: "checkbox", id: "dup-pub" });
+    const out = h("div", { id: "dup-msg", role: "status", "aria-live": "polite", class: "muted" });
+    box.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "The copy gets the same questions, points, answer key, attempts, time limit and late policy. Its other dates keep the same distance from the due date. Students' work isn't copied."));
+    box.appendChild(h("label", { class: "f", for: "dup-title" }, "Title")); box.appendChild(title);
+    box.appendChild(h("label", { class: "f", for: "dup-class" }, "Put the copy in")); box.appendChild(to);
+    box.appendChild(h("label", { class: "f", for: "dup-due" }, "Due (" + tz.replace(/_/g, " ") + ")")); box.appendChild(due);
+    box.appendChild(h("label", { class: "check", for: "dup-pub" }, pub, h("span", {}, "Publish the copy now (otherwise it stays hidden until you publish it)")));
+    const go1 = h("button", { class: "btn", id: "dup-save", onclick: async () => {
+      const newDue = zonedToIso(due.value, tz); if (!newDue) { out.textContent = "❌ Set a due date."; return; } if (!title.value.trim()) { out.textContent = "❌ Give the copy a title."; return; }
+      go1.disabled = true; out.textContent = "Copying…";
+      try { const d = (await asgCall({ action: "detail", id: a.id }, { fresh: true })).assignment, shift = Date.parse(newDue) - Date.parse(d.due_at);
+        const mv = v => v ? new Date(Date.parse(v) + shift).toISOString() : null;
+        const body = { action: "save", class_code: to.value, kind: d.kind, title: title.value.trim(), qids: d.qids || [], points: d.points || {}, answer_key: d.answer_key || {}, items: d.items || [],
+          open_at: mv(d.open_at), due_at: newDue, lock_at: mv(d.lock_at), grade_release_at: mv(d.grade_release_at), solution_release_at: mv(d.solution_release_at),
+          time_limit_min: d.time_limit_min || null, max_attempts: d.max_attempts || null, late_policy: d.late_policy || { mode: "accept" }, shuffle: !!d.shuffle, pool_draw: d.pool_draw || null,
+          instructions: d.instructions || "", published: pub.checked };
+        if (d.kind === "lab") { body.max_points = d.max_points; body.expect_pages = d.expect_pages; }
+        const r = await asgCall(body);
+        if (d.kind === "lab" && d.rubric && r.assignment) await asgCall({ action: "lab_rubric", assignment_id: r.assignment.id, rubric: d.rubric }).catch(() => {});
+        out.textContent = "✅ Copied."; toast("✅ Copied: " + body.title + (to.value !== c.code ? " → " + to.value : "")); setTimeout(() => { close(); render(); }, 400);
+      } catch (e) { go1.disabled = false; out.textContent = "❌ " + e.message; } } }, "Make the copy");
+    box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost", id: "dup-cancel", onclick: close }, "Cancel"), go1)); box.appendChild(out);
+  });
+}
+// Assign: everyone in a class sees its published activities, including students who join later. Selected students or a
+// group can be given their own dates (for example new students who joined after the due date).
+function assignSheet(a, c, tz) {
+  sheet("assign-sheet", "Assign: " + a.title, (box, close) => {
+    const body = h("div", { id: "assign-body" }, h("div", { class: "muted" }, "⏳ Loading the class…")); box.appendChild(body);
+    Promise.all([asgCall({ action: "detail", id: a.id }, { fresh: true }), DB.get("members", "class_code=eq." + c.code).catch(() => [])]).then(([j, mem]) => {
+      body.innerHTML = ""; const A = j.assignment, joined = {}; (mem || []).forEach(m => joined[m.sid] = m.joined_at);
+      const created = Date.parse(A.created_at || 0), roster = (j.roster || []).slice().sort((x, y) => String(x.name || "").localeCompare(String(y.name || "")));
+      const isNew = r => joined[r.sid] && Date.parse(joined[r.sid]) > created && !(r.attempts || []).length;
+      const hidden = A.published === false, wk = new Date(Math.max(srvNow(), Date.parse(A.due_at)) + 7 * 864e5);
+      const who = { v: "class" }, pick = new Set();
+      body.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Everyone in this class sees published activities, including students who join later. " + (hidden ? "This one is hidden right now." : "This one is published.") + " To give some students their own deadline (for example students who joined late), choose them below."));
+      const radio = (v, label) => { const r = h("input", { type: "radio", name: "assign-who", id: "assign-" + v, value: v, onchange: () => { who.v = v; draw(); } }); r.checked = who.v === v; return h("label", { class: "check", for: "assign-" + v }, r, h("span", {}, label)); };
+      const nNew = roster.filter(isNew).length;
+      body.appendChild(radio("class", "The whole class" + (hidden ? " (publishes it)" : "")));
+      body.appendChild(radio("students", "Selected students, with their own dates" + (nNew ? " · " + nNew + " new since it was created" : "")));
+      if ((j.groups || []).length) body.appendChild(radio("group", "A group, with its own dates"));
+      const area = h("div", { id: "assign-area" }); body.appendChild(area);
+      const out = h("div", { id: "assign-msg", role: "status", "aria-live": "polite", class: "muted" });
+      const due = h("input", { class: "field", id: "assign-due", type: "datetime-local" }); due.value = isoToZoned(Date.parse(A.due_at) > srvNow() ? A.due_at : wk.toISOString(), tz);
+      const lock = h("input", { class: "field", id: "assign-lock", type: "datetime-local" });
+      const grp = h("select", { class: "field", id: "assign-group" }, (j.groups || []).map(g => h("option", { value: g }, g)));
+      function draw() { area.innerHTML = "";
+        if (who.v === "class") { area.appendChild(h("p", { class: "muted", style: "font-size:13px" }, hidden ? "Publishing shows it to every student in the class, with its own dates (due " + fmtTz(A.due_at, tz) + ")." : "Nothing to change: the whole class already has it. Students who join later see it too.")); return; }
+        if (who.v === "students") {
+          if (!roster.length) { area.appendChild(h("p", { class: "muted" }, "No students have joined this class yet.")); return; }
+          if (nNew) area.appendChild(h("button", { class: "btn ghost small", id: "assign-pick-new", onclick: () => { roster.filter(isNew).forEach(r => pick.add(r.sid)); draw(); } }, "Select the " + nNew + " new student" + (nNew > 1 ? "s" : "")));
+          const list = h("div", { style: "max-height:220px;overflow:auto;border:1px solid var(--hair);border-radius:8px;padding:6px;margin:6px 0", role: "group", "aria-label": "Students" });
+          roster.forEach(r => { const cb = h("input", { type: "checkbox", id: "assign-s-" + r.sid, onchange: e => e.target.checked ? pick.add(r.sid) : pick.delete(r.sid) }); cb.checked = pick.has(r.sid);
+            list.appendChild(h("label", { class: "check", for: "assign-s-" + r.sid }, cb, h("span", {}, (r.name || "Student") + (isNew(r) ? " · new" : "") + ((r.attempts || []).length ? " · started" : "")))); });
+          area.appendChild(list);
+        } else { area.appendChild(h("label", { class: "f", for: "assign-group" }, "Group")); area.appendChild(grp); }
+        area.appendChild(h("label", { class: "f", for: "assign-due" }, "Their due date (" + tz.replace(/_/g, " ") + ")")); area.appendChild(due);
+        area.appendChild(h("label", { class: "f", for: "assign-lock" }, "Their available-until date (optional)")); area.appendChild(lock);
+        if (hidden) area.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "It's hidden right now, so it's published too. Everyone else keeps the class dates."));
+      }
+      draw();
+      const save = h("button", { class: "btn", id: "assign-save", onclick: async () => {
+        try { save.disabled = true; out.textContent = "Saving…";
+          if (who.v === "class") { if (hidden) await asgCall({ action: "bulk_asg", class_code: c.code, ids: [a.id], what: "publish" }); out.textContent = "✅ Assigned to the whole class."; toast("✅ Assigned to the whole class: " + a.title); setTimeout(() => { close(); render(); }, 400); return; }
+          const d = zonedToIso(due.value, tz), l = zonedToIso(lock.value, tz); if (!d) throw new Error("Set their due date.");
+          if (l && Date.parse(l) < Date.parse(d)) throw new Error("The available-until date can't be before the due date.");
+          if (who.v === "students") { if (!pick.size) throw new Error("Choose at least one student.");
+            await asgCall({ action: "override_many", assignment_id: a.id, targets: [...pick], due_at: d, lock_at: l, extra_minutes: 0, extra_attempts: 0, accommodation: false, note: "Assigned" }); }
+          else await asgCall({ action: "override", assignment_id: a.id, scope: "group", target: grp.value, due_at: d, lock_at: l, extra_minutes: 0, extra_attempts: 0, note: "Assigned" });
+          if (hidden) await asgCall({ action: "bulk_asg", class_code: c.code, ids: [a.id], what: "publish" });
+          const n = who.v === "students" ? pick.size + " student" + (pick.size > 1 ? "s" : "") : "group " + grp.value;
+          out.textContent = "✅ Assigned to " + n + ", due " + fmtTz(d, tz) + "."; toast("✅ Assigned to " + n); setTimeout(() => { close(); render(); }, 600);
+        } catch (e) { save.disabled = false; out.textContent = "❌ " + e.message; } } }, "Assign");
+      body.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost", id: "assign-cancel", onclick: close }, "Cancel"), save)); body.appendChild(out);
+    }).catch(e => { body.innerHTML = ""; body.appendChild(h("div", { class: "muted" }, "❌ " + e.message)); });
   });
 }
 const QE_STATE = (a, now) => a.published === false ? ["Hidden", "warn"] : a.open_at && Date.parse(a.open_at) > now ? ["Not open yet", ""] : now >= Date.parse(a.lock_at || a.due_at) ? ["Closed", "bad"] : now > Date.parse(a.due_at) ? ["Late work accepted", "warn"] : ["Open", "ok"];
@@ -7333,17 +7454,19 @@ VIEWS.admin = function () {
 const PRIV_ACT = { lab_open: "opened your lab report", attempt_view: "opened your answers", lab_grade: "graded your lab report", lab_grade_draft: "saved a draft grade for your lab report", grade: "graded your answers", gb_cell: "changed a gradebook entry", gb_import: "imported a score",
   feedback_file_add: "added a feedback file", feedback_file_remove: "removed a feedback file", extension_add: "gave you an extension", extension_update: "changed your extension", extension_remove: "removed your extension", extension_bulk: "gave you an extension", lab_add: "added a report you sent by email or on paper", student_remove: "removed you from the class", join_approve: "approved your join request", join_reject: "declined your join request" };
 const fmtBytes = b => b == null ? "—" : b >= 1073741824 ? (b / 1073741824).toFixed(2) + " GB" : b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+let PRIV_MSG = "";   // kept across redraws (a background refresh can redraw Settings right after the download)
 function privacyCard() {
   if (!DB || !DB.live) return null;
-  const out = h("div", { class: "muted", id: "priv-msg", role: "status", "aria-live": "polite" });
+  const out = h("div", { class: "muted", id: "priv-msg", role: "status", "aria-live": "polite" }, PRIV_MSG);
+  const say = t => { PRIV_MSG = t; const el = document.getElementById("priv-msg"); (el || out).textContent = t; };
   return h("div", { class: "card", id: "privacy-card" }, h("b", {}, "🔒 Privacy and my records"),
     h("p", { class: "muted" }, "Your class records (answers, grades, lab reports and feedback) can be seen only by you and the instructors of your classes. Files open only through private links that expire after 10 minutes."),
     h("div", { class: "btnrow", style: "flex-wrap:wrap" },
-      h("button", { class: "btn sec2 small", id: "priv-export", onclick: async () => { out.textContent = "Preparing your file…";
+      h("button", { class: "btn sec2 small", id: "priv-export", onclick: async () => { say("Preparing your file…");
         try { const j = await asgCall({ action: "priv_export" }); const blob = new Blob([JSON.stringify(j, null, 2)], { type: "application/json" });
           const a = h("a", { href: URL.createObjectURL(blob), download: "chemflip-my-data-" + new Date().toISOString().slice(0, 10) + ".json" }); document.body.appendChild(a); a.click(); a.remove();
-          out.textContent = "✓ Downloaded: " + j.classes.length + " class" + (j.classes.length === 1 ? "" : "es") + ", " + j.attempts.length + " attempt" + (j.attempts.length === 1 ? "" : "s") + ", " + j.lab_reports.length + " lab report" + (j.lab_reports.length === 1 ? "" : "s") + "."; }
-        catch (e) { out.textContent = "❌ " + e.message; } } }, "⬇️ Download my data"),
+          say("✓ Downloaded: " + j.classes.length + " class" + (j.classes.length === 1 ? "" : "es") + ", " + j.attempts.length + " attempt" + (j.attempts.length === 1 ? "" : "s") + ", " + j.lab_reports.length + " lab report" + (j.lab_reports.length === 1 ? "" : "s") + "."); }
+        catch (e) { say("❌ " + e.message); } } }, "⬇️ Download my data"),
       h("button", { class: "btn ghost small", id: "priv-access", onclick: privAccessSheet }, "👁️ Who has opened my records"),
       h("button", { class: "btn ghost small", onclick: () => go("privacy") }, "Privacy policy")), out);
 }
