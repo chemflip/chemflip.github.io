@@ -500,6 +500,7 @@ function storeCovers(cid) {
 function isPremium(cid) {
   cid = cid || course().id;
   if (typeof ltiLicensed === "function" && ltiLicensed(cid)) return true;
+  if (typeof instCovers === "function" && instCovers(cid)) return true;   // 5.0: a college or university license
   if (trialLeft() > 0 && !S.prem) return true;
   const p = S.prem; if (!p) return false;
   if (p.src === "store") return storeCovers(cid);
@@ -2916,6 +2917,7 @@ VIEWS.premium = function () {
     card.appendChild(h("p", { class: "muted", style: "font-size:12px" }, "Payment is charged to your " + (CFG.flavor === "play" ? "Google Play" : CFG.flavor === "msstore" ? "Microsoft" : "Apple ID") + " account. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period (or of the free trial), and can be managed or cancelled anytime in your " + (CFG.flavor === "play" ? "Google Play" : CFG.flavor === "msstore" ? "Microsoft" : "App Store") + " account settings. ", h("a", { href: "#", onclick: e => { e.preventDefault(); go("privacy"); } }, "Privacy policy"), " · ", h("a", { href: CFG.flavor === "msstore" ? "https://www.microsoft.com/en-us/storedocs/terms-of-sale" : "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/", target: "_blank" }, "Terms of use")));
   }
   if (storeFlavor() && !(S.prem && S.prem.src === "web")) card.appendChild(restoreBox(true));
+  { const ic = instPremiumCard(); if (ic) card.appendChild(ic); }
   if (!(S.prem && S.prem.src === "code")) {
     const inp = h("input", { class: "field code", id: "code", placeholder: CFG.app + "-XX-YYMM-XXXXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", value: CODE_FAIL ? CODE_FAIL.v : "" });
     const msg = h("div", { class: "muted", id: "code-msg", style: "margin-top:6px" + (CODE_FAIL ? ";color:var(--bad)" : "") }, CODE_FAIL ? "❌ " + CODE_FAIL.why : "🎓 Have an access code, a 50%-off code, or the invite code of the friend who invited you? Enter it here.");
@@ -2946,7 +2948,7 @@ async function payFetch(body) {
 }
 async function payCall(body) { return await payFetch(Object.assign({ op: "pay" }, body)); }
 // 5.0: smaller services beside the main one (cf-x), with the same device identity: activity archive.
-const XREAD = new Set(["archived", "classes", "meta", "alerts_get", "cfg_get", "get", "mine", "log", "inbox", "inbox_read", "seen", "activity", "rem_get"]);
+const XREAD = new Set(["archived", "classes", "meta", "alerts_get", "cfg_get", "get", "mine", "log", "inbox", "inbox_read", "seen", "activity", "rem_get", "list", "usage"]);
 async function xCall(body) {
   if (!DB || !DB.live || !CFG.sb || !CFG.sb.url) throw new Error("This needs ChemFlip's online service.");
   await signedIn();
@@ -3133,6 +3135,7 @@ function syncSubscriber() {
   (DB.upsMin ? DB.upsMin("subscribers", row, "email") : DB.ins("subscribers", row)).catch(() => {});
 }
 async function redeemCode(v, msg) {
+  if (/^\s*INST-/i.test(v || "")) return instRedeem(String(v).trim(), msg);
   msg.textContent = "Checking…"; msg.style.color = "";
   const r = await onlineCode(v);
   if (redeemInvite(r, msg)) return;
@@ -8385,6 +8388,124 @@ function customAnswerUI(card, Z, q) {
 /* ---------- administrator: instructor approvals (5.0) ---------- */
 const ADMIN_EMAILS = ["chemflipp@gmail.com"];
 function adminHint() { return !!(S.acct && S.acct.email && ADMIN_EMAILS.includes(S.acct.email.toLowerCase())) || !!S.isAdmin; }
+// ----- 5.0 Institutional Licensing: Premium from a college or university (codes, invitations, approved email domains)
+function instList() { const I = S.inst; if (!I || !Array.isArray(I.list)) return []; const now = Date.now(); return I.list.filter(l => Date.parse(l.ends_at) > now && Date.parse(l.starts_at) <= now); }
+function instCovers(cid) { return instList().some(l => !l.courses || !l.courses.length || l.courses.includes(cid) || (cid === "oall" && l.courses.includes("o1") && l.courses.includes("o2"))); }
+let _instP = null;
+function instRefresh(force) {
+  if (_instP || !DB || !DB.live || !CFG.sb || !S.profile) return _instP || Promise.resolve(null);
+  if (!force && S.inst && Date.now() - S.inst.at < 864e5) return Promise.resolve(S.inst);
+  const was = instList().length;
+  _instP = xCall({ op: "inst", action: "mine" }).then(j => { S.inst = { at: Date.now(), list: j.licenses || [] }; save();
+    if (instList().length > was) { toast("💎 Premium from " + instList()[0].name + " until " + new Date(instList()[0].ends_at).toLocaleDateString()); render(); } return S.inst; })
+    .catch(() => null).finally(() => { _instP = null; });
+  return _instP;
+}
+async function instRedeem(v, msg) {
+  msg.textContent = "Checking…"; msg.style.color = "";
+  try { const j = await xCall({ op: "inst", action: "redeem", code: v }); await instRefresh(true); CODE_FAIL = null; msg.textContent = "";
+    sfx("win"); toast("💎 " + (j.already ? "You already have" : "Unlocked:") + " Premium from " + j.license.name + " until " + new Date(j.license.ends_at).toLocaleDateString()); render(); }
+  catch (e) { sfx("bad"); msg.textContent = "❌ " + e.message; msg.style.color = "var(--bad)"; CODE_FAIL = { v, why: e.message }; }
+}
+function instPremiumCard() {
+  const L = instList(); if (!L.length && !(DB && DB.live)) return null;
+  const c = h("div", { class: "card", id: "inst-card", style: "margin:10px 0" }, h("b", {}, "🏫 School license"));
+  if (L.length) L.forEach(l => c.appendChild(h("div", { id: "inst-" + l.id.slice(0, 8) }, l.name + (l.department ? " · " + l.department : "") + ": Premium for " + (l.courses && l.courses.length ? l.courses.map(x => (CFG.courses.find(k => k.id === x) || { name: x }).name).join(", ") : "every course") + " until " + new Date(l.ends_at).toLocaleDateString() + (l.role === "instructor" ? " (instructor)" : ""))));
+  else c.appendChild(h("p", { class: "muted", style: "font-size:13px;margin:4px 0" }, "If your college or university has a ChemFlip license, enter its INST- code below, or check with your verified school email."));
+  c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "inst-check", onclick: async () => { const r = await instRefresh(true); toast(r && instList().length ? "✓ School license active" : "No school license found for your verified email. Your school can give you a code."); render(); } }, "Check for my school's license")));
+  return c;
+}
+// administrator
+const INST_DUR = [["sem", "One semester (5 months)", 152], ["6m", "Six months", 182], ["ay", "Academic year (10 months)", 304], ["12m", "Twelve months", 365], ["custom", "Custom dates", 0]];
+function instAdminCard(box) {
+  const card = h("div", { class: "card", id: "inst-admin" }, h("b", {}, "🏫 Institutional Licensing"), h("div", { class: "muted", role: "status", id: "inst-loading" }, "⏳ Loading…")); box.appendChild(card);
+  const call = async body => { const t = await acctToken(); if (!t) throw new Error("Sign in with the administrator email under Settings → Sync first."); return xCall(Object.assign({ op: "inst", token: t }, body)); };
+  const reload = () => { card.remove(); instAdminCard(box); };
+  call({ action: "list" }).then(j => { card.innerHTML = ""; const now = Date.parse(j.now) || Date.now(), day = 864e5;
+    card.appendChild(h("b", {}, "🏫 Institutional Licensing"));
+    card.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Give a college or university Premium for a period: access codes, email invitations, or anyone with a verified email at its approved domains. Suspending or ending a license stops access; students' records are kept."));
+    const soon = j.licenses.filter(l => l.status === "active" && Date.parse(l.ends_at) > now && Date.parse(l.ends_at) - now < 30 * day);
+    if (soon.length) card.appendChild(h("div", { id: "inst-soon", role: "status", style: "background:#fff4d6;color:#5a4300;border-radius:8px;padding:8px;margin:6px 0" }, "⚠️ Ending within 30 days: " + soon.map(l => l.name + " (" + new Date(l.ends_at).toLocaleDateString() + ")").join(", ") + ". You'll also get an email 30 and 7 days before."));
+    card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "inst-add", onclick: () => instEdit(null, call, reload) }, "+ Add a college or university"),
+      h("button", { class: "btn sec2 small", id: "inst-grant", onclick: () => instEdit(null, call, reload, true) }, "Grant Institutional Access (complimentary)")));
+    if (!j.licenses.length) card.appendChild(h("p", { class: "muted", id: "inst-none" }, "No licenses yet."));
+    j.licenses.forEach((l, i) => { const st = l.status !== "active" ? "Suspended" : now < Date.parse(l.starts_at) ? "Starts " + new Date(l.starts_at).toLocaleDateString() : now >= Date.parse(l.ends_at) ? "Ended" : "Active";
+      const seats = (n, m) => n + (m != null ? " / " + m : "");
+      const row = h("div", { class: "card", id: "inst-l-" + i, style: "margin:8px 0;border-left:4px solid " + (st === "Active" ? "var(--teal,#156082)" : "#999") },
+        h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, l.name + (l.department ? " · " + l.department : "")), h("span", { class: "chip" + (st === "Active" ? " ok" : ""), id: "inst-st-" + i }, st)),
+        h("div", { class: "muted", style: "font-size:13px" }, new Date(l.starts_at).toLocaleDateString() + " – " + new Date(l.ends_at).toLocaleDateString() + " · " + ({ campus: "Campus-wide", department: "Department", per_student: "Per student", per_instructor: "Per instructor" }[l.kind]) + " · students " + seats(l.students, l.max_students) + " · instructors " + seats(l.instructors, l.max_instructors) +
+          " · " + (l.courses && l.courses.length ? l.courses.length + " course" + (l.courses.length > 1 ? "s" : "") : "every course") + (l.domains.length ? " · domains " + l.domains.join(", ") : "") + " · " + (l.complimentary ? "Complimentary" : l.price != null ? "$" + Number(l.price).toFixed(2) + (l.price_note ? " (" + l.price_note + ")" : "") : "no price set")),
+        l.codes.length ? h("div", { style: "font-size:13px;margin-top:4px" }, "Codes: ", ...l.codes.filter(c => !c.revoked_at).map(c => h("span", { class: "chip", style: "margin:2px;font-family:monospace" }, c.code + " · " + c.role + " · " + c.uses + (c.max_uses != null ? "/" + c.max_uses : "") + " used",
+          h("button", { class: "btn ghost small", style: "padding:0 4px;margin-left:4px", "aria-label": "Revoke code " + c.code, onclick: () => confirmBox("Revoke " + c.code + "?", "Nobody new can use it. People who already joined keep access.", async () => { await call({ action: "revoke", id: l.id, code: c.code }); reload(); }, "Revoke") }, "✕")))) : null,
+        h("div", { class: "btnrow", style: "flex-wrap:wrap" }, h("button", { class: "btn ghost small", id: "inst-edit-" + i, onclick: () => instEdit(l, call, reload) }, "Edit"),
+          h("button", { class: "btn ghost small", id: "inst-codes-" + i, onclick: () => instCodes(l, call, reload) }, "Generate codes"),
+          h("button", { class: "btn ghost small", id: "inst-inv-" + i, onclick: () => instInvite(l, call, reload) }, "Invite / bulk enroll"),
+          h("button", { class: "btn ghost small", id: "inst-ext-" + i, onclick: () => instDates(l, call, reload, "extend") }, "Extend"),
+          h("button", { class: "btn ghost small", id: "inst-ren-" + i, onclick: () => instDates(l, call, reload, "renew") }, "Renew"),
+          h("button", { class: "btn ghost small", id: "inst-use-" + i, onclick: () => instUsage(l, call) }, "Usage report"),
+          h("button", { class: "btn ghost small", id: "inst-sus-" + i, style: l.status === "active" ? "color:var(--bad)" : "", onclick: () => l.status === "active" ? confirmBox("Suspend " + l.name + "?", "Its students and instructors lose license access until you activate it again. Nothing is deleted.", async () => { await call({ action: "status", id: l.id, status: "suspended" }); reload(); }, "Suspend") : call({ action: "status", id: l.id, status: "active" }).then(reload) }, l.status === "active" ? "Suspend" : "Activate")));
+      card.appendChild(row); });
+  }).catch(e => { card.innerHTML = ""; card.appendChild(h("b", {}, "🏫 Institutional Licensing")); card.appendChild(h("p", { class: "muted" }, "❌ " + e.message)); });
+}
+function instDateIn(id, label, iso) { const i = h("input", { class: "field", id, type: "date", value: iso ? new Date(iso).toLocaleDateString("en-CA") : "" }); return [h("label", { class: "f", for: id }, label), i]; }
+const instDay = (v, end) => v ? new Date(v + (end ? "T23:59:59" : "T00:00:00")).toISOString() : null;
+function instEdit(l, call, reload, grant) {
+  const msg = h("div", { class: "muted", role: "status", id: "inst-e-msg" }), F = l ? JSON.parse(JSON.stringify(l)) : { name: "", department: "", kind: "campus", courses: null, max_students: "", max_instructors: "", domains: [], complimentary: !!grant, price: "", price_note: "", notes: "" };
+  const inp = (id, lab, k, ex) => { const i = h("input", Object.assign({ class: "field", id, value: F[k] == null ? "" : F[k] }, ex || {})); i.oninput = () => F[k] = i.value; return [h("label", { class: "f", for: id }, lab), i]; };
+  const kind = h("select", { class: "field", id: "inst-e-kind", onchange: e => F.kind = e.target.value }, ...[["campus", "Campus-wide"], ["department", "Department"], ["per_student", "Per student (limit student places)"], ["per_instructor", "Per instructor (limit instructor places)"]].map(([v, t]) => h("option", { value: v, selected: F.kind === v ? "" : null }, t)));
+  const today = new Date(); const [sl, s] = instDateIn("inst-e-start", "Start date", l ? l.starts_at : today.toISOString()), [el, en] = instDateIn("inst-e-end", "End date", l ? l.ends_at : null);
+  const dur = h("select", { class: "field", id: "inst-e-dur", "aria-label": "Length", onchange: e => { const d = INST_DUR.find(x => x[0] === e.target.value); if (d && d[2] && s.value) { const x = new Date(s.value + "T00:00:00"); x.setDate(x.getDate() + d[2]); en.value = x.toLocaleDateString("en-CA"); } } }, ...INST_DUR.map(([v, t]) => h("option", { value: v }, t)));
+  if (!l) { const x = new Date(today); x.setDate(x.getDate() + 152); en.value = x.toLocaleDateString("en-CA"); }
+  const crs = h("div", { id: "inst-e-courses", role: "group", "aria-label": "Courses covered", style: "display:flex;flex-wrap:wrap;gap:10px" }, ...CFG.courses.map(c => { const b = h("input", { type: "checkbox", id: "inst-e-c-" + c.id }); b.checked = !F.courses || F.courses.includes(c.id); return h("label", { class: "check", for: "inst-e-c-" + c.id }, b, h("span", {}, c.name)); }));
+  const comp = h("input", { type: "checkbox", id: "inst-e-comp", onchange: e => F.complimentary = e.target.checked }); comp.checked = !!F.complimentary;
+  const m = gbModal("inst-e", grant ? "Grant Institutional Access" : l ? "Edit " + l.name : "Add a college or university",
+    ...inp("inst-e-name", "College or university", "name", { maxlength: "120", placeholder: "e.g. Palomar College" }), ...inp("inst-e-dept", "Department (optional; required for a department license)", "department", { maxlength: "120", placeholder: "e.g. Chemistry" }),
+    h("label", { class: "f", for: "inst-e-kind" }, "License type"), kind, sl, s, h("label", { class: "f", for: "inst-e-dur" }, "Length (sets the end date)"), dur, el, en,
+    ...inp("inst-e-ms", "Student places (empty = no limit)", "max_students", { type: "number", min: "0" }), ...inp("inst-e-mi", "Instructor places (empty = no limit)", "max_instructors", { type: "number", min: "0" }),
+    h("div", { class: "f" }, "Courses covered"), crs,
+    ...inp("inst-e-dom", "Approved email domains (comma-separated; anyone with a verified email there joins by themselves)", "domains", { placeholder: "palomar.edu, student.palomar.edu", value: (F.domains || []).join(", ") }),
+    h("label", { class: "check", for: "inst-e-comp" }, comp, h("span", {}, "Complimentary (free; no payment required)")),
+    ...inp("inst-e-price", "Price (custom pricing, a record only; leave empty if complimentary)", "price", { type: "number", min: "0", step: "0.01" }), ...inp("inst-e-pnote", "Pricing note", "price_note", { maxlength: "300", placeholder: "e.g. $4/student per semester, invoiced" }),
+    ...inp("inst-e-notes", "Notes (only you see them)", "notes", { maxlength: "1000" }),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "inst-e-save", onclick: async e => { const sel = CFG.courses.filter(c => document.getElementById("inst-e-c-" + c.id).checked).map(c => c.id);
+      if (!sel.length) { msg.textContent = "Choose at least one course."; return; }
+      const body = Object.assign({}, F, { action: "save", id: l ? l.id : undefined, starts_at: instDay(s.value), ends_at: instDay(en.value, true), courses: sel.length === CFG.courses.length ? null : sel, domains: String(document.getElementById("inst-e-dom").value).split(/[\s,;]+/).filter(Boolean) });
+      e.target.disabled = true; try { await call(body); m.remove(); toast(grant && !l ? "✅ Complimentary access granted" : "✅ Saved"); reload(); } catch (er) { e.target.disabled = false; msg.textContent = "❌ " + er.message; } } }, grant && !l ? "Grant access" : "Save")), msg);
+}
+function instCodes(l, call, reload) {
+  const msg = h("div", { role: "status", id: "inst-c-msg" }), role = h("select", { class: "field", id: "inst-c-role" }, h("option", { value: "student" }, "Students"), h("option", { value: "instructor" }, "Instructors"));
+  const n = h("input", { class: "field", id: "inst-c-n", type: "number", min: "1", max: "50", value: "1", style: "width:90px" }), mx = h("input", { class: "field", id: "inst-c-max", type: "number", min: "1", placeholder: "no limit", style: "width:120px" });
+  gbModal("inst-c", "Access codes for " + l.name, h("p", { class: "muted", style: "font-size:13px" }, "Share a code with the class; each person enters it once under Premium. Places are limited by the license; a code can also have its own limit."),
+    h("label", { class: "f", for: "inst-c-role" }, "For"), role, h("label", { class: "f", for: "inst-c-n" }, "How many codes"), n, h("label", { class: "f", for: "inst-c-max" }, "Uses per code"), mx,
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "inst-c-go", onclick: async () => { try { const j = await call({ action: "codes", id: l.id, role: role.value, n: +n.value, max_uses: mx.value || null }); msg.innerHTML = ""; msg.appendChild(h("div", {}, "✅ " + j.codes.length + " code" + (j.codes.length > 1 ? "s" : "") + ":")); msg.appendChild(h("pre", { id: "inst-c-list", style: "user-select:all;white-space:pre-wrap" }, j.codes.join("\n"))); reload(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Generate")), msg);
+}
+function instInvite(l, call, reload) {
+  const msg = h("div", { role: "status", id: "inst-i-msg" }), ta = h("textarea", { class: "field", id: "inst-i-emails", rows: "6", placeholder: "one email per line, or paste a column from a spreadsheet" }), role = h("select", { class: "field", id: "inst-i-role" }, h("option", { value: "student" }, "Students"), h("option", { value: "instructor" }, "Instructors"));
+  const snd = h("input", { type: "checkbox", id: "inst-i-send" }); snd.checked = true;
+  gbModal("inst-i", "Invite or bulk enroll · " + l.name, h("p", { class: "muted", style: "font-size:13px" }, "Each address gets its own one-time code by email. Bulk enrollment: paste the whole list."),
+    h("label", { class: "f", for: "inst-i-emails" }, "Email addresses"), ta, h("label", { class: "f", for: "inst-i-role" }, "As"), role, h("label", { class: "check", for: "inst-i-send" }, snd, h("span", {}, "Send the invitation emails now")),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "inst-i-go", onclick: async () => { const list = ta.value.split(/[\s,;]+/).filter(Boolean); try { const j = await call({ action: "invite", id: l.id, role: role.value, emails: list, send: snd.checked, bulk: list.length > 5 });
+      msg.innerHTML = ""; msg.appendChild(h("div", {}, "✅ " + j.count + " invited" + (snd.checked ? ", " + j.sent + " emails sent" : ""))); msg.appendChild(h("pre", { id: "inst-i-list", style: "white-space:pre-wrap;font-size:12px" }, Object.entries(j.codes).map(([e, c]) => e + "  " + c).join("\n"))); reload(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Invite")), msg);
+}
+function instDates(l, call, reload, mode) {
+  const msg = h("div", { class: "muted", role: "status", id: "inst-d-msg" }), [sl, s] = instDateIn("inst-d-start", "New start date", mode === "renew" ? l.ends_at : l.starts_at), [el, en] = instDateIn("inst-d-end", "New end date", null);
+  const base = new Date(mode === "renew" ? l.ends_at : l.ends_at), quick = h("div", { class: "btnrow" }, ...[["1 month", 30], ["1 semester", 152], ["1 year", 365]].map(([t, d]) => h("button", { class: "btn ghost small", id: "inst-d-q" + d, onclick: () => { const x = new Date(base); x.setDate(x.getDate() + d); en.value = x.toLocaleDateString("en-CA"); } }, "+ " + t)));
+  const m = gbModal("inst-d", (mode === "renew" ? "Renew " : "Extend ") + l.name, h("p", { class: "muted", style: "font-size:13px" }, "Now " + new Date(l.starts_at).toLocaleDateString() + " – " + new Date(l.ends_at).toLocaleDateString() + ". " + (mode === "renew" ? "Renewing starts a new period (a new semester or year) for the same members, codes and settings." : "Extending moves the end date; nothing else changes.")),
+    mode === "renew" ? sl : null, mode === "renew" ? s : null, el, en, quick,
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "inst-d-go", onclick: async () => { try { await call({ action: mode, id: l.id, starts_at: mode === "renew" ? instDay(s.value) : undefined, ends_at: instDay(en.value, true) }); m.remove(); toast("✅ " + (mode === "renew" ? "Renewed" : "Extended")); reload(); } catch (e) { msg.textContent = "❌ " + e.message; } } }, mode === "renew" ? "Renew" : "Extend")), msg);
+}
+async function instUsage(l, call) {
+  const box = h("div", { id: "inst-u-box" }, h("p", { class: "muted" }, "⏳ Loading…"));
+  gbModal("inst-u", "Usage · " + l.name, box);
+  try { const j = await call({ action: "usage", id: l.id }); box.innerHTML = "";
+    const st = j.members.filter(x => x.role === "student").length, ins = j.members.length - st;
+    box.appendChild(h("p", { id: "inst-u-sum" }, st + " students and " + ins + " instructors · active in the last 7 days: " + j.active7 + " · last 30 days: " + j.active30));
+    const via = {}; j.members.forEach(x => via[x.via] = (via[x.via] || 0) + 1); box.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Joined by " + (Object.entries(via).map(([k, v]) => v + " " + ({ code: "code", invite: "invitation", domain: "school email", bulk: "bulk" }[k] || k)).join(", ") || "nobody yet") + "."));
+    const csv = "Name,Role,Joined by,Email,Joined,Last active\r\n" + j.members.map(x => [x.name || "", x.role, x.via, x.email || "", x.joined_at.slice(0, 10), x.last_seen ? x.last_seen.slice(0, 10) : "never"].map(v => /[",\n]/.test(v) || /^[=+\-@]/.test(v) ? '"' + String(v).replace(/^([=+\-@])/, "'$1").replace(/"/g, '""') + '"' : v).join(",")).join("\r\n") + "\r\n";
+    box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "inst-u-csv", onclick: () => labDownload(new Blob(["﻿" + csv], { type: "text/csv" }), l.name.replace(/[^\w\- ]+/g, "").replace(/\s+/g, "-") + "-ChemFlip-usage.csv") }, "⬇️ CSV")));
+    box.appendChild(h("b", {}, "History")); box.appendChild(h("ul", { id: "inst-u-ev", style: "font-size:13px" }, ...j.events.slice(0, 40).map(e => h("li", {}, new Date(e.at).toLocaleString() + " · " + e.action.replace(/_/g, " ") + (e.details && e.details.n ? " (" + e.details.n + ")" : "")))));
+  } catch (e) { box.innerHTML = ""; box.appendChild(h("p", {}, "❌ " + e.message)); }
+}
 VIEWS.admin = function () {
   document.getElementById("title").textContent = "Administrator";
   app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "Administrator"), h("h2", {}, "Platform and instructor approvals"), h("div", { class: "muted" }, "Requests from school addresses that couldn't be approved automatically (student-looking addresses, non-.edu institutions). Approving lets that person create classes; revoking removes instructor access on all their devices.")));
@@ -8392,7 +8513,7 @@ VIEWS.admin = function () {
   const call = async (body) => { const t = await acctToken(); if (!t) throw Object.assign(new Error("Sign in with the administrator email under Settings → Sync first."), { status: 401 }); return DB.call(Object.assign({ op: "admin", token: t }, body)); };
   call({ action: "list" }).then(j => {
     S.isAdmin = true; save(); box.innerHTML = "";
-    adminDash(call, box);
+    adminDash(call, box); instAdminCard(box);
     const groups = [["pending", "⏳ Waiting for review"], ["verified", "✅ Verified"], ["rejected", "⛔ Rejected"], ["revoked", "🚫 Revoked"]];
     groups.forEach(([st, t]) => { const rows = j.instructors.filter(r => r.status === st); if (!rows.length && st !== "pending") return;
       const card = h("div", { class: "card", id: "admin-" + st }, h("b", {}, t + " (" + rows.length + ")"));
@@ -8660,7 +8781,8 @@ async function checkContent() {
 loadRemote(); setTimeout(checkContent, 1500); setTimeout(() => eduRefresh(true), 1200); setTimeout(() => syncSchool(), 3000); setTimeout(() => { if (S.cls && S.cls.role !== "teacher") { syncScore(); loadClassInfo().then(() => { if (cur() && cur().view === "home") render(); }); } }, 2500);
 stack = [{ view: S.profile ? "home" : "onboard" }];
 setTimeout(() => { if (S.profile) remStart(); }, 4000);   // Phase J: deadline reminders
-setTimeout(() => { if (S.profile) seenStart(); }, 2500);   // 5.0: Student Activity and the notification bell
+setTimeout(() => { if (S.profile) seenStart(); }, 2500);
+setTimeout(() => { if (S.profile) instRefresh(); }, 3500);   // 5.0: school licenses (once a day; kept for offline use until they end)   // 5.0: Student Activity and the notification bell
 if (S.asgDraft) { const cut = Date.now() - 30 * 864e5; Object.keys(S.asgDraft).forEach(k => { if (!S.asgDraft[k] || S.asgDraft[k].t < cut) delete S.asgDraft[k]; }); }   // device copies of graded answers older than 30 days
 if (window.matchMedia) try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") applyTheme(); }); } catch (e) {}
 render();
