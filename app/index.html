@@ -26,6 +26,7 @@ button{font:inherit;color:inherit;cursor:pointer}input,select{font:inherit}
 header.top{background:#0E2841;color:#fff;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;position:sticky;top:0;z-index:5}
 header.top .row{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:8px}
 @media (max-width:420px){header.top .row{gap:5px}header.top{padding-left:10px;padding-right:10px}}
+@media (max-width:380px){header.top .row{gap:3px}header.top .hbtn{min-width:30px;padding:0 5px}header.top .iconbtn{padding:6px 7px}header.top{padding-left:8px;padding-right:8px}}
 header.top h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn{background:rgba(255,255,255,.13);border:0;border-radius:10px;padding:6px 10px;color:#fff;font-weight:600;font-size:14px;line-height:1.2}
 .badge{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:20px;padding:3px 9px;background:var(--gold);color:#0E2841;white-space:nowrap}
@@ -500,11 +501,12 @@ function storeCovers(cid) {
 function isPremium(cid) {
   cid = cid || course().id;
   if (typeof ltiLicensed === "function" && ltiLicensed(cid)) return true;
-  if (typeof instCovers === "function" && instCovers(cid)) return true;   // 5.0: a college or university license
+  if (typeof instCovers === "function" && instCovers(cid)) return true;
+  if (typeof eduOk === "function" && eduOk()) return true;   // 5.0: verified instructors are free (every course, every feature)   // 5.0: a college or university license
   if (trialLeft() > 0 && !S.prem) return true;
   const p = S.prem; if (!p) return false;
   if (p.src === "store") return storeCovers(cid);
-  if (p.src === "web") return webOk(p);   // 5.0: website subscription, all courses
+  if (p.src === "web") return webOk(p) && codeCovers(p, cid);   // 5.0: website subscription: its courses (older plans: every course)
   if (p.src === "code" || p.src === "class") { if (!codeStillOk(p)) { S.prem = null; save(); return false; } revalidateCode(); return codeCovers(p, cid); }
   return false;
 }
@@ -651,7 +653,7 @@ document.addEventListener("keydown", e => {
 });
 function cur() { return stack[stack.length - 1]; }
 function bottom(btns) { const bb = document.getElementById("bb"), bin = document.getElementById("bbin"); bin.innerHTML = ""; if (!btns || !btns.length) { bb.style.display = "none"; return; } btns.forEach(b => bin.appendChild(b)); bb.style.display = "block"; }
-const VIEW_TITLES = { notices: "Notifications", activity: "Student activity", flash: "Flashcards", practice: "Practice Questions", bulkacc: "Student accounts", accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
+const VIEW_TITLES = { iapply: "Instructor application", notices: "Notifications", activity: "Student activity", flash: "Flashcards", practice: "Practice Questions", bulkacc: "Student accounts", accom: "Student accommodations", ctestedit: "Edit test", classfiles: "Student files and privacy", admin: "Administrator", gradebook: "Gradebook", labinbox: "Lab report inbox", examexport: "Print / export", labscan: "Lab report", labedit: "Lab report", canvasInt: "Canvas Integration Settings", canvasSetup: "Canvas class", canvasAdmin: "School settings", quest: "Chemistry Quest", qsubjects: "Subjects", qlevels: "Levels", qplay: "Challenge", qrace: "Reaction Race", qracing: "Reaction Race", qshop: "Lab shop", qach: "Achievements", qboard: "Leaderboard", qsettings: "Settings", qarrange: "Arrange", features: "Features", mechtut: "Tutorial", games: "Games", gjoin: "Join a game", ghostsetup: "New game", ghost: "Live game", gplay: "Game", gteam: "Pick a team", gduel: "Duel", arcade: "Arcade", owner: "Owner tools", schools: "Compare schools", privacy: "Privacy policy", teach: "Instructor dashboard", student: "Student", classes: "My class", cls: "Class", ctest: "Class test", newtest: "New class test", drills: "Drills", about: "About", chapter: "Chapter", quiz: "Practice", draw: "Structure editor", asggrade: "Grade", results: "Results", exam: "Practice test", premium: "Premium", ref: "Reference", settings: "Settings", profile: "My profile", mechs: "Mechanisms", mech: "Mechanism", onboard: "Welcome" };
 let RENDER_N = 0, RENDER_AT = 0, LAST_INPUT = 0;
 ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { LAST_INPUT = performance.now(); }, true));
 function render() {
@@ -2846,10 +2848,10 @@ setTimeout(() => { if ((S.acct && S.acct.at) || ltiOn()) syncNow(true); }, 2500)
 VIEWS.premium = function () {
   const cur0 = course().id; const prem = isPremium(); const P = S.prem;
   const card = h("div", { class: "card" }, h("div", { class: "kicker" }, prem ? "💎 You have Premium" : "💎 Premium"),
-    h("h2", { style: "color:var(--navy);margin:4px 0 8px" }, prem ? (P && P.src === "store" ? "Your courses are unlocked ✓" : "Everything is unlocked ✓") : "Unlock " + course().name),
+    h("h2", { style: "color:var(--navy);margin:4px 0 8px" }, prem ? (P && (P.src === "store" || (P.src === "web" && P.courses)) ? "Your courses are unlocked ✓" : eduOk() ? "Free for verified instructors ✓" : "Everything is unlocked ✓") : "Unlock " + course().name),
     h("ul", {}, h("li", {}, "📖 Every chapter, easiest → hardest, with worked solutions"), h("li", {}, "🎯 Exams built from any topics you choose"), h("li", {}, "🖊️ Drawable mechanisms in the organic courses"), h("li", {}, "📊 Full results with weak-topic practice"), h("li", {}, "🔁 Mistake review and bookmarks everywhere")));
-  if (!storeFlavor()) card.appendChild(h("div", { class: "card", style: "background:var(--chip);margin:10px 0" }, h("b", {}, "💲 One plan, every course"),
-    h("div", { id: "web-price" }, webPrice("monthly") + "/month or " + webPrice("yearly") + "/year"), h("div", { class: "muted", style: "font-size:12.5px" }, "All " + PAID.length + " courses, renewing automatically. Cancel anytime.")));
+  if (!storeFlavor()) card.appendChild(h("div", { class: "card", style: "background:var(--chip);margin:10px 0" }, h("b", {}, "💲 Pay per course"),
+    h("div", { id: "web-price" }, webPrice("monthly") + "/month or " + webPrice("yearly") + "/year for your first course"), h("div", { class: "muted", style: "font-size:12.5px" }, "Each additional course +$" + wpExtra("monthly").toFixed(2) + "/month or +$" + wpExtra("yearly").toFixed(2) + "/year. Renews automatically; cancel anytime. Verified instructors use ChemFlip free.")));
   else card.appendChild(h("div", { class: "card", style: "background:var(--chip);margin:10px 0" }, h("b", {}, "💲 Simple pricing"),
     h("div", {}, "First course: " + priceOf(1, "monthly") + "/month or " + priceOf(1, "yearly") + "/year"),
     h("div", {}, "Each extra course: +" + "$" + num((S.remote || {}).extraMonthly || CFG.prices.extraMonthly, 3).toFixed(2) + "/month or +" + "$" + num((S.remote || {}).extraYearly || CFG.prices.extraYearly, 25).toFixed(2) + "/year"),
@@ -2927,10 +2929,16 @@ VIEWS.premium = function () {
   app.appendChild(card);
 };
 let PM_SEL = null;
-/* ---------- 5.0 Premium subscriptions on the website and desktop apps: one plan, every course; card (Stripe) or PayPal.
+/* ---------- 5.0 Premium subscriptions on the website and desktop apps: per course; card (Stripe) or PayPal.
    The server decides: Premium turns on when the payment provider confirms, and stays in step with renewals and cancellations.
    The free week needs no card and is kept on the server, once per device. Store builds keep their store's billing. ---------- */
-let PAYST = null, PAYAT = 0, PAYWAIT = 0, WP_PLAN = "yearly", RS = null;
+let PAYST = null, PAYAT = 0, PAYWAIT = 0, WP_PLAN = "yearly", RS = null, WP_COURSES = null;
+// 5.0 per-course plans: the first course at the plan price, each additional course +$3/month or +$25/year (from the server)
+function wpExtra(cycle) { const e = (PAYST && PAYST.extra) || {}; return Number(cycle === "yearly" ? e.yearly || 25 : e.monthly || 3); }
+function wpTotal(cycle, n) { return num(webPrice(cycle), cycle === "yearly" ? 59.99 : 5.99) + Math.max(0, n - 1) * wpExtra(cycle); }
+function wpCourses() { if (!WP_COURSES) WP_COURSES = [PAID.includes(course().id) ? course().id : PAID[0]]; return WP_COURSES; }
+const cName = id => (CFG.courses.find(c => c.id === id) || { name: id }).name;
+function wpPicker(sel, onchange, idp) { return h("div", { id: idp || "wp-courses", role: "group", "aria-label": "Courses to include", style: "display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0" }, ...PAID.filter(id => CFG.courses.some(c => c.id === id)).map(id => { const b = h("input", { type: "checkbox", id: (idp || "wp-courses") + "-" + id, onchange: e => { const l = sel.filter(x => x !== id); if (e.target.checked) l.push(id); if (!l.length) { e.target.checked = true; toast("Keep at least one course."); return; } onchange(l); } }); b.checked = sel.includes(id); return h("label", { class: "check", for: (idp || "wp-courses") + "-" + id }, b, h("span", {}, cName(id))); })); }
 function webPrice(cycle) { const r = (PAYST && PAYST.prices) || {}, R0 = S.remote || {}, P0 = CFG.prices || {}; const v = cycle === "yearly" ? (r.yearly || num(R0.yearly || P0.yearly, 59.99)) : (r.monthly || num(R0.monthly || P0.monthly, 5.99)); return "$" + Number(v).toFixed(2); }
 function webOk(p) { if (Date.now() - (p.vAt || 0) > 6 * 36e5) payStatus().catch(() => {}); return !p.until || Date.parse(p.until) + 3 * 864e5 > Date.now(); }
 const isDesktopApp = () => location.protocol === "file:" || !!window.chemflipApp;
@@ -2962,7 +2970,7 @@ async function xCall(body) {
 function applyPay(j) {
   if (!j) return;
   const was = isPremium();
-  if (j.premium && j.subscription) { if (!S.prem || S.prem.src === "web" || (S.prem.src === "class")) S.prem = { src: "web", until: j.subscription.current_period_end, plan: j.subscription.plan, provider: j.subscription.provider, ending: j.subscription.cancel_at_period_end, vAt: Date.now() }; }
+  if (j.premium && j.subscription) { if (!S.prem || S.prem.src === "web" || (S.prem.src === "class")) S.prem = { src: "web", until: j.subscription.current_period_end, plan: j.subscription.plan, provider: j.subscription.provider, ending: j.subscription.cancel_at_period_end, courses: j.courses !== undefined ? j.courses : (j.subscription.courses || null), vAt: Date.now() }; }
   else if (S.prem && S.prem.src === "web" && j.premium === false) S.prem = null;
   if (j.trial) { S.trial = Date.parse(j.trial.started_at); S.trialEnd = Date.parse(j.trial.ends_at); }
   save(); return was !== isPremium();
@@ -2975,7 +2983,7 @@ async function startCheckout(provider) {
   const btn = document.getElementById(provider === "paypal" ? "wp-paypal" : "wp-card"); if (btn) { btn.disabled = true; btn.textContent = "Opening the payment page…"; }
   try {
     const ret = /(^|\.)chemflip\.org$/.test(location.hostname) ? location.origin + location.pathname : undefined;
-    const j = await payCall({ action: "checkout", plan: WP_PLAN, provider, disc: S.disc ? S.disc.code : undefined, return_url: ret });
+    const j = await payCall({ action: "checkout", plan: WP_PLAN, provider, courses: wpCourses(), disc: S.disc ? S.disc.code : undefined, return_url: ret });
     if (isDesktopApp()) { window.open(j.url, "_blank"); PAYWAIT = Date.now(); render(); pollPay(); }
     else { S.payPending = { provider, plan: WP_PLAN, at: Date.now() }; save(); location.href = j.url; }
   } catch (e) { toast("❌ " + e.message); render(); }
@@ -3007,6 +3015,8 @@ function webPlanCard(card) {
     box.appendChild(h("div", { class: "muted", id: "wp-when" }, sub.status === "past_due" ? "⚠️ The last payment didn't go through. Update your payment method to keep Premium." :
       sub.cancel_at_period_end ? "Renewal is off. Premium stays on until " + dateOf(sub.current_period_end) + "." : "Renews on " + dateOf(sub.current_period_end) + (sub.amount ? " for $" + Number(sub.amount).toFixed(2) : "") + "."));
     if (sub.email) box.appendChild(h("div", { class: "muted", style: "font-size:12.5px" }, "Receipts go to " + sub.email + "."));
+    box.appendChild(h("div", { id: "wp-mycourses", style: "margin:6px 0" }, sub.courses ? "Your courses: " + sub.courses.map(cName).join(", ") : "Your plan includes every course."));
+    if (sub.courses && !sub.cancel_at_period_end) box.appendChild(h("button", { class: "btn ghost small", id: "wp-change", onclick: () => wpChange(sub) }, "Add or remove courses"));
     const row = h("div", { class: "btnrow" }, h("button", { class: "btn sec2", id: "wp-manage", onclick: () => payManage("portal", sub) }, sub.provider === "paypal" ? "Manage in PayPal" : "Manage plan and payment"));
     if (!sub.cancel_at_period_end) row.appendChild(h("button", { class: "btn ghost", id: "wp-cancel", onclick: () => confirmBox("Turn off renewal?", "You keep Premium until " + dateOf(sub.current_period_end) + ". After that you won't be charged again." + (sub.provider === "paypal" ? " A PayPal plan can't be restarted later; you'd subscribe again." : ""), () => payManage("cancel", sub), "Turn off renewal") }, "Cancel renewal"));
     else if (sub.provider === "stripe") row.appendChild(h("button", { class: "btn", id: "wp-resume", onclick: () => payManage("resume", sub) }, "Turn renewal back on"));
@@ -3024,9 +3034,13 @@ function webPlanCard(card) {
     h("button", { class: "btn gold wide", id: "start-trial", onclick: async e => { e.target.disabled = true; try { const j = await payCall({ action: "trial_start", local_started: S.trial || undefined }); S.trial = Date.parse(j.started_at); S.trialEnd = Date.parse(j.ends_at); PAYST = null; save(); sfx("win"); toast("🎁 Your 7-day free trial has started!"); } catch (err) { toast("❌ " + err.message); } render(); } }, "Start my free week")));
   else box.appendChild(h("p", { class: "muted" }, "Your free week has ended. Thanks for trying Premium! 🙏"));
   // the plan
-  const save$ = Math.max(0, num(webPrice("monthly"), 5.99) * 12 - num(webPrice("yearly"), 59.99));
+  const save$ = Math.max(0, wpTotal("monthly", wpCourses().length) * 12 - wpTotal("yearly", wpCourses().length));
   const tile = (cycle, label, note) => h("button", { class: "plan" + (WP_PLAN === cycle ? " best" : ""), id: "wp-" + cycle, "aria-pressed": WP_PLAN === cycle ? "true" : "false", style: "cursor:pointer;text-align:center;font:inherit;color:inherit", onclick: () => { WP_PLAN = cycle; render(); } },
-    h("div", { class: "muted" }, label), h("b", {}, webPrice(cycle)), h("div", { class: "muted" }, note));
+    h("div", { class: "muted" }, label), h("b", {}, "$" + wpTotal(cycle, nC).toFixed(2)), h("div", { class: "muted" }, note + (nC > 1 ? " · " + nC + " courses" : "")));
+  const nC = wpCourses().length;
+  box.appendChild(h("b", { style: "display:block" }, "Choose your courses"));
+  box.appendChild(wpPicker(wpCourses(), l => { WP_COURSES = l; render(); }));
+  box.appendChild(h("p", { class: "muted", id: "wp-per", style: "font-size:12.5px;margin:0 0 8px" }, "First course " + webPrice("monthly") + "/month or " + webPrice("yearly") + "/year; each additional course +$" + wpExtra("monthly").toFixed(2) + "/month or +$" + wpExtra("yearly").toFixed(2) + "/year. Verified instructors use ChemFlip free."));
   box.appendChild(h("b", { style: "display:block" }, "Choose your plan"));
   box.appendChild(h("div", { class: "plans", role: "group", "aria-label": "Plan" }, tile("monthly", "Monthly", "per month"), tile("yearly", "Yearly" + (save$ > 0 ? " · save $" + save$.toFixed(2) : ""), "per year")));
   if (P.half) box.appendChild(h("p", { id: "wp-half", style: "margin:6px 0" }, "🏷️ 50% off your first payment (invite reward). It's taken off at checkout."));
@@ -3040,9 +3054,19 @@ function webPlanCard(card) {
     h("button", { class: "btn sec2", id: "wp-paypal", disabled: !P.paypal, onclick: () => startCheckout("paypal") }, "Pay with PayPal")));
   if (!P.paypal) box.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "PayPal is coming soon. Pay by card for now."));
   if (!P.card) box.appendChild(h("p", { class: "muted", style: "font-size:12.5px" }, "Card payments aren't open yet."));
-  box.appendChild(h("p", { class: "muted", id: "wp-fine", style: "font-size:12px" }, "You pay " + webPrice(WP_PLAN) + (WP_PLAN === "yearly" ? " a year" : " a month") + (P.half ? " (half of it the first time)" : "") + " and Premium turns on right away. It renews automatically until you cancel, which you can do here at any time; you keep Premium until the end of the period you paid for. Card payments (also Apple Pay and Google Pay) are handled by Stripe and PayPal payments by PayPal. ChemFlip never sees your card number."));
+  box.appendChild(h("p", { class: "muted", id: "wp-fine", style: "font-size:12px" }, "You pay $" + wpTotal(WP_PLAN, nC).toFixed(2) + (WP_PLAN === "yearly" ? " a year" : " a month") + " for " + wpCourses().map(cName).join(", ") + (P.half ? " (half of it the first time)" : "") + " and Premium turns on right away. It renews automatically until you cancel, which you can do here at any time; you keep Premium until the end of the period you paid for. Card payments (also Apple Pay and Google Pay) are handled by Stripe and PayPal payments by PayPal. ChemFlip never sees your card number."));
   card.appendChild(box);
   card.appendChild(restoreBox(false));
+}
+function wpChange(sub) {
+  let sel = sub.courses.slice(); const msg = h("div", { class: "muted", role: "status", id: "wp-ch-msg" }), price = h("div", { id: "wp-ch-price" });
+  const plan = sub.plan === "yearly" ? "yearly" : "monthly", upd = () => { price.textContent = "New price: $" + wpTotal(plan, sel.length).toFixed(2) + (plan === "yearly" ? " a year" : " a month") + " for " + sel.length + " course" + (sel.length > 1 ? "s" : "") + "."; };
+  const pick = h("div", {}), draw = () => { pick.innerHTML = ""; pick.appendChild(wpPicker(sel, l => { sel = l; draw(); upd(); }, "wp-ch")); }; draw(); upd();
+  const m = gbModal("wp-ch", "Add or remove courses", h("p", { class: "muted", style: "font-size:13px" }, sub.provider === "stripe" ? "The change applies now; Stripe charges or credits the difference for the rest of this period." : "PayPal asks you to approve the new amount; the courses change once you approve."), pick, price,
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "wp-ch-save", onclick: async e => { e.target.disabled = true; msg.textContent = "Saving…";
+      try { const j = await payCall({ action: "courses", id: sub.id, courses: sel });
+        if (j.url) { m.remove(); if (isDesktopApp()) window.open(j.url, "_blank"); else location.href = j.url; return; }
+        m.remove(); PAYST = null; await payStatus().catch(() => {}); toast("✅ Your courses were updated"); render(); } catch (er) { e.target.disabled = false; msg.textContent = "❌ " + er.message; } } }, "Save courses")), msg);
 }
 // Use a subscription on another device: a 6-digit code to the email address used to pay.
 function restoreBox(store) {
@@ -5102,7 +5126,8 @@ function eduSheet() {
         eduApply(email, st);
         if (st.status === "verified") { S.profile.role = "instructor"; save(); sfx("win"); toast("✅ Verified! Instructor mode is on."); close(); stack = [{ view: "home" }]; render(); return; }
         verifyBtn.style.display = "none"; codeIn.style.display = "none"; msg.style.color = "";
-        msg.textContent = st.status === "pending" ? "📨 Thanks — your email is confirmed. Because " + email.split("@")[1] + " " + (/student/i.test(st.review || "") ? "looks like a student address" : "isn't on our list of approved institutions yet") + ", a ChemFlip administrator will review your instructor request (usually within one business day). Until then you can use ChemFlip as a student." : "❌ This address can't be used for instructor access. Contact chemflipp@gmail.com if you think this is a mistake.";
+        if (st.status === "pending" && DB && DB.live) box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "edu-apply", onclick: () => { close(); go("iapply"); } }, "Complete my application")));
+        msg.textContent = st.status === "pending" ? "📨 Thanks — your email is confirmed. Because " + email.split("@")[1] + " " + (/student/i.test(st.review || "") ? "looks like a student address" : "isn't on our list of approved institutions yet") + ", a ChemFlip administrator will review your instructor request. Next, complete your application (institution, position and evidence) so it can be approved; the decision usually comes within 3 days. Until then you can use ChemFlip as a student." : "❌ This address can't be used for instructor access. Contact chemflipp@gmail.com if you think this is a mistake.";
       } catch (e) { msg.textContent = "❌ That code didn't work (" + e.message + "). Check the email or send a new code."; msg.style.color = "var(--bad)"; verifyBtn.disabled = false; }
     } }, "✅ Verify");
     const sendBtn = h("button", { class: "btn sec2", id: "edu-send", onclick: async () => {
@@ -5117,7 +5142,7 @@ function eduSheet() {
       } catch (e) { msg.textContent = "❌ Couldn't send the code: " + e.message; msg.style.color = "var(--bad)"; }
       sendBtn.disabled = false;
     } }, "📧 Email me a code");
-    if (S.edu && S.edu.status === "pending") box.appendChild(h("div", { class: "card", id: "edu-pending", style: "background:var(--chip)" }, h("b", {}, "⏳ Request under review"), h("div", { class: "muted" }, "Your instructor request for " + S.edu.email + " is waiting for an administrator. You'll be switched to instructor mode automatically once it's approved.")));
+    if (S.edu && S.edu.status === "pending") box.appendChild(h("div", { class: "card", id: "edu-pending", style: "background:var(--chip)" }, h("b", {}, "⏳ Request under review"), h("div", { class: "muted" }, "Your instructor request for " + S.edu.email + " is waiting for an administrator. You'll be switched to instructor mode automatically once it's approved."), DB && DB.live ? h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "edu-app-open", onclick: () => { close(); go("iapply"); } }, "View or complete my application")) : null));
     box.appendChild(h("label", { class: "f", for: "edu-email" }, "School email")); box.appendChild(em);
     box.appendChild(h("div", { class: "btnrow" }, sendBtn)); box.appendChild(codeIn); box.appendChild(h("div", { class: "btnrow" }, verifyBtn)); box.appendChild(msg);
   });
@@ -6574,7 +6599,7 @@ const HELP = [
   { id: "bulk", t: "Instructors: bulk actions", who: "instructor", kw: "bulk select several publish unpublish move dates shift extension selected", b: ["On a class's graded assignments, tick several assignments to publish, unpublish or move all their dates by a number of days at once. Students' individual extensions keep their own dates.", "On an assignment, tick several students to give them the same extension in one step."] },
   { id: "courses", t: "Instructors: courses, sections and joining", who: "instructor", kw: "course section courses sections join approve approval request invite link email remove student closed mode independent", b: ["On the instructor dashboard, Courses and sections groups your classes into courses, for example CHEM 120 with Sections 01 and 02. Each section keeps its own code, students and grades.", "In a class, open Students → Class settings to choose the course and section, who can join (anyone with the code, only students you approve, or nobody new), and how the class works: independent, Canvas connected or email-only. Canvas is optional.", "Share the invite link: it opens ChemFlip with the code filled in. Email invites open as a draft in your own email app; nothing is sent until you press Send.", "When a class needs approval, waiting students appear at the top of Students. Approve or decline them one by one or all at once. Removing a student takes them off the roster but keeps their answers, scores and grades."] },
   { id: "examprint", t: "Instructors: print an exam, PDF, Word, versions and answer keys", who: "instructor", kw: "email send recipients print exam pdf word docx export versions answer key bubble sheet email paper test", b: ["Open a quiz, test or assignment in your class and press 🖨️ Print / PDF / Word. Fill in the header (institution, course, date, time limit, instructions), choose how many versions (A–D, with shuffled questions and/or choices) and what to include: the student version, an instructor version with the key, with explanations, or the answer key only.", "Preview shows exactly what prints and what goes into the PDF. Download Word gives an editable .docx. Each version has its own key; student copies can end with a bubble answer sheet.", "Email makes the file and opens a draft in your own email app; ChemFlip doesn't send it. A warning appears before any file with answers is emailed. Save exam settings keeps your choices with the exam in your account.", "Email: tap \u2709\ufe0f Email, add one or more addresses (up to 30) and a message, then Preview email. ChemFlip sends it from notices@mail.chemflip.org with your attached PDF or Word file, and replies go to your verified instructor email. Files with the answer key show a warning and ask once more before sending. Up to 20 exam emails a day. \"Open a draft in my email app\" makes the file and opens your own email app instead; nothing is sent until you press Send there."] },
-  { id: "premium", t: "Premium: plans, free trial, paying and cancelling", who: "all", kw: "premium subscribe subscription pay card paypal apple pay google pay trial free week cancel renew refund restore another device price monthly yearly receipt", b: ["Premium unlocks every course. On chemflip.org and the Windows, Mac and Linux apps there is one plan: monthly or yearly, prices shown on the Premium page.", "Free week: Premium → Start my free week. No card and no sign-up. It's once per device, and when it ends Premium simply stops; nothing is charged.", "Subscribe: choose monthly or yearly, then Pay by card (also Apple Pay and Google Pay, handled by Stripe) or Pay with PayPal. Premium turns on as soon as the payment goes through. In the desktop apps the payment opens in your browser and the app turns Premium on by itself.", "Renewal and cancelling: plans renew automatically. Premium → Cancel renewal turns it off; you keep Premium until the end of the period you paid for. Card plans can be turned back on before then. Manage plan and payment changes your card, switches between monthly and yearly, or shows receipts.", "Another device: Premium → Restore my subscription, enter the email you paid with, then the 6-digit code it receives.", "From an app store: ChemFlip from the App Store, Google Play or the Microsoft Store uses that store's subscriptions. Manage or cancel them in the store's own settings. A chemflip.org subscription can be used there too (Restore)."] },
+  { id: "premium", t: "Premium: plans, free trial, paying and cancelling", who: "all", kw: "premium subscribe subscription pay card paypal apple pay google pay trial free week cancel renew refund restore another device price monthly yearly receipt", b: ["On chemflip.org and the Windows, Mac and Linux apps you pay per course: the first course at the monthly or yearly price on the Premium page, plus a smaller amount for each additional course. Add or remove courses on your plan any time. Verified college and university instructors use ChemFlip free, and some schools have a license that covers their students.", "Free week: Premium → Start my free week. No card and no sign-up. It's once per device, and when it ends Premium simply stops; nothing is charged.", "Subscribe: choose monthly or yearly, then Pay by card (also Apple Pay and Google Pay, handled by Stripe) or Pay with PayPal. Premium turns on as soon as the payment goes through. In the desktop apps the payment opens in your browser and the app turns Premium on by itself.", "Renewal and cancelling: plans renew automatically. Premium → Cancel renewal turns it off; you keep Premium until the end of the period you paid for. Card plans can be turned back on before then. Manage plan and payment changes your card, switches between monthly and yearly, or shows receipts.", "Another device: Premium → Restore my subscription, enter the email you paid with, then the 6-digit code it receives.", "From an app store: ChemFlip from the App Store, Google Play or the Microsoft Store uses that store's subscriptions. Manage or cancel them in the store's own settings. A chemflip.org subscription can be used there too (Restore)."] },
 { id: "editing", t: "Instructors: editing quizzes, deadlines and accommodations", who: "instructor", kw: "edit quiz assignment change deadline extend shorten reopen quick edit accommodation extension version regrade publish unpublish", b: ["Every quiz, test, assignment and lab report has its own dates: Available from, Due and Available until, in your class's time zone. Changing one never changes another.", "Edit Quiz or Edit Assignment (on each row, or on the item's page) opens the full editor: title, instructions, questions, choices, correct answers, order, points, versions, time limit, attempts, late work, release dates and publishing. Cancel discards your changes; leaving with unsaved changes asks first.", "Quick edit changes dates, attempts, publishing and (for lab reports) points without opening the editor. The Quick Edit table on your dashboard lists everything in your classes.", "You can extend or shorten a deadline (shortening asks first) and reopen a closed quiz. Submissions, grades and progress are always kept, and each student's own extension keeps its date. Tick \"Email students about the new dates\" to notify students who turned that notice on.", "If students already submitted and you change questions, answers or points, ChemFlip keeps the earlier version and asks whether to regrade their submissions or keep the scores already given. Earlier versions are listed on the item's page and can be opened in the editor.", "Student accommodations (on your dashboard): pick a class, a student and an item, then set a new due date, extra attempts or extra minutes. The list shows every active accommodation and extension in your classes; only you and the student see them.", "Class and group tests (\ud83d\udcdd Tests tab) can be edited too: title, type, time limit, and questions (reorder, remove or add). Results already taken are kept."] },
   { id: "notices", t: "Email notices", who: "all", kw: "email notices notifications reminders unsubscribe code alerts", b: ["Email notices are optional. In Settings → Email notices, enter your address, then enter the 6-digit code ChemFlip emails you. Instructors can use the instructor email they already verified.", "Choose which emails you get: new work, new tests, a reminder a day before work is due, missing work, confirmation when your work is received, returned feedback and class announcements.", "Grades are never sent by email. A feedback email only says your work was returned; open ChemFlip to see the grade.", "Every email has a link to stop all ChemFlip emails. You can also switch emails off or remove your address in Settings at any time. Work placed in Canvas gets Canvas's own due-date reminders instead of ChemFlip's."] },
   { id: "records", t: "Privacy and student records", who: "all", kw: "privacy records ferpa download my data export who opened access log retention delete files", b: ["A student's answers, grades, lab reports and feedback can be seen only by that student and the instructors of the class. Files open only through private links that expire after 10 minutes; there are no public links, and ChemFlip never emails grades.", "Students: Settings → Privacy and my records → Download my data saves everything ChemFlip's server keeps for your device as a file. Who has opened my records lists each time an instructor opened, graded or changed your work.", "Instructors: Students → Class settings → Student files and privacy. Choose how long students' report files are kept after a lab report locks. Nothing is removed automatically: files past the rule are listed, and they're removed only when you type the class code to confirm. Grades, feedback and receipts are always kept."] },
@@ -8506,6 +8531,116 @@ async function instUsage(l, call) {
     box.appendChild(h("b", {}, "History")); box.appendChild(h("ul", { id: "inst-u-ev", style: "font-size:13px" }, ...j.events.slice(0, 40).map(e => h("li", {}, new Date(e.at).toLocaleString() + " · " + e.action.replace(/_/g, " ") + (e.details && e.details.n ? " (" + e.details.n + ")" : "")))));
   } catch (e) { box.innerHTML = ""; box.appendChild(h("p", {}, "❌ " + e.message)); }
 }
+// ----- 5.0 Free instructor accounts: the application (after the academic email code), its status, and the review timeline
+const IA_POS = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Adjunct or part-time instructor", "Laboratory instructor", "Teaching staff", "Other academic teaching position"];
+const IA_EV = [["id", "College or university ID (photo or scan)"], ["directory", "Public faculty directory listing (link)"], ["webpage", "Official department webpage (link)"], ["letter", "Employment or appointment letter (upload)"], ["admin", "Department administrator who can confirm (name and email)"]];
+VIEWS.iapply = function () {
+  document.getElementById("title").textContent = "Instructor application";
+  const box = h("div", { id: "ia-box" }, h("div", { class: "card muted" }, "⏳ Loading…")); app.appendChild(box);
+  if (!DB || !DB.live) { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "This needs ChemFlip's online service.")); return; }
+  xCall({ op: "iapp", action: "get" }).then(j => { if (cur().view !== "iapply") return; box.innerHTML = "";
+    box.appendChild(h("div", { class: "hero" }, h("h2", {}, "Apply for free instructor access"), h("div", { class: "muted" }, "ChemFlip is free for verified college and university instructors. Please verify your academic affiliation to activate your complimentary instructor account.")));
+    if (!j.email) { box.appendChild(h("div", { class: "card", id: "ia-email" }, h("b", {}, "Step 1: confirm your academic email"), h("p", { class: "muted" }, "Use the email address your college or university gave you. Any academic domain worldwide works, not only .edu."), h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ia-verify", onclick: eduSheet }, "Confirm my academic email")))); return; }
+    if (j.instructor_status === "verified") { box.appendChild(h("div", { class: "card", id: "ia-ok" }, h("b", {}, "✅ Your instructor account is verified"), h("p", { class: "muted" }, "You have free access to every chemistry course and all instructor tools.")));
+      eduRefresh(true); return; }
+    const a = j.application;
+    if (a) { const steps = [["Submitted", true], ["Email verified", true], ["Under review", true], [a.label, a.status !== "review"]];
+      box.appendChild(h("div", { class: "card", id: "ia-status", style: "border-left:5px solid " + (a.status === "approved" ? "var(--good,#1b7a3a)" : a.status === "rejected" ? "var(--bad)" : "var(--gold,#c98a00)") },
+        h("div", { class: "kicker" }, a.status === "review" ? "Verification pending" : "Application status"), h("h3", { style: "margin:4px 0" }, a.label),
+        a.status === "review" ? h("p", {}, "Thank you for applying for a free ChemFlip Instructor Account. Your academic credentials have been submitted for review. We aim to notify you of the verification decision within 3 days.") : null,
+        a.status === "info" ? h("div", { id: "ia-info", style: "background:#fff4d6;color:#5a4300;border-radius:8px;padding:8px" }, h("b", {}, "The reviewer asked: "), a.info_request || "") : null,
+        a.status === "rejected" ? h("p", {}, "We couldn't verify your instructor status from the information provided. You can apply again with other evidence below.") : null,
+        h("p", { class: "muted", style: "font-size:13px" }, "Submitted " + new Date(a.submitted_at).toLocaleString() + " · decision expected by " + new Date(a.due_at).toLocaleString() + (a.label === "Review Delayed" ? " (taking longer than planned; an administrator has been reminded)" : "")),
+        h("ol", { class: "muted", style: "font-size:13px;margin:4px 0 0 18px" }, ...steps.filter(s => s[1]).map(s => h("li", {}, s[0]))),
+        h("p", { class: "muted", style: "font-size:13px" }, "While you wait you can sign in and use ChemFlip as a student (study materials and the free trial). Instructor tools open as soon as you're approved.")));
+    }
+    if (!a || a.status === "info" || a.status === "rejected") box.appendChild(iaForm(j.email, a));
+    else box.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "ia-edit", onclick: () => { const f = document.getElementById("ia-form"); if (!f) box.appendChild(iaForm(j.email, a, true)); } }, "Add or change information")));
+  }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card" }, "❌ " + e.message)); });
+};
+function iaForm(email, a, update) {
+  const V = VIEWS.iapply; if (V.F && V.F.email === email) return iaFormBuild(email, a, update, V.F);   // a background redraw keeps what was typed and the chosen file
+  return iaFormBuild(email, a, update, V.F = { email, full_name: (a && a.full_name) || (S.profile && S.profile.name) || "", institution: (a && a.institution) || (S.profile && S.profile.school) || "", department: (a && a.department) || "Chemistry", position: (a && a.position) || "", evidence_kind: (a && a.evidence_kind) || "id", evidence_url: (a && a.evidence_url) || "", file: null, src: null, boxes: [], agree: false });
+}
+function iaFormBuild(email, a, update, F) {
+  const msg = h("div", { role: "status", id: "ia-msg", class: "muted" });
+  const inp = (id, lab, k, ex) => { const i = h("input", Object.assign({ class: "field", id, value: F[k] }, ex || {})); i.oninput = () => F[k] = i.value; return [h("label", { class: "f", for: id }, lab), i]; };
+  const pos = h("select", { class: "field", id: "ia-pos", onchange: e => F.position = e.target.value }, h("option", { value: "" }, "Choose…"), ...IA_POS.map(p => h("option", { value: p, selected: F.position === p ? "" : null }, p)));
+  const evBox = h("div", { id: "ia-ev-box" }), prev = h("div", { id: "ia-prev" });
+  const drawEv = () => { evBox.innerHTML = ""; const k = F.evidence_kind;
+    if (k === "id" || k === "letter") {
+      evBox.appendChild(h("p", { class: "muted", style: "font-size:13px" }, k === "id" ? "A photo or scan of your college or university ID. Government ID is never needed. Cover anything that isn't needed (employee number, barcode): after choosing a photo, drag over those parts to black them out." : "A PDF or photo of the letter on institutional letterhead."));
+      const file = h("input", { type: "file", id: "ia-file", accept: ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf", "aria-label": "Choose a file (JPG, PNG or PDF)", onchange: e => { F.boxes = []; iaPick(F.src = e.target.files[0], F, prev, msg); } });
+      const cam = h("input", { type: "file", id: "ia-cam", accept: "image/*", capture: "environment", style: "display:none", onchange: e => { F.boxes = []; iaPick(F.src = e.target.files[0], F, prev, msg); } });
+      evBox.appendChild(h("div", { class: "btnrow" }, file, cam, h("button", { class: "btn ghost small", id: "ia-cam-btn", onclick: () => cam.click() }, "📷 Take a photo")));
+      if (a && a.has_file && !F.file) evBox.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "A file is already on your application; choose a new one only to replace it."));
+      evBox.appendChild(prev); if (F.src) iaPick(F.src, F, prev, msg);
+    } else evBox.appendChild(h("div", {}, ...inp("ia-url", k === "admin" ? "Administrator's name and email address" : "Link (https://…) to the page that lists you", "evidence_url", { placeholder: k === "admin" ? "Dr. Jane Smith, chair@college.edu" : "https://chemistry.college.edu/faculty" })));
+  };
+  const ev = h("div", { role: "radiogroup", "aria-label": "How you'll show you teach there", id: "ia-ev" }, ...IA_EV.map(([v, t]) => { const r = h("input", { type: "radio", name: "ia-ev", id: "ia-ev-" + v, value: v, onchange: () => { F.evidence_kind = v; drawEv(); } }); r.checked = F.evidence_kind === v; return h("label", { class: "check", for: "ia-ev-" + v }, r, h("span", {}, t)); }));
+  drawEv();
+  const agree = h("input", { type: "checkbox", id: "ia-agree", onchange: e => F.agree = e.target.checked }); agree.checked = !!F.agree;
+  const card = h("div", { class: "card", id: "ia-form" }, h("b", {}, update ? "Add or change information" : "Your application"),
+    ...inp("ia-name", "Full name", "full_name", { maxlength: "120", autocomplete: "name" }), ...inp("ia-inst", "College or university", "institution", { maxlength: "160" }), ...inp("ia-dept", "Department", "department", { maxlength: "120" }),
+    h("label", { class: "f" }, "Academic email"), h("div", { id: "ia-mail" }, email + " ✓ confirmed"),
+    h("label", { class: "f", for: "ia-pos" }, "Teaching position"), pos,
+    h("div", { class: "f" }, "Evidence of your teaching appointment"), ev, evBox,
+    h("label", { class: "check", for: "ia-agree", style: "margin-top:8px" }, agree, h("span", {}, "I confirm I teach at this institution and agree that ChemFlip may review this information (and contact my institution if needed) to verify it. ChemFlip keeps the evidence privately and only administrators can see it.")),
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ia-submit", onclick: async e => {
+      if (!F.full_name.trim() || !F.institution.trim()) { msg.textContent = "Enter your full name and your college or university."; return; }
+      if (!F.position) { msg.textContent = "Choose your teaching position."; return; }
+      if (!agree.checked) { msg.textContent = "Please agree to the verification terms."; return; }
+      e.target.disabled = true; msg.textContent = "Submitting…";
+      try { await xCall({ op: "iapp", action: "submit", update: !!update || (a && a.status === "info"), full_name: F.full_name, institution: F.institution, department: F.department, position: F.position, evidence_kind: F.evidence_kind, evidence_url: F.evidence_url, agree: true, file: F.file || undefined });
+        VIEWS.iapply.F = null; toast("📨 Application submitted"); render(); } catch (er) { e.target.disabled = false; msg.textContent = "❌ " + er.message; } } }, update || (a && a.status === "info") ? "Send update" : "Submit application")), msg);
+  return card;
+}
+// An image is shown on a canvas where the applicant drags to black out parts; it's sent as a JPEG. PDFs are sent as they are.
+function iaPick(f, F, prev, msg) {
+  prev.innerHTML = ""; F.file = null; if (!f) return; F.boxes = F.boxes || [];
+  if (f.size > 8 * 1024 * 1024 && f.type === "application/pdf") { msg.textContent = "That PDF is larger than 8 MB. A single scanned page is enough."; return; }
+  const rd = new FileReader();
+  if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) { rd.onload = () => { F.file = { name: f.name, data: String(rd.result).split(",")[1] }; prev.appendChild(h("p", { id: "ia-pdf" }, "📄 " + f.name + " (" + Math.round(f.size / 1024) + " KB). Black out anything unneeded before uploading a PDF.")); msg.textContent = ""; }; rd.readAsDataURL(f); return; }
+  const img = new Image(); img.onload = () => {
+    const sc = Math.min(1, 1600 / Math.max(img.width, img.height)), cv = h("canvas", { id: "ia-canvas", width: Math.round(img.width * sc), height: Math.round(img.height * sc), style: "max-width:100%;border:1px solid var(--line,#ccd);touch-action:none;cursor:crosshair", role: "img", "aria-label": "Your ID photo. Drag over parts to black them out." });
+    const g = cv.getContext("2d"), boxes = F.boxes, paint = () => { g.drawImage(img, 0, 0, cv.width, cv.height); g.fillStyle = "#000"; boxes.forEach(b => g.fillRect(b[0], b[1], b[2], b[3])); F.file = { name: "id.jpg", data: cv.toDataURL("image/jpeg", 0.85).split(",")[1] }; };
+    let st = null; const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+    cv.onpointerdown = e => { st = pt(e); cv.setPointerCapture(e.pointerId); };
+    cv.onpointerup = e => { if (!st) return; const p = pt(e), b = [Math.min(st[0], p[0]), Math.min(st[1], p[1]), Math.abs(p[0] - st[0]), Math.abs(p[1] - st[1])]; st = null; if (b[2] > 3 && b[3] > 3) { boxes.push(b); paint(); } };
+    paint(); prev.appendChild(cv);
+    prev.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "ia-undo", onclick: () => { boxes.pop(); paint(); } }, "Undo last black-out"), h("span", { class: "muted", style: "font-size:12.5px" }, boxes.length ? "" : "Drag over anything not needed, like an employee number or barcode.")));
+    msg.textContent = ""; };
+  img.onerror = () => { msg.textContent = "That image couldn't be opened. Use a JPG or PNG photo, or a PDF."; };
+  rd.onload = () => { img.src = rd.result; }; rd.readAsDataURL(f);
+}
+// administrator: Instructor Verification Management
+function iaAdminCard(box) {
+  const card = h("div", { class: "card", id: "ia-admin" }, h("b", {}, "🎓 Instructor verification management"), h("div", { class: "muted", id: "ia-a-loading" }, "⏳ Loading…")); box.appendChild(card);
+  const call = async body => { const t = await acctToken(); if (!t) throw new Error("Sign in with the administrator email under Settings → Sync first."); return xCall(Object.assign({ op: "iapp", token: t }, body)); };
+  const reload = () => { card.remove(); iaAdminCard(box); };
+  call({ action: "list" }).then(j => { card.innerHTML = ""; card.appendChild(h("b", {}, "🎓 Instructor verification management"));
+    const open = j.applications.filter(a => a.status === "review" || a.status === "info"), done = j.applications.filter(a => !open.includes(a));
+    card.appendChild(h("p", { class: "muted", style: "font-size:13px" }, open.length + " waiting" + (open.some(a => a.overdue) ? " · " + open.filter(a => a.overdue).length + " past the 3-day target" : "") + ". Approval makes the account a Verified Instructor: free access to every course and all instructor tools, and an approval email."));
+    const row = (a, i) => h("div", { class: "card", id: "ia-a-" + i, style: "margin:8px 0;border-left:4px solid " + (a.overdue ? "var(--bad)" : a.status === "approved" ? "var(--good,#1b7a3a)" : "var(--gold,#c98a00)") },
+      h("div", { style: "display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap" }, h("b", {}, a.full_name), h("span", { class: "chip" + (a.overdue ? " bad" : "") }, a.label + (a.overdue ? " · overdue" : ""))),
+      h("div", { style: "font-size:13.5px" }, a.institution + (a.department ? " · " + a.department : "") + " · " + a.position),
+      h("div", { class: "muted", style: "font-size:13px" }, a.email + " (confirmed) · applied " + new Date(a.submitted_at).toLocaleString() + " · review by " + new Date(a.due_at).toLocaleString()),
+      h("div", { style: "font-size:13px;margin-top:4px" }, "Evidence: " + (IA_EV.find(x => x[0] === a.evidence_kind) || [0, a.evidence_kind])[1] + " ", a.file_url ? h("a", { href: a.file_url, target: "_blank", rel: "noopener", id: "ia-a-file-" + i }, "Open file (link valid 10 minutes)") : null, a.evidence_url ? h("span", {}, " · ", /^https:/.test(a.evidence_url) ? h("a", { href: a.evidence_url, target: "_blank", rel: "noopener noreferrer" }, a.evidence_url) : a.evidence_url) : null),
+      a.info_request ? h("div", { class: "muted", style: "font-size:13px" }, "Asked: " + a.info_request) : null,
+      h("div", { class: "btnrow", style: "flex-wrap:wrap" }, a.status !== "approved" ? h("button", { class: "btn small", id: "ia-a-ok-" + i, onclick: () => confirmBox("Approve " + a.full_name + "?", "They become a Verified Instructor with free access to all courses and instructor tools, and get the approval email.", async () => { await call({ action: "decide", email: a.email, decision: "approve" }); toast("✅ Approved"); reload(); }, "Approve") }, "Approve Instructor") : null,
+        a.status !== "rejected" ? h("button", { class: "btn ghost small", id: "ia-a-no-" + i, style: "color:var(--bad)", onclick: () => iaMsg("Reject " + a.full_name + "'s application", "Reason (included in the email; optional)", false, async m => { await call({ action: "decide", email: a.email, decision: "reject", message: m }); toast("Application rejected"); reload(); }) }, "Reject Application") : null,
+        a.status === "review" || a.status === "info" ? h("button", { class: "btn ghost small", id: "ia-a-info-" + i, onclick: () => iaMsg("Request more information from " + a.full_name, "What do you need? (emailed and shown in their application)", true, async m => { await call({ action: "decide", email: a.email, decision: "info", message: m }); toast("📨 Request sent"); reload(); }) }, "Request More Information") : null,
+        h("button", { class: "btn ghost small", id: "ia-a-msg-" + i, onclick: () => iaMsg("Email " + a.full_name, "Message", true, async m => { const r = await call({ action: "contact", email: a.email, message: m }); toast(r.sent ? "📨 Sent" : "Saved in the history (email isn't set up)"); reload(); }) }, "Contact Applicant"),
+        h("details", { style: "display:inline-block" }, h("summary", { id: "ia-a-hist-" + i, style: "cursor:pointer;font-size:13px" }, "View Verification History"), h("ul", { style: "font-size:12.5px;margin:4px 0" }, ...(a.history || []).map(x => h("li", {}, new Date(x.at).toLocaleString() + " · " + x.action.replace(/_/g, " ") + " · " + (x.by === "applicant" ? "applicant" : x.by) + (x.note ? " — " + x.note : "")))))));
+    if (!j.applications.length) card.appendChild(h("p", { class: "muted", id: "ia-a-none" }, "No applications yet."));
+    open.forEach((a, i) => card.appendChild(row(a, i)));
+    if (done.length) card.appendChild(h("details", { id: "ia-a-done" }, h("summary", {}, "Decided (" + done.length + ")"), ...done.map((a, i) => row(a, open.length + i))));
+  }).catch(e => { card.innerHTML = ""; card.appendChild(h("b", {}, "🎓 Instructor verification management")); card.appendChild(h("p", { class: "muted" }, "❌ " + e.message)); });
+}
+function iaMsg(title, label, required, send) {
+  const msg = h("div", { class: "muted", role: "status", id: "ia-m-msg" }), ta = h("textarea", { class: "field", id: "ia-m-text", rows: "4", maxlength: "2000" });
+  const m = gbModal("ia-m", title, h("label", { class: "f", for: "ia-m-text" }, label), ta, h("div", { class: "btnrow" }, h("button", { class: "btn", id: "ia-m-send", onclick: async e => { if (required && !ta.value.trim()) { msg.textContent = "Write the message first."; return; } e.target.disabled = true; try { await send(ta.value.trim()); m.remove(); } catch (er) { e.target.disabled = false; msg.textContent = "❌ " + er.message; } } }, "Send")), msg);
+}
 VIEWS.admin = function () {
   document.getElementById("title").textContent = "Administrator";
   app.appendChild(h("div", { class: "hero" }, h("div", { class: "kicker" }, "Administrator"), h("h2", {}, "Platform and instructor approvals"), h("div", { class: "muted" }, "Requests from school addresses that couldn't be approved automatically (student-looking addresses, non-.edu institutions). Approving lets that person create classes; revoking removes instructor access on all their devices.")));
@@ -8513,7 +8648,7 @@ VIEWS.admin = function () {
   const call = async (body) => { const t = await acctToken(); if (!t) throw Object.assign(new Error("Sign in with the administrator email under Settings → Sync first."), { status: 401 }); return DB.call(Object.assign({ op: "admin", token: t }, body)); };
   call({ action: "list" }).then(j => {
     S.isAdmin = true; save(); box.innerHTML = "";
-    adminDash(call, box); instAdminCard(box);
+    adminDash(call, box); iaAdminCard(box); instAdminCard(box);
     const groups = [["pending", "⏳ Waiting for review"], ["verified", "✅ Verified"], ["rejected", "⛔ Rejected"], ["revoked", "🚫 Revoked"]];
     groups.forEach(([st, t]) => { const rows = j.instructors.filter(r => r.status === st); if (!rows.length && st !== "pending") return;
       const card = h("div", { class: "card", id: "admin-" + st }, h("b", {}, t + " (" + rows.length + ")"));
@@ -8729,6 +8864,7 @@ async function noticesHistory() {
 VIEWS.settings = function () {
   if (AUTH) app.appendChild(accountCard());
   { const rc = remSettingsCard(); if (rc) app.appendChild(rc); }
+  if (S.edu && S.edu.email && !eduOk() && DB && DB.live) app.appendChild(h("div", { class: "card", id: "ia-settings" }, h("b", {}, "🎓 Instructor application"), h("p", { class: "muted" }, "Free instructor access for " + S.edu.email + ": see the status or add information."), h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "ia-settings-open", onclick: () => go("iapply") }, "Open my application"))));
   { const nc = noticesCard(); if (nc) app.appendChild(nc); }
   app.appendChild(h("div", { class: "card", id: "sync-card" }, h("b", {}, "☁️ Sync across devices"), h("p", { class: "muted" }, S.acct && S.acct.email ? "Signed in as " + S.acct.email + (S.syncAt ? " · last synced " + new Date(S.syncAt).toLocaleString() : "") : "Sign in with your e-mail to continue on any device (Windows, Mac, iPhone, Android, web)."), h("button", { class: "btn small", id: "sync-btn", onclick: acctSheet }, S.acct && S.acct.email ? "Manage sync" : "☁️ Turn on sync")));
   { const wc = h("div", { class: "card", id: "work-card" }, h("b", {}, "📄 Photos of my work"), h("p", { class: "muted", id: "work-count" }, "Photos you take of your handwritten work are kept on this device, with their question."));
