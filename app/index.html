@@ -3741,6 +3741,297 @@ async function exDocx(a, cfg, what, only) {
 function exFileName(a, cfg, what, only, ext) { const M = exModel(a, cfg); const v = only != null && M.versions.length > 1 ? "-Version" + EXV[only] : M.versions.length > 1 ? "-AllVersions" : "";
   return ((cfg.title || a.title).replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 50) || "Exam") + v + { student: "", instructor: "-Instructor", explain: "-Instructor-Explanations", key: "-AnswerKey" }[what] + "." + ext; }
 
+/* ---------- 5.0 Lab Reports: format, writing a report in ChemFlip, PDF / Word upload, Pre-lab → Lab report → Post-lab ----------
+   The instructor chooses how students may hand in a report (write it in ChemFlip, scan or photograph pages, upload a PDF or a Word
+   file) and which sections a written report has (on/off, names, order, guidance; templates kept on the instructor's device).
+   Everything ends as one PDF submitted through the same lab-report path as scanned pages, so grading, rubrics, feedback, the
+   gradebook, Canvas and email work unchanged. Written reports and converted Word files are drawn into pages on the student's
+   device; nothing is sent anywhere until the student presses Submit. */
+const LAB_SECTIONS = [["title", "Experiment title"], ["objective", "Objective"], ["intro", "Introduction"], ["safety", "Safety information"], ["materials", "Materials and chemicals"],
+  ["procedure", "Experimental procedure"], ["data", "Data and observations"], ["calc", "Calculations"], ["results", "Results"], ["discussion", "Discussion"], ["conclusion", "Conclusion"],
+  ["postlab", "Post-lab questions"], ["refs", "References"]];
+function labDefaultCfg() { return { v: 1, modes: { write: true, scan: true, upload: true }, sections: LAB_SECTIONS.map(([k, name]) => ({ k, name, on: true })), links: { pre: null, post: null } }; }
+function labCfgFix(c) { const d = labDefaultCfg(); if (!c) return d; return { v: 1, modes: Object.assign({}, d.modes, c.modes || {}), sections: (c.sections && c.sections.length ? c.sections : d.sections).map(x => Object.assign({}, x)), links: Object.assign({ pre: null, post: null }, c.links || {}) }; }
+// null = no format saved (defaults); undefined = couldn't load it (offline): callers fall back to the defaults too
+async function labCfgGet(aid) { try { const j = await xCall({ op: "lab", action: "cfg_get", assignment_id: aid }); return j.cfg || null; } catch (e) { return undefined; } }
+
+/* ----- chemistry helpers ----- */
+const SUBS = { 0: "₀", 1: "₁", 2: "₂", 3: "₃", 4: "₄", 5: "₅", 6: "₆", 7: "₇", 8: "₈", 9: "₉" }, SUPS = { 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹", "+": "⁺", "-": "⁻" };
+// "Fe2(SO4)3 + 3 H2O -> 2 Fe(OH)3" → "Fe₂(SO₄)₃ + 3 H₂O → 2 Fe(OH)₃"; "Cu^2+" → "Cu²⁺". Only formula-like words change (Trial2, pH 7 and 25.0 stay).
+function chemFmt(s) {
+  return String(s).replace(/<=>|<->/g, "⇌").replace(/->/g, "→").replace(/\^([0-9]*[+-])/g, (m, c) => [...c].map(x => SUPS[x] || x).join(""))
+    .replace(/(^|[\s(\[{,;:+=→⇌])((?:\(?(?:[A-Z][a-z]?\d*)+\)?\d*)+)(?=$|[\s)\]},;:.+=→⇌⁺⁻²³¹⁰⁴⁵⁶⁷⁸⁹]|\b)/g, (m, pre, tok) => {
+      if (!/\d/.test(tok) || !/[A-Z]/.test(tok) || /^[A-Z][a-z]+\d+$/.test(tok) && !/^(?:[A-Z][a-z]?)$/.test(tok.replace(/\d+$/, ""))) return m;
+      return pre + tok.replace(/([A-Za-z)\]])(\d+)/g, (q, a, d) => a + [...d].map(x => SUBS[x]).join("")); });
+}
+// Significant figures of a typed number (trailing zeros without a decimal point are ambiguous and said so).
+function sigFigs(raw) {
+  let s = String(raw || "").trim().replace(/[,\s]/g, "").replace(/×10\^?|x10\^?|\*10\^?/i, "e"); if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(s)) return null;
+  let m = s.replace(/^[+-]/, "").split(/e/i)[0], amb = false;
+  if (m.includes(".")) { const d = m.replace(".", "").replace(/^0+/, ""); return { n: d.length || 1, amb: false }; }
+  const t = m.replace(/^0+/, ""); if (!t) return { n: 1, amb: false }; const core = t.replace(/0+$/, ""); amb = core.length < t.length; return { n: core.length, amb, max: t.length };
+}
+function linFit(pts) { const n = pts.length; if (n < 2) return null; let sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0; pts.forEach(([x, y]) => { sx += x; sy += y; sxx += x * x; sxy += x * y; syy += y * y; });
+  const d = n * sxx - sx * sx; if (!d) return null; const m = (n * sxy - sx * sy) / d, b = (sy - m * sx) / n, ss = syy - sy * sy / n, r2 = ss ? Math.pow(n * sxy - sx * sy, 2) / (d * (n * syy - sy * sy)) : 1; return { m, b, r2 }; }
+const nfmt = v => { if (!Number.isFinite(v)) return ""; const a = Math.abs(v); return a !== 0 && (a < 1e-3 || a >= 1e5) ? v.toExponential(3) : String(Math.round(v * 10000) / 10000); };
+// A graph of two table columns (x, y), with the best-fit line, its equation and R² when asked. Returns a canvas.
+function labGraph(tb, g, w, hgt) {
+  w = w || 1200; hgt = hgt || 750; const c = document.createElement("canvas"); c.width = w; c.height = hgt; const x = c.getContext("2d");
+  const head = tb.rows[0] || [], pts = tb.rows.slice(1).map(r => [parseFloat(r[g.x]), parseFloat(r[g.y])]).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  x.fillStyle = "#fff"; x.fillRect(0, 0, w, hgt); const L = 120, R = 40, T = 50, B = 110, pw = w - L - R, ph = hgt - T - B;
+  x.strokeStyle = "#1A1A1A"; x.lineWidth = 2; x.beginPath(); x.moveTo(L, T); x.lineTo(L, T + ph); x.lineTo(L + pw, T + ph); x.stroke();
+  x.font = "28px Arial, sans-serif"; x.fillStyle = "#1A1A1A"; x.textAlign = "center"; x.fillText(String(head[g.x] || "x"), L + pw / 2, hgt - 30);
+  x.save(); x.translate(34, T + ph / 2); x.rotate(-Math.PI / 2); x.fillText(String(head[g.y] || "y"), 0, 0); x.restore();
+  if (pts.length < 2) { x.fillText("Add at least two rows of numbers to graph.", L + pw / 2, T + ph / 2); return { canvas: c, fit: null, n: pts.length }; }
+  let x0 = Math.min(...pts.map(p => p[0])), x1 = Math.max(...pts.map(p => p[0])), y0 = Math.min(...pts.map(p => p[1])), y1 = Math.max(...pts.map(p => p[1]));
+  if (x0 === x1) { x0 -= 1; x1 += 1; } if (y0 === y1) { y0 -= 1; y1 += 1; } const px = (x1 - x0) * .06, py = (y1 - y0) * .08; x0 -= px; x1 += px; y0 -= py; y1 += py;
+  const X = v => L + (v - x0) / (x1 - x0) * pw, Y = v => T + ph - (v - y0) / (y1 - y0) * ph;
+  x.font = "22px Arial, sans-serif"; x.fillStyle = "#5B6B75"; x.strokeStyle = "#C9D6DE"; x.lineWidth = 1;
+  // round tick values (1, 2 or 5 × a power of ten), about five per axis
+  const nice = (a, b) => { const raw = (b - a) / 5, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p, st = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p, out = [];
+    for (let v = Math.ceil(a / st) * st; v <= b + st * 1e-9; v += st) out.push(Math.round(v / st) * st); return { out, dec: Math.max(0, -Math.floor(Math.log10(st))) }; };
+  const tx = nice(x0, x1), ty = nice(y0, y1);
+  tx.out.forEach(v => { x.textAlign = "center"; x.fillText(v.toFixed(tx.dec), X(v), T + ph + 32); x.beginPath(); x.moveTo(X(v), T + ph); x.lineTo(X(v), T + ph + 8); x.stroke(); });
+  ty.out.forEach(v => { x.textAlign = "right"; x.fillText(v.toFixed(ty.dec), L - 10, Y(v) + 8); x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(L + pw, Y(v)); x.stroke(); });
+  const fit = g.fit !== false ? linFit(pts) : null;
+  if (fit) { x.strokeStyle = "#156082"; x.lineWidth = 3; x.beginPath(); x.moveTo(X(x0), Y(fit.m * x0 + fit.b)); x.lineTo(X(x1), Y(fit.m * x1 + fit.b)); x.stroke();
+    x.fillStyle = "#156082"; x.font = "26px Arial, sans-serif"; x.textAlign = "left"; x.fillText("y = " + nfmt(fit.m) + "x " + (fit.b < 0 ? "− " : "+ ") + nfmt(Math.abs(fit.b)) + "   R² = " + fit.r2.toFixed(4), L + 16, T + 30); }
+  x.fillStyle = "#0E2841"; pts.forEach(([a, b]) => { x.beginPath(); x.arc(X(a), Y(b), 8, 0, Math.PI * 2); x.fill(); });
+  return { canvas: c, fit, n: pts.length };
+}
+
+/* ----- instructor: the report's format in the lab report editor ----- */
+function labFmtEditor(F, code, a) {
+  const C = F.cfg, card = h("div", { class: "card", id: "lf-card", style: "margin-top:10px" }, h("b", {}, "Report format"));
+  card.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Choose how students may hand in this report. Whichever they use, you receive one PDF to grade with your rubric."));
+  [["write", "Write it in ChemFlip (sections below, with data tables, graphs and photos)"], ["scan", "Photograph or scan handwritten pages"], ["upload", "Upload a PDF or Word file"]].forEach(([k, t]) => {
+    const cb = h("input", { type: "checkbox", id: "lf-mode-" + k, onchange: e => { C.modes[k] = e.target.checked; render(); } }); cb.checked = C.modes[k] !== false;
+    card.appendChild(h("label", { class: "check", for: "lf-mode-" + k }, cb, h("span", {}, t))); });
+  if (C.modes.write !== false) {
+    const sc = h("div", { id: "lf-secs", style: "margin-top:8px" }, h("b", {}, "Sections of a written report"), h("p", { class: "muted", style: "font-size:12.5px;margin:2px 0 6px" }, "Turn sections on or off, rename them, change their order and add guidance students see while writing."));
+    C.sections.forEach((x, i) => { const on = h("input", { type: "checkbox", id: "lf-on-" + x.k, "aria-label": "Include " + x.name, onchange: e => { x.on = e.target.checked; } }); on.checked = x.on !== false;
+      const nm = h("input", { class: "field", id: "lf-name-" + x.k, maxlength: "60", "aria-label": "Section name", style: "flex:1 1 180px;min-width:140px" }); nm.value = x.name; nm.addEventListener("input", () => { x.name = nm.value; });
+      const hint = h("input", { class: "field", id: "lf-hint-" + x.k, maxlength: "500", placeholder: "Guidance (optional)", "aria-label": "Guidance for " + x.name, style: "flex:2 1 220px" }); hint.value = x.hint || ""; hint.addEventListener("input", () => { x.hint = hint.value; });
+      const mv = d => () => { const j = i + d; if (j < 0 || j >= C.sections.length) return; [C.sections[i], C.sections[j]] = [C.sections[j], C.sections[i]]; render(); };
+      sc.appendChild(h("div", { class: "lf-row", id: "lf-row-" + x.k, style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0" }, on, nm, hint,
+        h("button", { class: "btn ghost small", id: "lf-up-" + x.k, "aria-label": "Move " + x.name + " up", disabled: i === 0 ? "" : null, onclick: mv(-1) }, "↑"),
+        h("button", { class: "btn ghost small", id: "lf-dn-" + x.k, "aria-label": "Move " + x.name + " down", disabled: i === C.sections.length - 1 ? "" : null, onclick: mv(1) }, "↓"),
+        /^c\d+$/.test(x.k) ? h("button", { class: "btn ghost small", id: "lf-del-" + x.k, "aria-label": "Remove " + x.name, onclick: () => { C.sections.splice(i, 1); render(); } }, "Remove") : null)); });
+    sc.appendChild(h("button", { class: "btn ghost small", id: "lf-add", onclick: () => { let n = 1; while (C.sections.some(x => x.k === "c" + n)) n++; C.sections.push({ k: "c" + n, name: "New section", on: true }); render(); } }, "+ Add a section"));
+    // templates on this device
+    const T = S.labTpl = S.labTpl || [], tsel = h("select", { class: "field", id: "lf-tpl", "aria-label": "Templates", style: "width:auto" }, h("option", { value: "" }, T.length ? "Start from a template…" : "No templates yet"), ...T.map((t, i) => h("option", { value: String(i) }, t.name)));
+    const tname = h("input", { class: "field", id: "lf-tpl-name", maxlength: "60", placeholder: "Template name, e.g. CHEM 151L standard", "aria-label": "Template name", style: "flex:1 1 200px" });
+    sc.appendChild(h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px" }, tsel,
+      h("button", { class: "btn ghost small", id: "lf-tpl-use", onclick: () => { if (tsel.value === "") return; const t = T[+tsel.value]; C.sections = t.sections.map(x => Object.assign({}, x)); C.modes = Object.assign({}, t.modes); toast("📋 Template applied: " + t.name); render(); } }, "Use"),
+      tname, h("button", { class: "btn ghost small", id: "lf-tpl-save", onclick: () => { const n = tname.value.trim(); if (!n) { toast("Name the template first."); return; } const i = T.findIndex(t => t.name === n), t = { name: n, sections: C.sections.map(x => Object.assign({}, x)), modes: Object.assign({}, C.modes) };
+        if (i >= 0) T[i] = t; else T.push(t); save(); toast("💾 Template saved: " + n); render(); } }, "Save as template")));
+    card.appendChild(sc);
+  }
+  // Pre-lab → Lab report → Post-lab
+  const ex = h("div", { id: "lf-exp", style: "margin-top:10px" }, h("b", {}, "Pre-lab → Lab report → Post-lab"), h("p", { class: "muted", style: "font-size:12.5px;margin:2px 0 6px" }, "Link a Pre-lab and a Post-lab, each with its own due date and grade. Students see the three parts together. A new one is created hidden, with one written question you can replace in Edit."));
+  const acts = (F.acts || []).filter(x => x.id !== a.id && x.kind !== "lab");
+  [["pre", "Pre-lab"], ["post", "Post-lab"]].forEach(([k, t]) => {
+    const sel = h("select", { class: "field", id: "lf-" + k, "aria-label": t, onchange: e => { F["new_" + k] = e.target.value === "new"; C.links[k] = e.target.value && e.target.value !== "new" ? e.target.value : null; render(); } },
+      h("option", { value: "" }, "No " + t), h("option", { value: "new", selected: F["new_" + k] ? "" : null }, "Create a new " + t), ...acts.map(x => h("option", { value: x.id, selected: C.links[k] === x.id ? "" : null }, (KIND[x.kind] || x.kind) + ": " + x.title)));
+    ex.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0" }, h("label", { for: "lf-" + k, style: "width:80px" }, t), sel));
+    if (F["new_" + k]) { const d = h("input", { class: "field", id: "lf-" + k + "-due", type: "datetime-local", "aria-label": t + " due date" }); d.value = F[k + "_due"] || ""; d.addEventListener("input", () => { F[k + "_due"] = d.value; });
+      ex.appendChild(h("div", { style: "display:flex;gap:8px;align-items:center;margin:0 0 6px 88px" }, h("span", { class: "muted", style: "font-size:13px" }, "Due"), d)); } });
+  card.appendChild(ex);
+  return card;
+}
+// After the lab report itself is saved: create new Pre-lab / Post-lab activities if asked, then save the format.
+async function labFmtSave(A, code, F, tz) {
+  const C = F.cfg, made = [];
+  for (const [k, t] of [["pre", "Pre-lab"], ["post", "Post-lab"]]) { if (!F["new_" + k]) continue;
+    const lab = Date.parse(A.due_at), due = zonedToIso(F[k + "_due"], tz) || new Date(k === "pre" ? lab - 2 * 864e5 : lab + 7 * 864e5).toISOString();
+    const r = await asgCall({ action: "save", class_code: code, kind: "assignment", title: (A.title + " — " + t).slice(0, 120), qids: [], answer_key: {}, points: {}, published: false, due_at: due, tz,
+      instructions: t + " for " + A.title + ".", items: [{ id: "x1", type: "short", points: 10, stem: t + " questions: replace this with your own questions (Edit → Your questions) or add questions from the ChemFlip bank.", solution: "", rubric: "" }] });
+    C.links[k] = r.assignment.id; F["new_" + k] = false; made.push(t); }
+  await xCall({ op: "lab", action: "cfg_set", assignment_id: A.id, cfg: C });
+  return made;
+}
+
+/* ----- student: one PDF from a written report, a Word file or pages, submitted the same way as scanned pages ----- */
+async function labRenderPdf(parts, title, author) {
+  const L = await exLayout(parts, { font: 11, paper: "letter" }), pages = [];
+  for (const p of L.pages) { const j = await scJpeg(exDraw(L, p), 700); pages.push({ bytes: await scBlobToBytes(j.blob), w: j.w, h: j.h }); }
+  return { pdf: await scPdf(pages, { title, author, subject: "Lab report" }, { w: 612, h: 792, m: 0 }), pages: pages.length };
+}
+async function labSendPdf(a, tz, box, pdf, pages, cid, msg, onDone) {
+  if (pdf.length > 12 * 1024 * 1024) { msg.textContent = "❌ The PDF is larger than 12 MB. Use fewer or smaller photos and try again."; return false; }
+  msg.textContent = "Uploading " + Math.round(pdf.length / 1024) + " KB…";
+  try { const r = await asgCall({ action: "lab_submit", assignment_id: a.id, client_id: cid, pdf: scB64(pdf), pages, processing: [] }), sb = r.submission;
+    a.attempts_used = (a.attempts_used || 0) + (r.duplicate ? 0 : 1); box = document.getElementById("ls-box") || box;   // the page may have been redrawn meanwhile
+    const el = h("div", { class: "card", id: "ls-receipt", role: "status", style: "border-left:5px solid var(--ok,#2a8)" }, h("b", {}, "✅ Your laboratory report has been successfully submitted."),
+      h("div", {}, "Receipt ", h("code", { id: "ls-receipt-code" }, sb.receipt), " · version " + sb.n + " · " + sb.pages + " page" + (sb.pages > 1 ? "s" : "") + " · " + fmtTz(sb.submitted_at, tz) + (sb.late ? " · late" : "")),
+      h("div", { class: "muted", style: "font-size:13px" }, "Your instructor sees it in ChemFlip now."));
+    VIEWS.labscan.rcpt = { aid: a.id, el };   // kept with the page, so a redraw shows it again
+    const old = document.getElementById("ls-receipt"); if (old) old.remove();
+    box.insertBefore(el, box.firstChild ? box.firstChild.nextSibling : null);
+    S.receipts = S.receipts || []; if (!S.receipts.some(x => x.code === sb.receipt)) { S.receipts.push({ code: sb.receipt, title: a.title, at: sb.submitted_at, tz, late: sb.late, pen: sb.penalty_pct, pages: sb.pages, cls: a.class_code }); save(); }
+    if (onDone) await onDone(sb); return true;
+  } catch (x) { msg.textContent = "❌ " + x.message + " Your report is still on this device. Press Submit again when you're ready; it won't make a second copy."; return false; }
+}
+function labChain(cfg, a, tz) {
+  const L = cfg && cfg.links || {}; if (!L.pre && !L.post) return null;
+  const item = id => (S.dlCache && S.dlCache.items || []).find(x => x.id === id);
+  const part = (id, t) => { if (!id) return null; const it = item(id); return h("div", { class: "lc-part", id: "lc-" + t.toLowerCase().replace(/[^a-z]/g, "") }, h("b", {}, t + ": "), it ? it.title + " · due " + fmtTz(it.due, localTz(), false) + (it.done ? " · submitted ✓" : "") : "see My assignments"); };
+  return h("div", { class: "card", id: "lab-chain" }, h("b", {}, "This experiment has three parts"), part(L.pre, "Pre-lab"), h("div", { class: "lc-part" }, h("b", {}, "Lab report: "), a.title + " (this page)"), part(L.post, "Post-lab"),
+    h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0 0" }, "Each part has its own due date and grade."));
+}
+
+/* ----- student: write the report in ChemFlip ----- */
+async function labWState(aid) {
+  const W = VIEWS.labscan; if (W.w && W.w.aid === aid) return W.w;
+  const d = await scGetDraft("labw-" + aid);
+  W.w = Object.assign({ aid, cid: labCid(), sec: {}, t: 0 }, d || {}); W.w.aid = aid; return W.w;
+}
+function labWSave(w, note) { w.t = Date.now(); clearTimeout(labWSave.tm); labWSave.tm = setTimeout(async () => { const ok = await scPutDraft("labw-" + w.aid, { cid: w.cid, sec: w.sec, t: w.t });
+  const el = document.getElementById("lw-saved"); if (el) el.textContent = ok ? "Saved on this device at " + new Date(w.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "⚠️ Couldn't save on this device (private browsing?). Keep this page open."; }, note ? 0 : 600); }
+function labWrite(box, a, cfg, tz, canUp) {
+  const secs = cfg.sections.filter(x => x.on !== false);
+  labWState(a.id).then(w => {
+    const wrap = h("div", { id: "lw" }); box.appendChild(wrap);
+    wrap.appendChild(h("p", { class: "muted", id: "lw-saved", role: "status", "aria-live": "polite", style: "font-size:13px" }, w.t ? "Saved on this device at " + new Date(w.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Your report is saved on this device as you type. Nothing is sent until you press Submit."));
+    secs.forEach(x => { const st = w.sec[x.k] = w.sec[x.k] || { text: "", table: null, graph: null, imgs: [] }; st.imgs = st.imgs || [];
+      const c = h("section", { class: "card lw-sec", id: "lw-" + x.k, "aria-labelledby": "lw-h-" + x.k }, h("h3", { id: "lw-h-" + x.k, style: "margin:0 0 4px;font-size:16px" }, x.name));
+      if (x.hint) c.appendChild(h("p", { class: "muted", id: "lw-hint-" + x.k, style: "font-size:13px;margin:0 0 4px" }, x.hint));
+      const ta = h("textarea", { class: "field", id: "lw-t-" + x.k, rows: x.k === "title" ? "1" : "5", maxlength: "20000", "aria-label": x.name, style: "width:100%;font:inherit" }); ta.value = st.text || "";
+      ta.addEventListener("input", () => { st.text = ta.value; labWSave(w); }); c.appendChild(ta);
+      const tools = h("div", { class: "btnrow", style: "flex-wrap:wrap;gap:6px" }); c.appendChild(tools);
+      tools.appendChild(h("button", { class: "btn ghost small", id: "lw-fmt-" + x.k, title: "H2SO4 → H₂SO₄, -> → →, Cu^2+ → Cu²⁺", onclick: () => { const v = chemFmt(ta.value); if (v === ta.value) { toast("Nothing to format. Type formulas like H2SO4, Cu^2+ or ->."); return; } ta.value = v; st.text = v; labWSave(w); toast("⚗️ Formulas formatted"); } }, "⚗️ Format formulas"));
+      const tbBox = h("div", { id: "lw-tb-" + x.k }); c.appendChild(tbBox);
+      const drawTable = () => { tbBox.innerHTML = ""; if (!st.table) return; const T = st.table;
+        const grid = h("table", { class: "t lw-grid", id: "lw-grid-" + x.k, style: "margin-top:6px" });
+        T.rows.forEach((r, ri) => grid.appendChild(h("tr", {}, ...r.map((v, ci) => { const inp = h("input", { class: "field", id: "lw-c-" + x.k + "-" + ri + "-" + ci, "aria-label": (ri === 0 ? "Column " + (ci + 1) + " heading" : "Row " + ri + ", " + (T.rows[0][ci] || "column " + (ci + 1))), style: "min-width:80px;width:100%" + (ri === 0 ? ";font-weight:700" : "") });
+          inp.value = v; inp.addEventListener("input", () => { T.rows[ri][ci] = inp.value; labWSave(w); if (st.graph) drawGraph(); }); return h(ri === 0 ? "th" : "td", { scope: ri === 0 ? "col" : null }, inp); }))));
+        const tw = h("div", { style: "overflow-x:auto" }, grid); tbBox.appendChild(tw);
+        tbBox.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap;gap:6px" },
+          h("button", { class: "btn ghost small", id: "lw-addrow-" + x.k, onclick: () => { T.rows.push(T.rows[0].map(() => "")); labWSave(w); drawTable(); } }, "+ Row"),
+          h("button", { class: "btn ghost small", id: "lw-addcol-" + x.k, onclick: () => { if (T.rows[0].length >= 8) { toast("Up to 8 columns."); return; } T.rows.forEach((r, i) => r.push(i ? "" : "Column " + (r.length + 1))); labWSave(w); drawTable(); } }, "+ Column"),
+          h("button", { class: "btn ghost small", id: "lw-delrow-" + x.k, disabled: T.rows.length <= 2 ? "" : null, onclick: () => { T.rows.pop(); labWSave(w); drawTable(); } }, "− Row"),
+          h("button", { class: "btn ghost small", id: "lw-delcol-" + x.k, disabled: T.rows[0].length <= 1 ? "" : null, onclick: () => { T.rows.forEach(r => r.pop()); if (st.graph) { st.graph.x = Math.min(st.graph.x, T.rows[0].length - 1); st.graph.y = Math.min(st.graph.y, T.rows[0].length - 1); } labWSave(w); drawTable(); } }, "− Column"),
+          T.rows[0].length >= 2 ? h("button", { class: "btn sec2 small", id: "lw-graph-" + x.k, onclick: () => { st.graph = st.graph ? null : { x: 0, y: 1, fit: true }; labWSave(w); drawTable(); } }, st.graph ? "Remove graph" : "📈 Graph this table") : null,
+          h("button", { class: "btn ghost small", id: "lw-deltb-" + x.k, style: "color:var(--bad)", onclick: () => confirmBox("Remove this table?", "Its numbers are deleted from this report.", () => { st.table = null; st.graph = null; labWSave(w); drawTable(); tbBtn.textContent = "▦ Data table"; }, "Remove") }, "Remove table")));
+        if (st.graph) { const gb = h("div", { id: "lw-gbox-" + x.k, style: "margin-top:6px" }); tbBox.appendChild(gb);
+          const col = (k, lab) => h("label", { style: "display:inline-flex;gap:4px;align-items:center;margin-right:10px" }, lab, h("select", { class: "field", id: "lw-g" + k + "-" + x.k, style: "width:auto", onchange: e => { st.graph[k] = +e.target.value; labWSave(w); drawGraph(); } }, T.rows[0].map((hd, i) => h("option", { value: String(i), selected: st.graph[k] === i ? "" : null }, hd || "Column " + (i + 1)))));
+          const fit = h("input", { type: "checkbox", id: "lw-gfit-" + x.k, onchange: e => { st.graph.fit = e.target.checked; labWSave(w); drawGraph(); } }); fit.checked = st.graph.fit !== false;
+          gb.appendChild(h("div", { style: "display:flex;flex-wrap:wrap;align-items:center;gap:4px" }, col("x", "x:"), col("y", "y:"), h("label", { class: "check", for: "lw-gfit-" + x.k }, fit, h("span", {}, "Best-fit line (equation and R²)"))));
+          gb.appendChild(h("div", { id: "lw-gimg-" + x.k })); drawGraph(); } };
+      // looked up inside the section: on the first draw the section isn't on the page yet
+      const drawGraph = () => { const el = c.querySelector("#lw-gimg-" + x.k); if (!el || !st.graph) return; const g = labGraph(st.table, st.graph, 900, 560); g.canvas.style.cssText = "max-width:100%;border:1px solid var(--hair);border-radius:8px";
+        g.canvas.setAttribute("role", "img"); g.canvas.setAttribute("aria-label", "Graph of " + (st.table.rows[0][st.graph.y] || "y") + " against " + (st.table.rows[0][st.graph.x] || "x") + (g.fit ? ", best-fit line y = " + nfmt(g.fit.m) + "x + " + nfmt(g.fit.b) + ", R² " + g.fit.r2.toFixed(4) : ""));
+        el.innerHTML = ""; el.appendChild(g.canvas); };
+      const tbBtn = h("button", { class: "btn ghost small", id: "lw-tbl-" + x.k, onclick: () => { if (st.table) { document.getElementById("lw-c-" + x.k + "-0-0").focus(); return; } st.table = { rows: [["Trial", "Volume (mL)", "Mass (g)"], ["1", "", ""], ["2", "", ""], ["3", "", ""]] }; labWSave(w); drawTable(); tbBtn.textContent = "▦ Table added"; } }, st.table ? "▦ Table added" : "▦ Data table");
+      tools.appendChild(tbBtn);
+      const imBox = h("div", { id: "lw-imgs-" + x.k, style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" }); c.appendChild(imBox);
+      const drawImgs = () => { imBox.innerHTML = ""; st.imgs.forEach((b, i) => { const u = URL.createObjectURL(b); imBox.appendChild(h("div", { style: "text-align:center" }, h("img", { src: u, alt: x.name + " photo " + (i + 1), style: "max-height:110px;max-width:160px;border-radius:6px;display:block", onload: () => URL.revokeObjectURL(u) }),
+        h("button", { class: "btn ghost small", id: "lw-imgdel-" + x.k + "-" + i, "aria-label": "Remove photo " + (i + 1) + " from " + x.name, onclick: () => { st.imgs.splice(i, 1); labWSave(w); drawImgs(); } }, "Remove"))); }); };
+      const fileIn = h("input", { type: "file", accept: "image/*", multiple: "", id: "lw-file-" + x.k, style: "display:none", onchange: async ev => { const fs = [...ev.target.files]; ev.target.value = ""; for (const f of fs.slice(0, 10)) { try { st.imgs.push(await labShrink(f)); } catch (e) { toast("Couldn't open " + f.name + "."); } } labWSave(w); drawImgs(); } });
+      tools.appendChild(h("button", { class: "btn ghost small", id: "lw-photo-" + x.k, onclick: () => fileIn.click() }, "🖼️ Add photo or spectrum")); tools.appendChild(fileIn);
+      if (typeof photoCapture === "function") tools.appendChild(h("button", { class: "btn ghost small", id: "lw-cam-" + x.k, onclick: async () => { const ph = await photoCapture({ title: "📷 " + x.name, facing: "environment", raw: true, maxSide: 1800, budgetKB: 900 }); if (!ph) return; st.imgs.push(ph.blob); labWSave(w); drawImgs(); } }, "📷 Camera"));
+      if (x.k === "calc" || x.k === "results" || x.k === "data") { const sf = h("input", { class: "field", id: "lw-sf-" + x.k, placeholder: "e.g. 0.002450", "aria-label": "Number to check significant figures", style: "width:140px" }), out = h("span", { class: "muted", id: "lw-sfo-" + x.k, "aria-live": "polite" });
+        sf.addEventListener("input", () => { const r = sigFigs(sf.value); out.textContent = !sf.value ? "" : !r ? "Type a number, e.g. 1.20 or 3.5e-4" : r.n + " significant figure" + (r.n > 1 ? "s" : "") + (r.amb ? " (or up to " + r.max + " — write it in scientific notation to make trailing zeros clear)" : ""); });
+        c.appendChild(h("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:13px" }, h("label", { for: "lw-sf-" + x.k }, "Significant figures:"), sf, out)); }
+      drawTable(); drawImgs(); wrap.appendChild(c); });
+    const msg0 = h("div", { class: "muted", id: "lw-msg", role: "status", "aria-live": "polite" }), msg = { set textContent(t) { (document.getElementById("lw-msg") || msg0).textContent = t; } };
+    const filled = () => secs.filter(x => { const s = w.sec[x.k] || {}; return (s.text || "").trim() || (s.table && s.table.rows.slice(1).some(r => r.some(v => String(v).trim()))) || (s.imgs || []).length; });
+    const build = async () => labWritePdf(a, cfg, w);
+    const act = h("div", { class: "card", id: "lw-actions" }, h("div", { class: "btnrow", style: "flex-wrap:wrap" },
+      h("button", { class: "btn ghost", id: "lw-savebtn", onclick: () => { labWSave(w, true); toast("💾 Draft saved on this device"); } }, "💾 Save draft"),
+      h("button", { class: "btn sec2", id: "lw-preview", onclick: async () => { msg.textContent = "Making the PDF…"; try { const r = await build(), u = URL.createObjectURL(new Blob([r.pdf], { type: "application/pdf" })); msg.textContent = "PDF ready: " + r.pages + " page" + (r.pages > 1 ? "s" : "") + "."; window.open(u, "_blank", "noopener"); } catch (e) { msg.textContent = "❌ Couldn't make the PDF: " + e.message; } } }, "👁️ Preview PDF"),
+      h("button", { class: "btn ghost", id: "lw-download", onclick: async () => { try { const r = await build(); labDownload(new Blob([r.pdf], { type: "application/pdf" }), labFileName(a)); } catch (e) { toast("❌ Couldn't make the PDF."); } } }, "⬇️ Download PDF"),
+      canUp ? h("button", { class: "btn", id: "lw-submit", onclick: () => { const f = filled(), empty = secs.length - f.length;
+        confirmBox("Submit your lab report?", (empty ? empty + " of " + secs.length + " sections are empty. " : "") + (a.attempts_used ? "This makes a new version; your instructor sees every version." : "Your instructor receives it as a PDF."), async () => {
+          if (w.busy) return; w.busy = true; msg.textContent = "Making the PDF…";
+          try { const r = await build(); await labSendPdf(a, tz, box, r.pdf, r.pages, w.cid, msg, async () => { await scDelDraft("labw-" + a.id); VIEWS.labscan.w = null; ["lw", "lw-actions"].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); }); wrap.remove(); act.remove(); }); }
+          catch (e) { msg.textContent = "❌ Couldn't make the PDF: " + e.message; } w.busy = false; }, "Submit"); } }, "Submit") : null), msg0);
+    box.appendChild(act);
+  });
+}
+async function labShrink(file, maxSide) { const img = await loadImg(URL.createObjectURL(file)); maxSide = maxSide || 1800; const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  return (await scJpeg(c, 600)).blob; }
+async function labWritePdf(a, cfg, w) {
+  const secs = cfg.sections.filter(x => x.on !== false), p = S.profile || {}, blocks = [];
+  const title = ((w.sec.title || {}).text || "").trim();
+  blocks.push({ t: "head", title: a.title, course: (S.cls && S.cls.name) || "", meta: [p.name ? "Name: " + p.name : "", p.sid ? "Student ID: " + p.sid : "", "Date: " + new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })].filter(Boolean).join("     "), instructions: title ? "Experiment: " + title : "" });
+  let fig = 0, tab = 0;
+  for (const x of secs) { if (x.k === "title") continue; const s = w.sec[x.k] || {};
+    blocks.push({ t: "h2", s: x.name });
+    blocks.push({ t: "p", s: (s.text || "").trim() || "(Left blank.)", italic: !(s.text || "").trim(), color: (s.text || "").trim() ? null : "#777" });
+    if (s.table && s.table.rows.length) { tab++; blocks.push({ t: "table", rows: s.table.rows, cap: "Table " + tab + ". " + x.name }); }
+    if (s.table && s.graph) { const g = labGraph(s.table, s.graph); fig++; const img = await loadImg(g.canvas.toDataURL("image/png"));
+      blocks.push({ t: "img", img, maxH: 4.2, cap: "Figure " + fig + ". " + (s.table.rows[0][s.graph.y] || "y") + " vs. " + (s.table.rows[0][s.graph.x] || "x") + (g.fit ? " — best-fit line y = " + nfmt(g.fit.m) + "x " + (g.fit.b < 0 ? "− " : "+ ") + nfmt(Math.abs(g.fit.b)) + ", R² = " + g.fit.r2.toFixed(4) : "") }); }
+    for (const b of s.imgs || []) { fig++; const u = URL.createObjectURL(b); try { blocks.push({ t: "img", img: await loadImg(u), cap: "Figure " + fig + ". " + x.name }); } finally { setTimeout(() => URL.revokeObjectURL(u), 4000); } }
+  }
+  return labRenderPdf([{ footer: a.title + (p.name ? " · " + p.name : ""), blocks }], a.title, p.name || "");
+}
+
+/* ----- student: upload a PDF or a Word file ----- */
+async function zipRead(bytes) {   // minimal .zip reader (stored and deflated entries) for Word files
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); let e = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 66000); i--) if (v.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error("That file isn't a Word document (.docx)."); const n = v.getUint16(e + 10, true); let p = v.getUint32(e + 16, true); const out = {}, dec = new TextDecoder();
+  for (let k = 0; k < n; k++) { if (v.getUint32(p, true) !== 0x02014b50) break; const meth = v.getUint16(p + 10, true), csz = v.getUint32(p + 20, true), nl = v.getUint16(p + 28, true), xl = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), off = v.getUint32(p + 42, true);
+    const name = dec.decode(bytes.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+    out[name] = async () => { const ln = v.getUint16(off + 26, true), lx = v.getUint16(off + 28, true), data = bytes.subarray(off + 30 + ln + lx, off + 30 + ln + lx + csz);
+      if (meth === 0) return data; if (meth !== 8) throw new Error("Unsupported compression in the Word file.");
+      if (typeof DecompressionStream === "undefined") throw new Error("This device can't read Word files. In Word, choose File → Save As → PDF and upload the PDF.");
+      return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()); }; }
+  return out;
+}
+// Word → blocks for the page layout: headings, paragraphs (with line breaks and tabs), tables and pictures (PNG, JPG, GIF).
+async function docxBlocks(bytes) {
+  const z = await zipRead(bytes); if (!z["word/document.xml"]) throw new Error("That file isn't a Word document (.docx).");
+  const dec = new TextDecoder(), xml = s => new DOMParser().parseFromString(s, "application/xml");
+  const doc = xml(dec.decode(await z["word/document.xml"]())), rels = {}, info = { paras: 0, tables: 0, pics: 0, skipped: 0 };
+  if (z["word/_rels/document.xml.rels"]) [...xml(dec.decode(await z["word/_rels/document.xml.rels"]())).getElementsByTagName("*")].forEach(r => { if (r.localName === "Relationship") rels[r.getAttribute("Id")] = r.getAttribute("Target"); });
+  const kids = (el, name) => [...el.children].filter(c => c.localName === name), all = (el, name) => [...el.getElementsByTagName("*")].filter(c => c.localName === name);
+  const textOf = p => { let s = ""; [...p.getElementsByTagName("*")].forEach(n => { if (n.localName === "t") s += n.textContent; else if (n.localName === "tab") s += "\t"; else if (n.localName === "br" || n.localName === "cr") s += "\n"; }); return s; };
+  const blocks = [], body = all(doc, "body")[0]; if (!body) return { blocks, info };
+  const pics = async p => { for (const b of all(p, "blip")) { const id = b.getAttribute("r:embed") || [...b.attributes].find(a => a.localName === "embed")?.value, tg = rels[id]; if (!tg) continue;
+      const path = "word/" + tg.replace(/^\.?\//, ""), ext = (path.split(".").pop() || "").toLowerCase(); if (!z[path] || !["png", "jpg", "jpeg", "gif"].includes(ext)) { info.skipped++; continue; }
+      const u = URL.createObjectURL(new Blob([await z[path]()], { type: ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg" }));
+      try { blocks.push({ t: "img", img: await loadImg(u), maxH: 5 }); info.pics++; } catch (e) { info.skipped++; } finally { setTimeout(() => URL.revokeObjectURL(u), 4000); } } };
+  for (const el of [...body.children]) {
+    if (el.localName === "p") { const st = (all(el, "pStyle")[0] || { getAttribute: () => "" }).getAttribute("w:val") || "", t = textOf(el);
+      if (t.trim()) { if (/^(heading|title)/i.test(st)) blocks.push({ t: "h2", s: t.trim() }); else blocks.push({ t: "p", s: t }); info.paras++; } await pics(el); }
+    else if (el.localName === "tbl") { const rows = kids(el, "tr").map(tr => kids(tr, "tc").map(tc => kids(tc, "p").map(textOf).join("\n").trim())); if (rows.length) { blocks.push({ t: "table", rows, head: true }); info.tables++; } await pics(el); }
+  }
+  return { blocks, info };
+}
+function pdfPages(bytes) { const s = new TextDecoder("latin1").decode(bytes); const m = s.match(/\/Type\s*\/Page(?![a-zA-Z])/g); return Math.max(1, Math.min(50, m ? m.length : 1)); }
+function labUpload(box, a, tz, canUp, toScan) {
+  const U = VIEWS.labscan.u = (VIEWS.labscan.u && VIEWS.labscan.u.aid === a.id) ? VIEWS.labscan.u : { aid: a.id, cid: labCid() };
+  const c = h("div", { class: "card", id: "lu" }, h("b", {}, "Upload your report"), h("p", { class: "muted", style: "font-size:13px" }, "Choose a PDF or a Word file (.docx). Word files become a PDF on this device: text, headings, tables and pictures are kept; fonts and exact layout may differ, so check the preview. For an exact copy, save it as PDF in Word first. Photos of pages go to the scanner instead."));
+  // a background refresh can redraw this page while a file is still being read: always write to the panel on screen
+  const msg0 = h("div", { class: "muted", id: "lu-msg", role: "status", "aria-live": "polite" }), info0 = h("div", { id: "lu-info" });
+  const msg = { set textContent(t) { (document.getElementById("lu-msg") || msg0).textContent = t; } }, cur_ = () => document.getElementById("lu-info") || info0;
+  const inp = h("input", { type: "file", id: "lu-file", accept: ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*", style: "display:none", onchange: async ev => {
+    const f = ev.target.files[0]; ev.target.value = ""; if (!f) return; msg.textContent = "Reading " + f.name + "…"; cur_().innerHTML = "";
+    try { const b = new Uint8Array(await f.arrayBuffer());
+      if (/^image\//.test(f.type)) { msg.textContent = ""; toScan([...ev.target.files].length ? [...ev.target.files] : [f]); return; }
+      if (String.fromCharCode(...b.slice(0, 5)) === "%PDF-") { if (b.length > 12 * 1024 * 1024) { msg.textContent = "❌ That PDF is larger than 12 MB."; return; } U.pdf = b; U.pages = pdfPages(b); U.name = f.name; U.kind = "PDF"; }
+      else if (b[0] === 0x50 && b[1] === 0x4b) { msg.textContent = "Converting " + f.name + " to PDF…"; const d = await docxBlocks(b);
+        if (!d.blocks.length) { msg.textContent = "❌ That Word file looks empty."; return; }
+        const p = S.profile || {}, head = { t: "head", title: a.title, course: (S.cls && S.cls.name) || "", meta: [p.name ? "Name: " + p.name : "", "Converted from " + f.name].filter(Boolean).join("     ") };
+        const r = await labRenderPdf([{ footer: a.title + (p.name ? " · " + p.name : ""), blocks: [head].concat(d.blocks) }], a.title, p.name || "");
+        U.pdf = r.pdf; U.pages = r.pages; U.name = f.name; U.kind = "Word"; U.info = d.info; }
+      else { msg.textContent = "❌ Choose a PDF or a Word file (.docx). Older .doc files: open them in Word and save as .docx or PDF."; return; }
+      U.cid = labCid(); msg.textContent = ""; drawInfo();
+    } catch (e) { msg.textContent = "❌ " + e.message; } } });
+  const drawInfo = () => { const info = cur_(); info.innerHTML = ""; if (!U.pdf) return;
+    info.appendChild(h("div", { id: "lu-ready", style: "margin:6px 0" }, h("b", {}, "Ready: "), U.name + " → PDF, " + U.pages + " page" + (U.pages > 1 ? "s" : "") + ", " + Math.round(U.pdf.length / 1024) + " KB",
+      U.info ? h("div", { class: "muted", style: "font-size:12.5px" }, "Converted " + U.info.paras + " paragraph" + (U.info.paras === 1 ? "" : "s") + ", " + U.info.tables + " table" + (U.info.tables === 1 ? "" : "s") + ", " + U.info.pics + " picture" + (U.info.pics === 1 ? "" : "s") + (U.info.skipped ? ". " + U.info.skipped + " picture" + (U.info.skipped > 1 ? "s" : "") + " in a format ChemFlip can't draw (for example EMF) " + (U.info.skipped > 1 ? "were" : "was") + " left out: save as PDF in Word to keep " + (U.info.skipped > 1 ? "them" : "it") + "." : ".")) : null));
+    info.appendChild(h("div", { class: "btnrow", style: "flex-wrap:wrap" },
+      h("button", { class: "btn sec2", id: "lu-preview", onclick: () => window.open(URL.createObjectURL(new Blob([U.pdf], { type: "application/pdf" })), "_blank", "noopener") }, "👁️ Preview PDF"),
+      canUp ? h("button", { class: "btn", id: "lu-submit", onclick: () => confirmBox("Submit " + U.name + "?", (a.attempts_used ? "This makes a new version; your instructor sees every version." : "Your instructor receives it as a PDF."), async () => {
+        if (U.busy) return; U.busy = true; await labSendPdf(a, tz, box, U.pdf, U.pages, U.cid, msg, async () => { VIEWS.labscan.u = null; const e = document.getElementById("lu"); if (e) e.remove(); c.remove(); }); U.busy = false; }, "Submit") }, "Submit") : null)); };
+  c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "lu-choose", onclick: () => inp.click() }, "📎 Choose a file"), inp)); c.appendChild(info0); c.appendChild(msg0);
+  box.appendChild(c); drawInfo();
+}
+
 /* ================= 5.0 Phase H: chemistry answer editor + molecular structure editor ================= */
 /* ---------- formatting and parsing typed chemistry ---------- */
 const CE_ESC = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -7248,8 +7539,11 @@ VIEWS.labedit = function (arg) {
   const a = arg.a || {}, tz = ASG.tz || a.tz || localTz(), wk = new Date(srvNow() + 7 * 864e5);
   if (!VIEWS.labedit.f || VIEWS.labedit.f.key !== (a.id || arg.code)) VIEWS.labedit.f = { key: a.id || arg.code, title: a.title || "", instructions: a.instructions || "", pts: a.max_points || 20, pages: a.expect_pages || 3,
     open: isoToZoned(a.open_at, tz), due: a.due_at ? isoToZoned(a.due_at, tz) : isoToZoned(wk.toISOString(), tz).slice(0, 10) + "T23:59", lock: isoToZoned(a.lock_at, tz), att: a.max_attempts || 1,
-    late: (a.late_policy || {}).mode || "accept", pen: (a.late_policy || {}).pct_per_day || 10, penmax: (a.late_policy || {}).max_pct || 50, pub: a.published !== false };
+    late: (a.late_policy || {}).mode || "accept", pen: (a.late_policy || {}).pct_per_day || 10, penmax: (a.late_policy || {}).max_pct || 50, pub: a.published !== false, cfg: labDefaultCfg(), acts: [] };
   const F = VIEWS.labedit.f;
+  if (!F.cfgAsked) { F.cfgAsked = true;   // 5.0: the report's format and the class's activities (for Pre-lab / Post-lab)
+    Promise.all([a.id ? labCfgGet(a.id) : Promise.resolve(null), asgCall({ action: "list", class_code: arg.code }).catch(() => ({ assignments: [] }))]).then(([c, l]) => {
+      if (VIEWS.labedit.f !== F) return; if (c) F.cfg = labCfgFix(c); F.acts = l.assignments || []; if (cur().view === "labedit") render(); }); }
   document.getElementById("title").textContent = a.id ? "Edit " + (a.title || "lab report") : "New lab report";
   const c = h("div", { class: "card", id: "le-form" }, h("b", {}, "📄 Lab report"), h("p", { class: "muted", style: "font-size:13px" }, "Students photograph their handwritten report page by page. ChemFlip straightens the pages on their device and makes one PDF, which arrives here with a receipt. You grade it with points and written feedback."));
   const fld = (id, lab, type, key, extra) => { const i = h(type === "area" ? "textarea" : "input", Object.assign({ class: "field", id }, type === "area" ? { rows: "5" } : { type: type || "text" }, extra || {})); i.value = F[key] ?? ""; i.addEventListener("input", () => { F[key] = i.value; }); c.appendChild(h("label", { class: "f", for: id }, lab)); c.appendChild(i); return i; };
@@ -7266,8 +7560,12 @@ VIEWS.labedit = function (arg) {
     r2.appendChild(h("div", {}, h("label", { class: "f", for: "le-pen" }, "% off per day"), p1)); r2.appendChild(h("div", {}, h("label", { class: "f", for: "le-penmax" }, "Maximum %"), p2)); c.appendChild(r2); }
   const pub = h("input", { type: "checkbox", id: "le-pub", onchange: e => F.pub = e.target.checked }); pub.checked = F.pub;
   c.appendChild(h("label", { class: "check", for: "le-pub", style: "margin-top:8px" }, pub, h("span", {}, "Students can see it")));
+  c.appendChild(labFmtEditor(F, arg.code, a));
   const msg = h("div", { class: "muted", id: "le-msg", role: "status" });
   c.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn", id: "le-save", onclick: async () => {
+    if (F.cfg.modes.write === false && F.cfg.modes.scan === false && F.cfg.modes.upload === false) { msg.textContent = "❌ Allow at least one way to hand in the report."; return; }
+    if (F.cfg.modes.write !== false && !F.cfg.sections.some(x => x.on !== false)) { msg.textContent = "❌ Turn on at least one section."; return; }
+    if (F.cfg.sections.some(x => !String(x.name || "").trim())) { msg.textContent = "❌ Every section needs a name."; return; }
     if (!F.title.trim()) { msg.textContent = "❌ Give the lab report a title."; return; }
     if (!(+F.pts > 0 && +F.pts <= 1000)) { msg.textContent = "❌ Points must be between 1 and 1000."; return; }
     if (!(+F.pages >= 1 && +F.pages <= 50)) { msg.textContent = "❌ Expected pages must be between 1 and 50."; return; }
@@ -7276,7 +7574,9 @@ VIEWS.labedit = function (arg) {
     try { const r = await asgCall({ action: "save", id: a.id, class_code: arg.code, kind: "lab", title: F.title.trim(), instructions: F.instructions, max_points: +F.pts, expect_pages: Math.round(+F.pages), qids: [], items: [], answer_key: {}, points: {},
         open_at: zonedToIso(F.open, tz), due_at: zonedToIso(F.due, tz), lock_at: zonedToIso(F.lock, tz), max_attempts: F.att ? Math.round(+F.att) : null, time_limit_min: null,
         late_policy: F.late === "penalty" ? { mode: "penalty", pct_per_day: +F.pen, max_pct: +F.penmax } : { mode: F.late }, published: F.pub, tz });
-      VIEWS.labedit.f = null; toast("✅ Lab report saved" + (F.pub ? " — students see it now" : "")); stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
+      let made = [], fe = ""; try { made = await labFmtSave(r.assignment, arg.code, F, tz); } catch (x) { fe = x.message; }
+      VIEWS.labedit.f = null; toast(fe ? "⚠️ Lab report saved, but its format wasn't: " + fe + " Open Edit and save again." : "✅ Lab report saved" + (made.length ? " with a new " + made.join(" and ") + " (hidden until you add questions)" : "") + (F.pub ? " — students see it now" : ""));
+      stack.pop(); go("asgdetail", { id: r.assignment.id, code: arg.code }); }
     catch (e) { msg.textContent = "❌ " + e.message; } } }, a.id ? "Save changes" : "Create lab report")), msg);
   app.appendChild(c);
 };
@@ -7551,9 +7851,21 @@ VIEWS.labscan = function (arg) {
         rubShow(j.rubric, s.rubric_scores, "ls-rub-" + s.n), s.files && s.files.length ? h("div", { style: "margin-top:4px" }, h("b", {}, "From your instructor"), fbFiles(s.files, "ls-files-" + s.n, false)) : null) : h("div", { class: "muted" }, s.status === "returned" ? "Graded; your grade is released " + fmtTz(a.grade_release_at, tz) + "." : "Submitted. Waiting for grading."),
       s.file_removed ? h("div", { class: "muted", id: "ls-removed-" + s.n, style: "font-size:12.5px" }, "🗂️ The PDF was removed " + fmtTz(s.file_removed, tz, false) + " under your class's file retention rule. Your grade and feedback are kept.") :
       h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "ls-open-" + s.n, onclick: async () => { try { const o = await asgCall({ action: "lab_open", submission_id: s.id }); window.open(o.url, "_blank", "noopener"); } catch (x) { toast("❌ " + x.message); } } }, "Open PDF"))))); return j; }).catch(() => {});
-  labState(a.id).then(st => { box.innerHTML = ""; box.appendChild(head); box.appendChild(subsC); loadSubs();
+  Promise.all([labState(a.id), labCfgGet(a.id)]).then(([st, cfg0]) => { box.innerHTML = ""; box.appendChild(head); box.appendChild(subsC); loadSubs();
+    const cfg = labCfgFix(cfg0); { const ch = labChain(cfg, a, tz); if (ch) box.insertBefore(ch, subsC); }
+    if (VIEWS.labscan.rcpt && VIEWS.labscan.rcpt.aid === a.id) box.insertBefore(VIEWS.labscan.rcpt.el, head.nextSibling);
     const canUp = (a.state === "open" || a.state === "late") && !(e.max_attempts && a.attempts_used >= e.max_attempts);
     if (!canUp) { box.appendChild(h("div", { class: "card muted", id: "ls-closed" }, a.state === "not_open" ? "This lab report opens " + fmtTz(e.open_at, tz) + ". You can already photograph your pages; they stay on this device." : a.state === "closed" ? "This lab report is closed. Ask your instructor if you need an extension." : "You've used all your uploads.")); if (a.state !== "not_open") return; }
+    // 5.0: the ways the instructor allows (write in ChemFlip, scan pages, upload a PDF or Word file)
+    const modes = [["write", "✍️ Write it in ChemFlip"], ["scan", "📷 Scan or photograph pages"], ["upload", "📎 Upload a PDF or Word file"]].filter(([k]) => cfg.modes[k] !== false);
+    // the student's last choice for this report (kept on the device); otherwise the scanner when allowed, as before
+    const want = (S.labMode || {})[a.id];
+    const mode = want && cfg.modes[want] !== false ? want : cfg.modes.scan !== false ? "scan" : modes[0][0];
+    if (modes.length > 1) { const seg = h("div", { class: "seg", id: "ls-modes", role: "tablist", "aria-label": "How to hand in your report", style: "flex-wrap:wrap;margin:8px 0" });
+      modes.forEach(([k, t]) => seg.appendChild(h("button", { class: k === mode ? "on" : "", id: "ls-mode-" + k, role: "tab", "aria-selected": k === mode ? "true" : "false", onclick: () => { S.labMode = S.labMode || {}; S.labMode[a.id] = k; save(); render(); } }, t)));
+      box.appendChild(seg); }
+    if (mode === "write") { labWrite(box, a, cfg, tz, canUp); return; }
+    if (mode === "upload") { labUpload(box, a, tz, canUp, async files => { for (const f of files.slice(0, 50)) { try { await labAddBlob(st, f); } catch (x) {} } S.labMode = S.labMode || {}; S.labMode[a.id] = "scan"; save(); toast("🖼️ Photos added as pages"); render(); }); return; }
     const pagesC = h("div", { class: "card", id: "ls-pages" }); box.appendChild(pagesC);
     const actC = h("div", { class: "card", id: "ls-actions" }); box.appendChild(actC);
     const fileIn = h("input", { type: "file", accept: "image/*", multiple: "", id: "ls-files", style: "display:none", onchange: async ev => { const fs = [...ev.target.files]; ev.target.value = ""; if (!fs.length) return;
