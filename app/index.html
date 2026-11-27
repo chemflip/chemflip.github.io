@@ -728,6 +728,7 @@ function renderSide() {
   if (CFG.courses.length > 1) { const c = course(); side.appendChild(h("button", { class: "crs", id: "side-course", onclick: courseSheet }, h("span", {}, h("small", {}, "Course"), h("b", {}, c.name)), ico("chev", 16))); }
   const g1 = h("div", { class: "grp" }); const T0 = isTeacher();
   if (T0) {   // 5.0: instructors get their own navigation
+    grStart();
     g1.appendChild(navItem("home", "home", "Dashboard", reset("home"), { on: v === "home" }));
     g1.appendChild(navItem("teach", "teach", "My classes", reset("teach"), { on: ["teach", "cls", "newtest", "ctest", "student"].includes(v) }));
     g1.appendChild(navItem("grades", "chart", "Grades", reset("grades"), { on: ["grades", "gradebook", "asggrade"].includes(v), count: S.grBadge || "", hot: !!S.grBadge }));
@@ -1127,8 +1128,15 @@ function startList(kind) {
   if (!list.length) { toast(kind === "wrong" ? "🎉 No mistakes to review. Nice!" : "⭐ No bookmarks yet. Tap ☆ on any question."); return; }
   startQuiz(list, kind === "wrong" ? "Review mistakes" : "Bookmarks", { review: kind === "wrong" });
 }
+// 5.0: an instructor's own Homework opens as a preview. Say so on every screen, and how to test the student side for real.
+function previewBanner(done) {
+  return h("div", { class: "card", id: done ? "pv-done" : "pv-banner", role: "status", style: "border-left:5px solid var(--gold,#e6a700)" }, h("b", {}, done ? "👀 That was an instructor preview" : "👀 Instructor preview"),
+    h("div", { style: "font-size:13.5px" }, "Nothing here is submitted or graded, so it won't appear in Grades. Your instructor account can't submit to its own class."),
+    h("div", { class: "btnrow" }, h("button", { class: "btn sec2 small", id: done ? "pv-test2" : "pv-test", onclick: () => grTestStudent() }, "Create a test student to try it for real")));
+}
 VIEWS.quiz = function () {
   const Z = QUIZ; const q = Z.list[Z.i]; const n = Z.target || Z.list.length;
+  if (Z.preview) app.appendChild(previewBanner(false));
   pqSave();
   document.getElementById("title").textContent = Z.label;
   const top = h("div", { class: "progress" }, h("span", {}, "Question " + (Z.i + 1) + " of " + n), h("div", { class: "bar" }, h("i", { style: "width:" + pct(Z.i, n) + "%" })));
@@ -1291,6 +1299,7 @@ function summarize(res) {
 }
 VIEWS.results = function (R) {
   let res = R.res;
+  if (typeof QUIZ !== "undefined" && QUIZ && QUIZ.preview && !R.all) app.appendChild(previewBanner(true));
   if (R.all) { const c = CHBYN[R.ch]; res = cqs(c).filter(q => S.a[q.id]).map(q => ({ q, ok: S.a[q.id].r })); }
   const sm = summarize(res), n = sm.n, ok = sm.ok, p = sm.p;
   document.getElementById("title").textContent = R.all ? CHBYN[R.ch].title : (R.exam ? "Exam results" : "Results");
@@ -3597,6 +3606,24 @@ async function exLayout(parts, cfg) {
         // split long tables across pages row by row
         for (let rr = 0; rr <= r; rr++) place(list.filter(o => o.dy === rr * hh).map(o => Object.assign({}, o, { dy: 0 })));
         y += 8;
+      } else if (b.t === "img" && b.img) {   // 5.0 lab reports: a photo, graph or Word picture, scaled to the text width (and at most 5.5 in tall)
+        const mw = W - 2 * M, k = Math.min(1, mw / b.img.width, (b.maxH || 5.5) * EX_DPI / b.img.height), w = Math.round(b.img.width * k), hh = Math.round(b.img.height * k);
+        const blk = [{ t: "img", img: b.img, x: M + Math.round((mw - w) / 2), w, h: hh + 6, dy: 0 }];
+        if (b.cap) blk.push(...stack(textOps(b.cap, M, mw, pt - 2, false, true, "#444")).map(o => Object.assign(o, { dy: o.dy + hh + 8 })));
+        place(blk); y += 10;
+      } else if (b.t === "table" && b.rows && b.rows.length) {   // 5.0 lab reports: a data table with borders; header row repeats on new pages
+        const cols = Math.max(...b.rows.map(r => r.length)), mw = W - 2 * M, cw = mw / cols, pad = 6, f = exFont(pt - 1), fb = exFont(pt - 1, true);
+        const rowOps = (r, bold) => { meas.font = bold ? fb : f; const cells = Array.from({ length: cols }, (_, i) => exWrap(meas, String(r[i] ?? ""), cw - 2 * pad));
+          const rh = Math.max(1, ...cells.map(c => c.length)) * lineH(pt - 1) + 2 * pad, out = [];
+          cells.forEach((lines, i) => { out.push({ t: "cell", x: M + i * cw, w: cw, h: rh, dy: 0, head: bold });
+            lines.forEach((s2, j) => out.push({ t: "text", s: s2, x: M + i * cw + pad, font: bold ? fb : f, color: "#111", h: 0, dy: pad + j * lineH(pt - 1) })); });
+          out.push({ t: "gap", h: rh, dy: 0 }); return out; };
+        const head = b.head !== false ? b.rows[0] : null;
+        b.rows.forEach((r, i) => { const isHead = head && i === 0, hgt = rowOps(r, isHead).find(o => o.t === "gap").h;
+          if (!isHead && head && y + hgt > H - M - FOOT) { newPage(); place(rowOps(head, true)); }
+          place(rowOps(r, isHead)); });
+        if (b.cap) place(stack(textOps(b.cap, M, mw, pt - 2, false, true, "#444")));
+        y += 10;
       } else if (b.t === "bubbles") {
         const per = 25, rowH = Math.round(0.3 * EX_DPI), colW = Math.round((W - 2 * M) / Math.ceil(b.n / per) ), f = exFont(pt - 1), fb = exFont(pt - 2, true), rad = Math.round(0.09 * EX_DPI);
         const startY = y; let maxY = y;
@@ -3619,6 +3646,7 @@ function exDraw(L, page) {
     if (o.t === "text") { g.font = o.font; g.fillStyle = o.color || "#111"; g.fillText(o.s, o.x, o.y); }
     else if (o.t === "rule") { g.strokeStyle = o.under ? "#999" : "#0E2841"; g.lineWidth = o.wd || 1; const yy = o.y + (o.under ? o.h - 2 : 1); g.beginPath(); g.moveTo(o.x1, yy); g.lineTo(o.x2, yy); g.stroke(); }
     else if (o.t === "box") { g.strokeStyle = "#999"; g.lineWidth = 1.5; g.strokeRect(o.x, o.y, o.w, o.h - 4); }
+    else if (o.t === "cell") { if (o.head) { g.fillStyle = "#EAF1F5"; g.fillRect(o.x, o.y, o.w, o.h); } g.strokeStyle = "#5B6B75"; g.lineWidth = 1; g.strokeRect(o.x, o.y, o.w, o.h); }
     else if (o.t === "img") g.drawImage(o.img, o.x, o.y, o.w, o.h - 6);
     else if (o.t === "bubble") { g.strokeStyle = "#333"; g.lineWidth = 1.5; g.beginPath(); g.arc(o.cx, o.cy, o.r, 0, Math.PI * 2); g.stroke(); g.font = o.font; g.fillStyle = "#555"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(o.s, o.cx, o.cy + 1); g.textAlign = "left"; g.textBaseline = "top"; }
   }
@@ -4058,7 +4086,20 @@ function warmUp() { const go_ = () => { try { if (DB && DB.prefetch) DB.prefetch
 function finishSignIn() {
   if (AUTHV.pending) { AUTH = AUTHV.pending; AUTHV.pending = null; }
   AUTH_RES(); stack = [{ view: "home" }]; render(); heartbeat(); warmUp();
+  acctRestoreInstructor();
   pkOk().then(ok => { if (ok && !localStorage.getItem(KEY + "-pk-" + AUTH.account.id) && !localStorage.getItem(KEY + "-pkno-" + AUTH.account.id)) setTimeout(offerPasskey, 1200); });
+}
+// 5.0: on a device this account hasn't used before, nothing is stored yet. The server knows whether the account is a verified
+// instructor, so restore that (and a basic profile) instead of asking to verify the school email again.
+async function acctRestoreInstructor() {
+  if (eduOk() || !DB || !DB.live || !DB.call) return;
+  try { const st = await DB.call({ op: "me" }); if (!st || st.status !== "verified" || !st.email) return;
+    eduApply(st.email, st); S.edu.chk = Date.now();
+    if (!S.profile) S.profile = { name: (AUTH && AUTH.account && (AUTH.account.name || AUTH.account.username)) || "", school: "", avatar: "🧪", role: "instructor", course: (CFG.courses[0] || {}).id };
+    else S.profile.role = "instructor";
+    save(); stack = [{ view: "home" }]; render(); toast("👩‍🏫 Signed in as a verified instructor (" + st.email + ")");
+    try { await loadCourses(); renderSide(); } catch (e) {}
+  } catch (e) {}
 }
 // Is the session still the account's live one? If it was ended (another device, password change), sign out here at once.
 let HB = null, HB_AT = 0;
@@ -5457,6 +5498,7 @@ function pickClass(then) {
 const toTab = (tab) => (k) => { CLSTAB = { students: 0, board: 1, tests: 2, feed: 3, assign: 4, graded: 5 }[tab] || 0; go("cls", k.code); };
 /* ----- 5.0 Grades (instructors): Submissions to review · Gradebook · Analytics · Alerts ----- */
 async function gradesLoad(fresh) {
+  try { await loadCourses(); } catch (e) {}   // the classes you teach come from the server, so Grades is complete on any device
   const ks = (S.tclasses || []).slice(0, 20), o = fresh ? { fresh: true } : undefined;
   const per = await Promise.all(ks.map(k => Promise.all([asgCall({ action: "gb", class_code: k.code }, o), asgCall({ action: "list", class_code: k.code }, o)]).then(([gb, list]) => ({ k, gb, list })).catch(e => ({ k, err: e.message }))));
   let rev = []; try { rev = (await xCall({ op: "grades", action: "meta", codes: ks.map(k => k.code) })).reviewed || []; } catch (e) {}
@@ -5469,7 +5511,40 @@ async function gradesLoad(fresh) {
   rows.sort((x, y) => Date.parse(y.at || 0) - Date.parse(x.at || 0));
   return { per, rows, at: Date.now() };
 }
-function grStatus(r) { return r.pending ? ["Pending manual grading", "warn"] : r.reviewed ? ["Reviewed", "ok"] : r.kind === "lab" ? ["Graded", ""] : ["Auto-graded", ""]; }
+function grStatus(r) { return r.pending ? ["Pending manual grading", "warn"] : r.reviewed ? ["Reviewed", "ok"] : r.kind === "lab" ? ["Graded · pending review", ""] : ["Auto-graded · pending review", ""]; }
+const grSig = M => JSON.stringify(M.rows.map(r => [r.aid, r.sid, r.at, r.score, r.pending, r.reviewed, r.released]));
+// 5.0: Grades stays current by itself: every 30 s while it's open (and the app is in view), and the badge every minute elsewhere.
+let GR_T = null;
+function grStart() {
+  if (GR_T) return;
+  GR_T = setInterval(async () => {
+    if (!isTeacher() || !(S.tclasses || []).length || document.visibilityState === "hidden" || !DB || !DB.live) return;
+    const v = cur().view, onGrades = v === "grades" && VIEWS.grades.tab !== "alerts" && VIEWS.grades.tab !== "book";
+    GR_T.n = (GR_T.n || 0) + 1; if (!onGrades && GR_T.n % 2) return;   // elsewhere: once a minute
+    try { const M = await gradesLoad(true), n = M.rows.filter(r => r.pending || !r.reviewed).length;
+      if (n !== (S.grBadge || 0)) { S.grBadge = n; save(); renderSide(); }
+      if (onGrades && cur().view === "grades" && grSig(M) !== VIEWS.grades.sig && !document.querySelector("#gr-list input[type=checkbox]:checked") && !document.querySelector(".refsheet")) { VIEWS.grades.sig = grSig(M); render(); toast("🔄 Grades updated"); }
+    } catch (e) {} }, 30e3);
+}
+// One real student account in a class, for trying the student side (sign in with it in a private window or another browser).
+function grTestStudent() {
+  const ks = (S.tclasses || []).filter(k => k && k.code); if (!ks.length) { toast("Create a class first."); return; }
+  sheet("ts-sheet", "Create a test student", (box, close) => {
+    box.appendChild(h("p", { class: "muted", style: "font-size:13.5px" }, "ChemFlip makes a real student account in the class you choose. Sign in with it in a private window (or another browser or device), open the Homework, and submit it: the submission appears in your Grades within 30 seconds. Remove the test student from the class's Students tab when you're done."));
+    const sel = h("select", { class: "field", id: "ts-class", "aria-label": "Class" }, ks.map(k => h("option", { value: k.code, selected: S.cls && S.cls.code === k.code ? "" : null }, k.name + " · " + k.code)));
+    const out = h("div", { id: "ts-out", role: "status", "aria-live": "polite" });
+    const go1 = h("button", { class: "btn", id: "ts-go", onclick: async () => { go1.disabled = true; out.textContent = "Creating…";
+      try { const j = await authFetch({ action: "bulk_create", class_code: sel.value, students: [{ name: "Test Student" }] }), a = (j.accounts || [])[0];
+        if (!a || a.error) throw new Error((a && a.error) || "Couldn't create the account.");
+        out.innerHTML = ""; out.appendChild(h("div", { class: "card", id: "ts-done", style: "border-left:5px solid var(--ok,#2a8)" }, h("b", {}, "✅ Test student added to " + (j.class || sel.value)),
+          h("div", {}, "Username: ", h("code", { id: "ts-user" }, a.username)), h("div", {}, "Temporary password: ", h("code", { id: "ts-pw" }, a.password)),
+          h("ol", { style: "margin:6px 0 0 18px;padding:0;font-size:13.5px" }, h("li", {}, "Open chemflip.org/app in a private window (Ctrl+Shift+N in Chrome or Edge)."), h("li", {}, "Sign in with the username and temporary password; choose a new password."),
+            h("li", {}, "Open the Homework from Upcoming Assignments & Tests and submit it."), h("li", {}, "Come back here: Grades shows it with its score.")),
+          h("p", { class: "muted", style: "font-size:12.5px" }, "The password is shown only now."))); }
+      catch (e) { go1.disabled = false; out.textContent = "❌ " + e.message; } } }, "Create test student");
+    box.appendChild(h("label", { class: "f", for: "ts-class" }, "Class")); box.appendChild(sel); box.appendChild(h("div", { class: "btnrow" }, go1)); box.appendChild(out);
+  });
+}
 const GR_TABS = [["review", "Submissions to review"], ["book", "Gradebook"], ["stats", "Analytics"], ["alerts", "Alerts"]];
 VIEWS.grades = function (arg) {
   if (!isTeacher()) { back0(); return; }
@@ -5478,12 +5553,13 @@ VIEWS.grades = function (arg) {
   const nav = h("div", { class: "seg", id: "gr-tabs", role: "tablist", style: "flex-wrap:wrap;margin-bottom:10px" });
   GR_TABS.forEach(([k, t]) => nav.appendChild(h("button", { class: k === tab ? "on" : "", id: "gr-tab-" + k, role: "tab", "aria-selected": k === tab ? "true" : "false", onclick: () => { VIEWS.grades.tab = k; render(); } }, t)));
   app.appendChild(nav);
-  if (!(S.tclasses || []).length) { app.appendChild(h("div", { class: "card muted" }, "Create a class first. Grades from every class you teach appear here.")); return; }
+  if (!(S.tclasses || []).length) { const m = h("div", { class: "card muted", id: "gr-noclass" }, "⏳ Loading your classes…"); app.appendChild(m);
+    loadCourses().then(() => { if (cur().view !== "grades") return; if ((S.tclasses || []).length) render(); else m.textContent = "Create a class first. Grades from every class you teach appear here."; }).catch(() => { m.textContent = "❌ Couldn't load your classes. Check your connection."; }); return; }
   const box = h("div", { id: "gr-box" }, h("div", { class: "card muted", id: "gr-loading" }, "⏳ Loading grades from " + S.tclasses.length + " class" + (S.tclasses.length > 1 ? "es" : "") + "…")); app.appendChild(box);
   if (tab === "alerts") { grAlerts(box); return; }
   if (tab === "book") { box.innerHTML = ""; const c = h("div", { class: "card", id: "gr-book" }, h("b", {}, "Gradebook by class"), h("p", { class: "muted", style: "font-size:13px" }, "Every Homework, Quiz, Test and Lab report is added to its class's gradebook automatically, with columns you add for exams on paper, participation or extra credit. Weights, drops, late penalties, CSV, Excel and PDF are in each gradebook."));
     S.tclasses.forEach(k => c.appendChild(h("div", { class: "ch" }, h("button", { class: "main", id: "gr-gb-" + k.code, onclick: () => go("gradebook", { code: k.code }) }, h("div", { style: "flex:1" }, h("div", { class: "t" }, k.name), h("div", { class: "meta" }, "Class code " + k.code)))))); box.appendChild(c); return; }
-  gradesLoad(VIEWS.grades.fresh).then(M => { VIEWS.grades.fresh = false; box.innerHTML = ""; S.grBadge = M.rows.filter(r => r.pending || !r.reviewed).length; save();
+  gradesLoad(true).then(M => { VIEWS.grades.fresh = false; box.innerHTML = ""; S.grBadge = M.rows.filter(r => r.pending || !r.reviewed).length; save(); renderSide(); VIEWS.grades.sig = grSig(M);
     const errs = M.per.filter(p => p.err); if (errs.length) box.appendChild(h("p", { class: "muted", id: "gr-errs" }, "❌ Couldn't load " + errs.map(p => p.k.name).join(", ") + ": " + errs[0].err));
     if (tab === "stats") grStats(box, M); else grReview(box, M);
   }).catch(e => { box.innerHTML = ""; box.appendChild(h("div", { class: "card muted" }, "❌ " + e.message)); });
@@ -5493,12 +5569,14 @@ function grReview(box, M) {
   const card = h("div", { class: "card", id: "gr-review" }, h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap" }, h("b", {}, "Submissions to review"),
     h("button", { class: "btn ghost small", id: "gr-refresh", onclick: () => { VIEWS.grades.fresh = true; DB.clearCache(); render(); } }, "Refresh")),
     h("p", { class: "muted", style: "font-size:13px" }, "Work arrives here as soon as a student submits it, already scored where ChemFlip can grade it (multiple choice, numbers with your tolerances, units and significant figures, structures). Questions that need your judgment stay “Pending manual grading” and are never counted as zero before you grade them."));
-  const st = h("select", { class: "field", id: "gr-f-st", "aria-label": "Show", onchange: e => { F.st = e.target.value; draw(); } }, [["todo", "Needs review"], ["pending", "Pending manual grading"], ["auto", "Auto-graded, not reviewed"], ["reviewed", "Reviewed"], ["held", "Grades not released"], ["late", "Late"], ["all", "All submissions"]].map(([v, t]) => h("option", { value: v, selected: F.st === v ? "" : null }, t)));
+  const st = h("select", { class: "field", id: "gr-f-st", "aria-label": "Show", onchange: e => { F.st = e.target.value; draw(); } }, [["todo", "Pending review"], ["pending", "Pending manual grading"], ["auto", "Auto-graded, not reviewed"], ["reviewed", "Reviewed"], ["held", "Grades not released"], ["late", "Late"], ["all", "All submissions"]].map(([v, t]) => h("option", { value: v, selected: F.st === v ? "" : null }, t)));
   const cl = h("select", { class: "field", id: "gr-f-cls", "aria-label": "Class", onchange: e => { F.code = e.target.value; draw(); } }, [["", "All classes"]].concat(S.tclasses.map(k => [k.code, k.name])).map(([v, t]) => h("option", { value: v, selected: F.code === v ? "" : null }, t)));
-  card.appendChild(h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin:6px 0" }, st, cl));
+  const ty = h("select", { class: "field", id: "gr-f-type", "aria-label": "Type", onchange: e => { F.type = e.target.value; draw(); } }, [["", "All grades"], ["assignment", "Homework grades"], ["quiz", "Quiz grades"], ["test", "Test and exam grades"], ["lab", "Lab report grades"]].map(([v, t]) => h("option", { value: v, selected: (F.type || "") === v ? "" : null }, t)));
+  card.appendChild(h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin:6px 0" }, ty, st, cl));
+  card.appendChild(h("p", { class: "muted", id: "gr-upd", style: "font-size:12px;margin:0" }, M.rows.length + " submission" + (M.rows.length === 1 ? "" : "s") + " in " + M.per.filter(p => p.gb).length + " class" + (M.per.filter(p => p.gb).length === 1 ? "" : "es") + " · updated " + new Date(M.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }) + " · refreshes by itself every 30 seconds"));
   const bar = h("div", { class: "bulkbar", id: "gr-bulk", style: "display:none", role: "region", "aria-label": "Actions for selected submissions" }), list = h("div", { id: "gr-list" });
   card.appendChild(bar); card.appendChild(list); box.appendChild(card);
-  const pass = r => (!F.code || r.code === F.code) && (F.st === "all" || (F.st === "todo" ? r.pending || !r.reviewed : F.st === "pending" ? r.pending : F.st === "auto" ? !r.pending && !r.reviewed : F.st === "reviewed" ? r.reviewed : F.st === "held" ? !r.released : r.late));
+  const pass = r => (!F.code || r.code === F.code) && (!F.type || r.kind === F.type) && (F.st === "all" || (F.st === "todo" ? r.pending || !r.reviewed : F.st === "pending" ? r.pending : F.st === "auto" ? !r.pending && !r.reviewed : F.st === "reviewed" ? r.reviewed : F.st === "held" ? !r.released : r.late));
   const sel = () => M.rows.filter(r => pick.has(r.aid + "|" + r.sid));
   const run = async (fn, msg) => { try { await fn(); toast("✅ " + msg); VIEWS.grades.fresh = true; DB.clearCache(); render(); } catch (e) { toast("❌ " + e.message); } };
   const byClass = rs => { const m = new Map(); rs.forEach(r => { if (!m.has(r.code)) m.set(r.code, []); m.get(r.code).push(r); }); return m; };
@@ -5512,7 +5590,11 @@ function grReview(box, M) {
       const byA = new Map(); redo.forEach(r => { if (!byA.has(r.aid)) byA.set(r.aid, []); byA.get(r.aid).push(r.sid); });
       for (const [aid, sids] of byA) await asgCall({ action: "override_many", assignment_id: aid, targets: sids, due_at: null, lock_at: null, extra_minutes: 0, extra_attempts: 1, accommodation: false, note: "Returned for revision" }); }, "Returned for revision"), "Return") }, "Return for revision")); }
   function draw() { list.innerHTML = ""; pick.clear(); drawBar(); const rs = M.rows.filter(pass);
-    if (!rs.length) { list.appendChild(h("p", { class: "muted", id: "gr-none" }, F.st === "todo" ? "Nothing waiting. New submissions appear here as students submit." : "No submissions match.")); return; }
+    if (!rs.length) { list.appendChild(h("p", { class: "muted", id: "gr-none" }, M.rows.length ? (F.st === "todo" ? "Nothing waiting for review. Choose \u201cAll submissions\u201d to see graded work." : "No submissions match these filters.")
+        : "No student has submitted graded work in your classes yet. Submissions appear here the moment a student presses Submit, with the automatic score."));
+      if (!M.rows.length) list.appendChild(h("div", { class: "card", id: "gr-howto", style: "border-left:5px solid var(--teal)" }, h("b", {}, "Trying it yourself?"),
+        h("p", { style: "font-size:13.5px;margin:4px 0" }, "Your instructor account opens your own Homework as a preview, which is never submitted. To see a submission here, use a separate student account."),
+        h("button", { class: "btn sec2 small", id: "gr-test", onclick: () => grTestStudent() }, "Create a test student"))); return; }
     const wrap = h("div", { style: "overflow-x:auto" }), t = h("table", { class: "t", id: "gr-table" }), tb = h("tbody", {});
     const all = h("input", { type: "checkbox", id: "gr-all", "aria-label": "Select all shown", onchange: e => { rs.forEach(r => { const k = r.aid + "|" + r.sid, cb = document.getElementById("gr-cb-" + r.aid.slice(0, 8) + "-" + r.sid); e.target.checked ? pick.add(k) : pick.delete(k); if (cb) cb.checked = e.target.checked; }); drawBar(); } });
     t.appendChild(h("thead", {}, h("tr", {}, h("th", { scope: "col" }, all), ...["Student", "Class", "Assessment", "Submitted", "Score", "Status", ""].map(x => h("th", { scope: "col" }, x)))));
@@ -5521,7 +5603,7 @@ function grReview(box, M) {
         h("td", {}, h("input", { type: "checkbox", id, "aria-label": "Select " + r.name + ", " + r.title, onchange: e => { e.target.checked ? pick.add(r.aid + "|" + r.sid) : pick.delete(r.aid + "|" + r.sid); drawBar(); } })),
         h("td", {}, r.name), h("td", {}, r.cname), h("td", {}, (r.kind === "assignment" ? "Homework" : KIND[r.kind]) + ": " + r.title),
         h("td", {}, r.at ? fmtTz(r.at, localTz(), false) : "—", r.late ? h("span", { class: "chip warn", style: "margin-left:4px" }, "late") : null),
-        h("td", {}, r.pending ? "Pending" : Math.round(r.score * 100) / 100 + " / " + r.total),
+        h("td", {}, r.pending ? (r.total ? "Pending (" + Math.round(r.score * 100) / 100 + " so far of " + r.total + ")" : "Pending") : Math.round(r.score * 100) / 100 + " / " + r.total + (r.total ? " (" + Math.round(r.score / r.total * 1000) / 10 + "%)" : "")),
         h("td", {}, h("span", { class: "chip " + tone }, lab), " ", h("span", { class: "chip " + (r.released ? "ok" : "") }, r.released ? "Released" : r.held ? "Held" : "Releases " + fmtTz(r.rel_at, localTz(), false))),
         h("td", {}, h("button", { class: "btn sec2 small", id: "gr-open-" + k8 + "-" + r.sid, "aria-label": (r.pending ? "Grade " : "Open ") + r.name + "'s " + r.title, onclick: () => grOpen(r) }, r.pending ? "Grade" : "Open")))); });
     t.appendChild(tb); wrap.appendChild(t); list.appendChild(wrap);
@@ -5678,6 +5760,7 @@ async function loadDeadlines(force) {
   const out = { at: Date.now(), items: [], tz: null, who: isTeacher() ? "t" : "s" };
   try {
     if (isTeacher()) {
+      try { await loadCourses(); } catch (e) {}
       for (const k of (S.tclasses || []).slice(0, 20)) { const j = await asgCall({ action: "list", class_code: k.code }, { fresh: true }); out.tz = out.tz || j.tz;
         j.assignments.forEach(a => out.items.push({ id: a.id, cls: k.name, code: k.code, kind: a.kind, title: a.title, open: a.open_at, due: a.due_at, lock: a.lock_at || a.due_at, tz: j.tz || localTz(), teacher: true, submitted: a.submitted, published: a.published })); }
     } else {
