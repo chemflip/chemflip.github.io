@@ -502,6 +502,7 @@ function isPremium(cid) {
   cid = cid || course().id;
   if (typeof ltiLicensed === "function" && ltiLicensed(cid)) return true;
   if (typeof instCovers === "function" && instCovers(cid)) return true;
+  if (typeof actCovers === "function" && actCovers(cid)) return true;   // 5.0: a course activation code (only its courses, until its access ends)
   if (typeof eduOk === "function" && eduOk()) return true;   // 5.0: verified instructors are free (every course, every feature)   // 5.0: a college or university license
   if (trialLeft() > 0 && !S.prem) return true;
   const p = S.prem; if (!p) return false;
@@ -916,6 +917,7 @@ VIEWS.home = function () {
     h("button", { class: "btn ghost", id: "class-quick", onclick: () => go("classes") }, "Join your class")));
   app.appendChild(duo);
   { const sd = studentDash(T); if (sd) app.appendChild(sd); }
+  { const ah = actHomeCard(); if (ah) app.appendChild(ah); }
   // the chapter table
   const head = h("div", { class: "sech" }, h("div", { class: "sec" }, "Your chapter table"),
     h("div", { class: "legend", "aria-hidden": "true" }, h("span", {}, "Mastery"), h("i", { style: "border:1px solid var(--hair);background:var(--m0)" }), h("i", { style: "background:var(--m1)" }), h("i", { style: "background:var(--m2)" }), h("i", { style: "background:var(--m3)" }), h("span", {}, "100%")));
@@ -2920,9 +2922,11 @@ VIEWS.premium = function () {
   }
   if (storeFlavor() && !(S.prem && S.prem.src === "web")) card.appendChild(restoreBox(true));
   { const ic = instPremiumCard(); if (ic) card.appendChild(ic); }
+  { const ac = actPremiumCard(); if (ac) card.appendChild(ac); }
   if (!(S.prem && S.prem.src === "code")) {
     const inp = h("input", { class: "field code", id: "code", placeholder: CFG.app + "-XX-YYMM-XXXXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", value: CODE_FAIL ? CODE_FAIL.v : "" });
-    const msg = h("div", { class: "muted", id: "code-msg", style: "margin-top:6px" + (CODE_FAIL ? ";color:var(--bad)" : "") }, CODE_FAIL ? "❌ " + CODE_FAIL.why : "🎓 Have an access code, a 50%-off code, or the invite code of the friend who invited you? Enter it here.");
+    const okNow = CODE_DONE && Date.now() - CODE_DONE.at < 30e3;
+    const msg = h("div", { class: "muted", id: "code-msg", style: "margin-top:6px" + (CODE_FAIL ? ";color:var(--bad)" : okNow ? ";color:var(--good,#1b7a3a)" : "") }, CODE_FAIL ? "❌ " + CODE_FAIL.why : okNow ? CODE_DONE.text : "🎓 Have a course activation code (ACT-…), an access code, a 50%-off code, or the invite code of the friend who invited you? Enter it here.");
     card.appendChild(h("div", { style: "margin-top:16px;border-top:1px solid var(--hair);padding-top:14px" }, h("b", {}, "🔑 Access code"), inp, msg,
       h("div", { class: "btnrow" }, h("button", { class: "btn", id: "redeem", onclick: () => redeemCode(inp.value, msg) }, "Unlock"))));
   }
@@ -2936,9 +2940,9 @@ let PAYST = null, PAYAT = 0, PAYWAIT = 0, WP_PLAN = "yearly", RS = null, WP_COUR
 // 5.0 per-course plans: the first course at the plan price, each additional course +$3/month or +$25/year (from the server)
 function wpExtra(cycle) { const e = (PAYST && PAYST.extra) || {}; return Number(cycle === "yearly" ? e.yearly || 25 : e.monthly || 3); }
 function wpTotal(cycle, n) { return num(webPrice(cycle), cycle === "yearly" ? 59.99 : 5.99) + Math.max(0, n - 1) * wpExtra(cycle); }
-function wpCourses() { if (!WP_COURSES) WP_COURSES = [PAID.includes(course().id) ? course().id : PAID[0]]; return WP_COURSES; }
+function wpCourses() { if (!WP_COURSES) { const want = PAID.includes(course().id) ? course().id : PAID[0]; WP_COURSES = [actCovers(want) ? (PAID.find(x => !actCovers(x)) || want) : want]; } return WP_COURSES; }
 const cName = id => (CFG.courses.find(c => c.id === id) || { name: id }).name;
-function wpPicker(sel, onchange, idp) { return h("div", { id: idp || "wp-courses", role: "group", "aria-label": "Courses to include", style: "display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0" }, ...PAID.filter(id => CFG.courses.some(c => c.id === id)).map(id => { const b = h("input", { type: "checkbox", id: (idp || "wp-courses") + "-" + id, onchange: e => { const l = sel.filter(x => x !== id); if (e.target.checked) l.push(id); if (!l.length) { e.target.checked = true; toast("Keep at least one course."); return; } onchange(l); } }); b.checked = sel.includes(id); return h("label", { class: "check", for: (idp || "wp-courses") + "-" + id }, b, h("span", {}, cName(id))); })); }
+function wpPicker(sel, onchange, idp) { return h("div", { id: idp || "wp-courses", role: "group", "aria-label": "Courses to include", style: "display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0" }, ...PAID.filter(id => CFG.courses.some(c => c.id === id)).map(id => { const b = h("input", { type: "checkbox", id: (idp || "wp-courses") + "-" + id, onchange: e => { const l = sel.filter(x => x !== id); if (e.target.checked) l.push(id); if (!l.length) { e.target.checked = true; toast("Keep at least one course."); return; } onchange(l); } }); b.checked = sel.includes(id); const au = actUntil(id); return h("label", { class: "check", for: (idp || "wp-courses") + "-" + id }, b, h("span", {}, cName(id), au ? h("small", { class: "muted" }, " (activation code until " + new Date(au).toLocaleDateString() + ")") : null)); })); }
 function webPrice(cycle) { const r = (PAYST && PAYST.prices) || {}, R0 = S.remote || {}, P0 = CFG.prices || {}; const v = cycle === "yearly" ? (r.yearly || num(R0.yearly || P0.yearly, 59.99)) : (r.monthly || num(R0.monthly || P0.monthly, 5.99)); return "$" + Number(v).toFixed(2); }
 function webOk(p) { if (Date.now() - (p.vAt || 0) > 6 * 36e5) payStatus().catch(() => {}); return !p.until || Date.parse(p.until) + 3 * 864e5 > Date.now(); }
 const isDesktopApp = () => location.protocol === "file:" || !!window.chemflipApp;
@@ -2956,7 +2960,7 @@ async function payFetch(body) {
 }
 async function payCall(body) { return await payFetch(Object.assign({ op: "pay" }, body)); }
 // 5.0: smaller services beside the main one (cf-x), with the same device identity: activity archive.
-const XREAD = new Set(["archived", "classes", "meta", "alerts_get", "cfg_get", "get", "mine", "log", "inbox", "inbox_read", "seen", "activity", "rem_get", "list", "usage"]);
+const XREAD = new Set(["archived", "classes", "meta", "alerts_get", "cfg_get", "get", "mine", "log", "inbox", "inbox_read", "seen", "activity", "rem_get", "list", "usage", "redemptions", "creators"]);
 async function xCall(body) {
   if (!DB || !DB.live || !CFG.sb || !CFG.sb.url) throw new Error("This needs ChemFlip's online service.");
   await signedIn();
@@ -2979,7 +2983,9 @@ async function payStatus() {
   const j = await payCall({ action: "status", disc: S.disc ? S.disc.code : undefined });
   PAYST = j; PAYAT = Date.now(); applyPay(j); return j;
 }
-async function startCheckout(provider) {
+async function startCheckout(provider, ok) {
+  const dup = wpCourses().filter(id => actUntil(id));
+  if (dup.length && !ok) { confirmBox("Already covered by your activation code", dup.map(id => cName(id) + " until " + new Date(actUntil(id)).toLocaleDateString()).join(", ") + ". You don't need to pay for " + (dup.length > 1 ? "these" : "it") + " until then. Subscribe anyway (for access after the code ends)?", () => startCheckout(provider, true), "Subscribe anyway"); return; }
   const btn = document.getElementById(provider === "paypal" ? "wp-paypal" : "wp-card"); if (btn) { btn.disabled = true; btn.textContent = "Opening the payment page…"; }
   try {
     const ret = /(^|\.)chemflip\.org$/.test(location.hostname) ? location.origin + location.pathname : undefined;
@@ -3160,6 +3166,7 @@ function syncSubscriber() {
 }
 async function redeemCode(v, msg) {
   if (/^\s*INST-/i.test(v || "")) return instRedeem(String(v).trim(), msg);
+  if (/^\s*ACT[\s-]?[A-Z0-9]/i.test(v || "")) return actRedeem(String(v).trim(), msg);
   msg.textContent = "Checking…"; msg.style.color = "";
   const r = await onlineCode(v);
   if (redeemInvite(r, msg)) return;
@@ -3168,7 +3175,7 @@ async function redeemCode(v, msg) {
   else if (r.ok) { S.prem = { src: "code", code: r.code, exp: r.exp, courses: r.courses || null, vAt: Date.now() }; save(); sfx("win"); msg.textContent = ""; toast("💎 Premium unlocked!"); render(); }
   else { sfx("bad"); msg.textContent = "❌ " + r.why; msg.style.color = "var(--bad)"; CODE_FAIL = { v, why: r.why }; }
 }
-let CODE_FAIL = null;   // the last refused code and why, so a redraw of the Premium page keeps the message
+let CODE_FAIL = null, CODE_DONE = null;   // CODE_DONE: the last activation's message, kept for a redraw   // the last refused code and why, so a redraw of the Premium page keeps the message
 
 /* ---------- profile ---------- */
 function badges() {
@@ -6610,6 +6617,7 @@ const HELP = [
   { id: "canvasint", t: "Instructors: Canvas Integration Settings", who: "instructor", kw: "canvas connect disconnect sync now automatic status failed history conflicts lms grades", b: ["ChemFlip works fully without Canvas. In a class, open Students → Class settings → Canvas Integration Settings to see the Canvas status (Connected, Disconnected or Synchronization Failed) and the last successful sync.", "Turn automatic sync off to keep grades in ChemFlip until you press Sync now. Untick a Canvas assignment to stop syncing it. Disconnect stops all sending for the class; links and waiting grades are kept, and reconnecting sends them once.", "If Canvas is down, students and instructors keep working; failed grades are retried and listed with the reason. The page also lists Canvas date differences and exactly what can sync today."] },
   { id: "joining", t: "Joining a class", who: "student", kw: "join class code invite link request approval waiting", b: ["Enter the 6-character class code under Classes, or open your instructor's invite link.", "Some classes need the instructor's approval: your request then shows as waiting under Classes, and the class opens once it is approved. Press Check to look again."] },
   { id: "canvas", t: "Canvas", who: "all", kw: "canvas lti grades roster deep link", b: ["ChemFlip can be added to a Canvas course by the school's Canvas administrator. Instructors can then add ChemFlip assignments from Canvas, sync the roster and send scores to the Canvas gradebook.", "Only scores are sent to Canvas, not submissions or extensions. ChemFlip also works fully without Canvas."] },
+  { id: "acodes", t: "Course activation codes (ACT-…)", who: "all", kw: "activation code redeem unlock course act code creator complimentary promotional school free access expire", b: ["An activation code unlocks the course or courses it was made for, and only those, for the time set when it was made (for example one semester). Redeem it on Home → Redeem activation code, or under Premium → Access code.", "Code access works like a purchase for that course: every chapter, flashcards, practice questions, tests and games. Your class's Homework, Quizzes, Exams and Lab reports never need Premium.", "When the access ends, the course locks again and you get a notice. Your progress and grades are kept; you can subscribe to that course under Premium. A code never starts a paid subscription, and while it covers a course you aren't asked to pay for it.", "Codes are checked by ChemFlip's server: each can be used only as many times as allowed, and too many wrong tries pause redeeming for an hour.", "Code Creator: administrators make codes under Administrator → Course activation codes (course, type, length, how many, uses per code; search, filter, export, revoke, history). Verified instructors can make class join codes, but codes that unlock paid content only if an administrator allows it."] },
   { id: "access", t: "Accessibility and keyboard shortcuts", who: "all", kw: "accessibility keyboard shortcuts text size dark mode screen reader motion contrast", b: ["Ctrl+K or / opens search. Esc goes back. In a question, A–D or 1–4 picks an answer and Enter goes on.", "Settings → Appearance has light and dark themes. Settings → Accessibility has larger text and less motion.", "Every screen has a Skip to main content link for keyboard and screen-reader users."] },
   { id: "privacy", t: "Privacy and your data", who: "all", kw: "privacy data delete ferpa grades", b: ["Your answers stay on your device unless you join a class or sign in to sync. Instructors see only their own classes.", "Settings → Delete my data removes your class records and leaderboard entries from ChemFlip's server."] },
   { id: "contact", t: "Contact", who: "all", kw: "contact email help support bug", b: ["Questions, feedback or a problem? Email chemflipp@gmail.com."] },
@@ -8531,6 +8539,155 @@ async function instUsage(l, call) {
     box.appendChild(h("b", {}, "History")); box.appendChild(h("ul", { id: "inst-u-ev", style: "font-size:13px" }, ...j.events.slice(0, 40).map(e => h("li", {}, new Date(e.at).toLocaleString() + " · " + e.action.replace(/_/g, " ") + (e.details && e.details.n ? " (" + e.details.n + ")" : "")))));
   } catch (e) { box.innerHTML = ""; box.appendChild(h("p", {}, "❌ " + e.message)); }
 }
+// ----- 5.0 Course activation codes: each code unlocks only the courses it was made for, for a set time (checked by the server)
+function actList() { const A = S.act; if (!A || !Array.isArray(A.list)) return []; const now = Date.now(); return A.list.filter(r => Date.parse(r.ends_at) > now); }
+function actCovers(cid) { return actList().some(r => (r.courses || []).includes(cid) || (cid === "oall" && r.courses.includes("o1") && r.courses.includes("o2"))); }
+function actUntil(cid) { let m = 0; actList().forEach(r => { if ((r.courses || []).includes(cid)) m = Math.max(m, Date.parse(r.ends_at)); }); return m || null; }
+const actCourses = l => (l || []).map(cName).join(" + ");
+let _actP = null;
+function actRefresh(force) {
+  if (_actP || !DB || !DB.live || !CFG.sb || !S.profile) return _actP || Promise.resolve(null);
+  if (!force && S.act && Date.now() - S.act.at < 864e5) { actEnded(); return Promise.resolve(S.act); }
+  _actP = xCall({ op: "acode", action: "mine" }).then(j => { S.act = { at: Date.now(), list: j.list || [], creator: !!j.creator, seen: (S.act && S.act.seen) || [] }; save(); actEnded(); return S.act; })
+    .catch(() => null).finally(() => { _actP = null; });
+  return _actP;
+}
+function actEnded() {   // once per redemption: tell the student their code-based access ended (records are kept)
+  const A = S.act; if (!A || !A.list) return; const now = Date.now(), seen = A.seen || (A.seen = []);
+  const gone = A.list.filter(r => Date.parse(r.ends_at) <= now && !seen.includes(r.code + r.ends_at)).filter(r => r.courses.some(c => !actCovers(c) && !isPremium(c)));
+  if (!gone.length) return; gone.forEach(r => seen.push(r.code + r.ends_at)); save();
+  setTimeout(() => toast("⏳ Your activation-code access to " + actCourses(gone.flatMap(r => r.courses).filter((c, i, l) => l.indexOf(c) === i)) + " has ended. Your progress is kept; subscribe under Premium to continue."), 800);
+}
+async function actRedeem(v, msg) {
+  CODE_DONE = null; msg.textContent = "Checking…"; msg.style.color = "";
+  try { const j = await xCall({ op: "acode", action: "redeem", code: v }); S.act = { at: Date.now(), list: j.list || [], creator: !!(S.act && S.act.creator), seen: (S.act && S.act.seen) || [] }; save(); CODE_FAIL = null;
+    msg.textContent = "✅ " + actCourses(j.courses) + ": Full Access until " + new Date(j.ends_at).toLocaleDateString(); msg.style.color = "var(--good,#1b7a3a)"; CODE_DONE = { at: Date.now(), text: msg.textContent };
+    sfx("win"); toast("🔓 " + (j.already ? "Already activated: " : "Activated: ") + actCourses(j.courses) + " — Full Access until " + new Date(j.ends_at).toLocaleDateString());
+    if (j.courses.length && !j.courses.includes(course().id) && S.profile) { const c0 = CFG.courses.find(c => c.id === j.courses[0]); if (c0) setTimeout(() => confirmBox("Switch to " + c0.name + "?", "Your code unlocked " + actCourses(j.courses) + ".", () => { S.profile.course = c0.id; save(); stack = [{ view: "home" }]; render(); }, "Switch course"), 300); }
+    setTimeout(render, 900); return j; }
+  catch (e) { sfx("bad"); msg.textContent = "❌ " + e.message; msg.style.color = "var(--bad)"; CODE_FAIL = { v, why: e.message }; return null; }
+}
+function actRedeemBox() {   // the student dashboard's "Redeem activation code"
+  const inp = h("input", { class: "field code", id: "act-in", placeholder: "ACT-XXXX-XXXX-XXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" }), msg = h("div", { class: "muted", role: "status", id: "act-msg", style: "margin-top:6px" }, "A code from your instructor, school or ChemFlip unlocks the course(s) it was made for.");
+  const m = gbModal("act-r", "Redeem activation code", h("label", { class: "f", for: "act-in" }, "Activation code"), inp, msg,
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "act-go", onclick: async e => { e.target.disabled = true; const j = await actRedeem(inp.value, msg); e.target.disabled = false; if (j) setTimeout(() => m.remove(), 1600); } }, "Activate")));
+  setTimeout(() => inp.focus(), 50);
+}
+function actHomeCard() {
+  if (!DB || !DB.live || isTeacher()) return null; const L = actList();
+  return h("div", { class: "card", id: "act-home", style: "display:flex;gap:12px;align-items:center;flex-wrap:wrap" }, h("div", { style: "flex:1 1 240px" }, h("b", {}, "🔑 Activation codes"),
+    L.length ? h("div", { class: "muted", id: "act-home-list", style: "font-size:13.5px" }, ...L.map(r => h("div", {}, actCourses(r.courses) + " — Full Access until " + new Date(r.ends_at).toLocaleDateString()))) : h("div", { class: "muted", style: "font-size:13.5px" }, "Got a code for a course? Redeem it here.")),
+    h("button", { class: "btn sec2 small", id: "act-open", onclick: actRedeemBox }, "Redeem activation code"));
+}
+function actPremiumCard() {
+  const A = S.act; if (!A || !A.list || !A.list.length) return null; const now = Date.now();
+  const c = h("div", { class: "card", id: "act-card", style: "margin:10px 0" }, h("b", {}, "🔑 Activated by code"));
+  A.list.forEach((r, i) => { const live = Date.parse(r.ends_at) > now; c.appendChild(h("div", { id: "act-r-" + i, style: "font-size:14px" + (live ? "" : ";opacity:.7") }, actCourses(r.courses) + (live ? " — Full Access until " : " — ended ") + new Date(r.ends_at).toLocaleDateString())); });
+  if (A.list.some(r => Date.parse(r.ends_at) <= now)) c.appendChild(h("p", { class: "muted", style: "font-size:13px;margin:6px 0 0" }, "Your progress and grades are kept. Choose the course(s) above to continue with a subscription."));
+  else c.appendChild(h("p", { class: "muted", style: "font-size:13px;margin:6px 0 0" }, "You won't be charged for these courses while the code covers them. Codes never start a paid subscription."));
+  return c;
+}
+// Code Creator: administrators, and instructors an administrator allowed
+const ACT_KIND = [["single", "Single-course activation"], ["multi", "Multiple-course activation"], ["promo", "Promotional access"], ["comp", "Complimentary student access"], ["time", "Time-limited access"], ["sub", "Subscription activation (fixed period, never renews)"]];
+const ACT_DUR = [["30", "30 days"], ["90", "90 days"], ["152", "One semester (5 months)"], ["182", "Six months"], ["365", "One year"], ["custom", "Custom expiration date"]];
+const ACT_ST = { active: "Active", expired: "Expired", exhausted: "Used up", revoked: "Revoked" };
+function actCall(admin) { return async body => { if (admin) { const t = await acctToken(); if (!t) throw new Error("Sign in with the administrator email under Settings → Sync first."); return xCall(Object.assign({ op: "acode", token: t }, body)); } return xCall(Object.assign({ op: "acode" }, body)); }; }
+function actAdminCard(box, admin) {
+  const call = actCall(admin), F = VIEWS.acodes.F || (VIEWS.acodes.F = { q: "", course: "", st: "" });
+  const card = h("div", { class: "card", id: "act-admin" }, h("b", {}, "🔑 Course activation codes"), h("div", { class: "muted", id: "act-a-loading" }, "⏳ Loading…")); box.appendChild(card);
+  const reload = () => { card.remove(); actAdminCard(box, admin); };
+  call({ action: "list" }).then(j => { card.innerHTML = ""; card.appendChild(h("b", {}, "🔑 Course activation codes"));
+    card.appendChild(h("p", { class: "muted", style: "font-size:13px" }, "Each code unlocks only the course(s) chosen when it was made, for the access period chosen, and only as many times as allowed. Class join codes are separate: they never unlock paid content."));
+    card.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "act-new", onclick: () => actMake(call, reload, admin) }, "+ Generate codes"), admin ? h("button", { class: "btn ghost small", id: "act-who", onclick: () => actCreators(call) }, "Who can create codes") : null));
+    const list = j.codes, rowsBox = h("div", { id: "act-rows" });
+    const q = h("input", { class: "field", id: "act-q", placeholder: "Search codes, institution or note", value: F.q, style: "flex:2 1 180px" });
+    const cf = h("select", { class: "field", id: "act-f-course", "aria-label": "Course", style: "flex:1 1 140px" }, h("option", { value: "" }, "All courses"), ...PAID.map(id => h("option", { value: id, selected: F.course === id ? "" : null }, cName(id))));
+    const sf = h("select", { class: "field", id: "act-f-st", "aria-label": "Status", style: "flex:1 1 120px" }, h("option", { value: "" }, "Any status"), ...Object.entries(ACT_ST).map(([v, t]) => h("option", { value: v, selected: F.st === v ? "" : null }, t)));
+    const shown = () => list.filter(c => (!F.course || c.courses.includes(F.course)) && (!F.st || c.status === F.st) && (!F.q || (c.code + " " + (c.institution || "") + " " + (c.note || "") + " " + c.created_by).toLowerCase().includes(F.q.toLowerCase())));
+    const paint = () => { rowsBox.innerHTML = ""; const L = shown();
+      rowsBox.appendChild(h("div", { class: "muted", id: "act-count", style: "font-size:13px;margin:6px 0" }, L.length + " of " + list.length + " codes · " + list.filter(c => c.status === "active").length + " active · " + list.reduce((t, c) => t + c.uses, 0) + " redemptions"));
+      if (!L.length) { rowsBox.appendChild(h("p", { class: "muted", id: "act-none" }, list.length ? "No codes match." : "No codes yet.")); return; }
+      const tb = h("table", { class: "t", id: "act-table", style: "font-size:13px" }, h("thead", {}, h("tr", {}, ...["Activation code", "Chemistry course", "Type", "Duration", "Created by", "Created", "Expires", "Limit", "Redeemed", "Status", ""].map(x => h("th", { scope: "col" }, x)))));
+      const body = h("tbody"); L.slice(0, 400).forEach((c, i) => body.appendChild(h("tr", { id: "act-row-" + i },
+        h("td", { style: "font-family:monospace;white-space:nowrap;user-select:all" }, c.code), h("td", {}, actCourses(c.courses)), h("td", {}, (ACT_KIND.find(k => k[0] === c.kind) || [0, c.kind])[1].split(" (")[0]),
+        h("td", {}, c.until_at ? "until " + new Date(c.until_at).toLocaleDateString() : c.days + " days"), h("td", {}, c.created_by), h("td", {}, new Date(c.created_at).toLocaleDateString()),
+        h("td", {}, c.redeem_by ? new Date(c.redeem_by).toLocaleDateString() : c.until_at ? new Date(c.until_at).toLocaleDateString() : "—"), h("td", { class: "n" }, c.max_uses == null ? "no limit" : String(c.max_uses)), h("td", { class: "n" }, String(c.uses)),
+        h("td", {}, h("span", { class: "chip" + (c.status === "active" ? " ok" : "") }, ACT_ST[c.status])),
+        h("td", { style: "white-space:nowrap" }, c.uses ? h("button", { class: "btn ghost small", id: "act-hist-" + i, onclick: () => actHistory(call, c) }, "History") : null,
+          c.status === "active" ? h("button", { class: "btn ghost small", id: "act-rev-" + i, style: "color:var(--bad)", onclick: () => confirmBox("Revoke " + c.code + "?", c.uses ? "Nobody new can redeem it. The " + c.uses + " student" + (c.uses > 1 ? "s" : "") + " who already did keep their access." : "It can't be redeemed after this.", async () => { await call({ action: "revoke", code: c.code }); toast("Revoked"); reload(); }, "Revoke") }, "Revoke") : null))));
+      tb.appendChild(body); rowsBox.appendChild(h("div", { style: "overflow-x:auto" }, tb));
+      if (L.length > 400) rowsBox.appendChild(h("p", { class: "muted" }, "Showing the first 400. Search or filter to narrow, or export them all."));
+      const unused = L.filter(c => c.status === "active" && !c.uses);
+      rowsBox.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "act-csv", onclick: () => actExport(L) }, "⬇️ Export " + L.length + " (CSV)"),
+        unused.length ? h("button", { class: "btn ghost small", id: "act-rev-unused", style: "color:var(--bad)", onclick: () => confirmBox("Revoke " + unused.length + " unused code" + (unused.length > 1 ? "s" : "") + "?", "Only the codes shown that nobody has redeemed yet.", async () => { const r = await call({ action: "revoke", codes: unused.map(c => c.code) }); toast("Revoked " + r.count); reload(); }, "Revoke") }, "Revoke " + unused.length + " unused") : null)); };
+    q.oninput = () => { F.q = q.value; paint(); }; cf.onchange = () => { F.course = cf.value; paint(); }; sf.onchange = () => { F.st = sf.value; paint(); };
+    card.appendChild(h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:8px" }, q, cf, sf)); card.appendChild(rowsBox); paint();
+  }).catch(e => { card.innerHTML = ""; card.appendChild(h("b", {}, "🔑 Course activation codes")); card.appendChild(h("p", { class: "muted", id: "act-a-err" }, "❌ " + e.message)); });
+}
+function actExport(L) {
+  const cell = v => { v = String(v == null ? "" : v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const csv = "Activation code,Chemistry course,Type,Duration,Created by,Created,Expires,Redemption limit,Redeemed,Status,Institution,Note\r\n" + L.map(c => [c.code, actCourses(c.courses), c.kind, c.until_at ? "until " + c.until_at.slice(0, 10) : c.days + " days", c.created_by, c.created_at.slice(0, 10), (c.redeem_by || c.until_at || "").slice(0, 10), c.max_uses == null ? "no limit" : c.max_uses, c.uses, ACT_ST[c.status], c.institution || "", c.note || ""].map(cell).join(",")).join("\r\n") + "\r\n";
+  labDownload(new Blob(["﻿" + csv], { type: "text/csv" }), "ChemFlip-activation-codes-" + new Date().toLocaleDateString("en-CA") + ".csv");
+}
+function actMake(call, reload, admin) {
+  const F = { courses: PAID.includes(course().id) ? [course().id] : [], kind: "single", dur: "152", until: "", rb: "", n: "1", nC: "", uses: "1", usesN: "5", inst: "", domain: "", note: "" };
+  const msg = h("div", { role: "status", id: "act-m-msg" }), sum = h("div", { id: "act-m-sum", style: "background:var(--chip);border-radius:10px;padding:8px 10px;margin:8px 0;font-size:14px" });
+  const sel = (id, opts, k, on) => { const s = h("select", { class: "field", id }, ...opts.map(([v, t]) => h("option", { value: v, selected: F[k] === v ? "" : null }, t))); s.onchange = () => { F[k] = s.value; if (on) on(); upd(); }; return s; };
+  const crs = h("div", { id: "act-m-courses", role: "group", "aria-label": "Chemistry course", style: "display:flex;flex-wrap:wrap;gap:6px 14px" }, ...PAID.filter(id => CFG.courses.some(c => c.id === id)).map(id => { const b = h("input", { type: F.kind === "single" ? "radio" : "checkbox", name: "act-m-c", id: "act-m-c-" + id }); b.checked = F.courses.includes(id);
+    b.onchange = () => { F.courses = F.kind === "single" ? [id] : PAID.filter(x => document.getElementById("act-m-c-" + x).checked); upd(); }; return h("label", { class: "check", for: "act-m-c-" + id }, b, h("span", {}, cName(id))); }));
+  const retype = () => { crs.querySelectorAll("input").forEach(b => { b.type = F.kind === "single" ? "radio" : "checkbox"; }); if (F.kind === "single" && F.courses.length > 1) { F.courses = F.courses.slice(0, 1); } crs.querySelectorAll("input").forEach(b => b.checked = F.courses.includes(b.id.slice(8))); };
+  const dIn = (id, k) => { const i = h("input", { class: "field", id, type: "date", min: new Date(Date.now() + 864e5).toLocaleDateString("en-CA") }); i.oninput = () => { F[k] = i.value; upd(); }; return i; };
+  const until = dIn("act-m-until", "until"), rb = dIn("act-m-rb", "rb"), untilL = h("label", { class: "f", for: "act-m-until" }, "Access ends on");
+  const nC = h("input", { class: "field", id: "act-m-nc", type: "number", min: "1", max: admin ? "1000" : "500", placeholder: "how many", style: "width:120px" }); nC.oninput = () => { F.nC = nC.value; upd(); };
+  const usesN = h("input", { class: "field", id: "act-m-usesn", type: "number", min: "2", value: F.usesN, style: "width:120px" }); usesN.oninput = () => { F.usesN = usesN.value; upd(); };
+  const txt = (id, lab, k, ex) => { const i = h("input", Object.assign({ class: "field", id }, ex || {})); i.oninput = () => { F[k] = i.value; upd(); }; return [h("label", { class: "f", for: id }, lab), i]; };
+  const go = h("button", { class: "btn", id: "act-m-go" }, "Generate");
+  const count = () => F.n === "custom" ? Math.floor(+F.nC || 0) : +F.n, usesOf = () => F.uses === "1" ? 1 : F.uses === "unlimited" ? null : Math.floor(+F.usesN || 0);
+  function upd() { const n = count(), u = usesOf();
+    until.style.display = untilL.style.display = F.dur === "custom" ? "" : "none"; nC.style.display = F.n === "custom" ? "" : "none"; usesN.style.display = F.uses === "multi" ? "" : "none";
+    sum.innerHTML = ""; sum.appendChild(h("b", {}, F.courses.length ? "Unlocks: " + actCourses(F.courses) : "Choose the course(s) first."));
+    if (F.courses.length) sum.appendChild(h("div", { class: "muted", style: "font-size:13px" }, "No other course. " + (n || "?") + " code" + (n === 1 ? "" : "s") + " · " + (u == null ? "no redemption limit" : u === 1 ? "one student each" : "up to " + u + " students each") + " · access for " + (F.dur === "custom" ? (F.until ? "until " + new Date(F.until + "T23:59:59").toLocaleDateString() : "…") : ACT_DUR.find(d => d[0] === F.dur)[1].toLowerCase()) + " from redemption" + (F.rb ? " · redeem by " + new Date(F.rb + "T23:59:59").toLocaleDateString() : "") + (F.domain ? " · only verified @" + F.domain.replace(/^@/, "") + " emails" : "")));
+    go.disabled = !F.courses.length || !n || (F.kind === "multi" && F.courses.length < 2) || (F.dur === "custom" && !F.until) || (F.uses === "multi" && !(u >= 2)); }
+  go.onclick = async () => { const n = count(); go.disabled = true; msg.textContent = "⏳ Generating…";
+    try { const j = await call({ action: "make", courses: F.courses, kind: F.kind, days: F.dur === "custom" ? null : +F.dur, until_at: F.dur === "custom" ? new Date(F.until + "T23:59:59").toISOString() : null, redeem_by: F.rb ? new Date(F.rb + "T23:59:59").toISOString() : null, n, max_uses: usesOf() === null ? "unlimited" : usesOf(), institution: F.inst, domain: F.domain, note: F.note });
+      msg.innerHTML = ""; msg.appendChild(h("div", {}, "✅ " + j.codes.length + " code" + (j.codes.length > 1 ? "s" : "") + " for " + actCourses(F.courses) + ":")); msg.appendChild(h("pre", { id: "act-m-list", style: "user-select:all;white-space:pre-wrap;max-height:200px;overflow:auto;font-size:13px" }, j.codes.join("\n")));
+      msg.appendChild(h("div", { class: "btnrow" }, h("button", { class: "btn ghost small", id: "act-m-copy", onclick: () => copyText(j.codes.join("\n")) }, "📋 Copy"))); reload(); }
+    catch (e) { msg.textContent = "❌ " + e.message; go.disabled = false; } };
+  gbModal("act-m", "Generate activation codes",
+    h("label", { class: "f", for: "act-m-kind" }, "Activation type"), sel("act-m-kind", ACT_KIND, "kind", retype),
+    h("div", { class: "f" }, "Select chemistry course" + " (every course included must be chosen)"), crs,
+    h("label", { class: "f", for: "act-m-dur" }, "Access duration (from when the student redeems it)"), sel("act-m-dur", ACT_DUR, "dur"), untilL, until,
+    h("label", { class: "f", for: "act-m-n" }, "Number of codes"), sel("act-m-n", [["1", "One code"], ["10", "10 codes"], ["50", "50 codes"], ["100", "100 codes"], ["custom", "Custom quantity"]], "n"), nC,
+    h("label", { class: "f", for: "act-m-uses" }, "Redemption limit"), sel("act-m-uses", [["1", "Single use (one student per code)"], ["multi", "Multiple uses, up to…"]].concat(admin ? [["unlimited", "No limit"]] : []), "uses"), usesN,
+    h("label", { class: "f", for: "act-m-rb" }, "Last day to redeem (optional)"), rb,
+    ...txt("act-m-inst", "Institution (optional label)", "inst", { maxlength: "120", placeholder: "e.g. Palomar College" }),
+    ...txt("act-m-dom", "Only for students with a verified email at (optional)", "domain", { placeholder: "e.g. palomar.edu" }),
+    ...txt("act-m-note", "Note (only code creators see it)", "note", { maxlength: "300" }),
+    sum, h("div", { class: "btnrow" }, go), msg);
+  upd();
+}
+async function actHistory(call, c) {
+  const box = h("div", { id: "act-h-box" }, h("p", { class: "muted" }, "⏳ Loading…")); gbModal("act-h", "Redemptions · " + c.code, box);
+  try { const j = await call({ action: "redemptions", code: c.code }); box.innerHTML = "";
+    box.appendChild(h("p", { class: "muted" }, actCourses(c.courses) + " · " + j.redemptions.length + " redemption" + (j.redemptions.length === 1 ? "" : "s")));
+    box.appendChild(h("ul", { id: "act-h-list", style: "font-size:13.5px" }, ...j.redemptions.map(r => h("li", {}, r.name + " · " + new Date(r.starts_at).toLocaleString() + " → until " + new Date(r.ends_at).toLocaleDateString())))); }
+  catch (e) { box.innerHTML = ""; box.appendChild(h("p", {}, "❌ " + e.message)); }
+}
+async function actCreators(call) {
+  const box = h("div", { id: "act-w-box" }), msg = h("div", { class: "muted", role: "status", id: "act-w-msg" });
+  const em = h("input", { class: "field", id: "act-w-email", type: "email", placeholder: "instructor@college.edu" }), mb = h("input", { class: "field", id: "act-w-max", type: "number", min: "1", max: "500", value: "50", style: "width:110px" }), mo = h("input", { class: "field", id: "act-w-month", type: "number", min: "1", value: "200", style: "width:110px" });
+  const paint = list => { box.innerHTML = ""; if (!list.length) box.appendChild(h("p", { class: "muted", id: "act-w-none" }, "Only administrators can create activation codes right now."));
+    list.forEach((c, i) => box.appendChild(h("div", { id: "act-w-" + i, style: "display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px solid var(--hair)" }, h("span", { style: "flex:1" }, c.email + " · up to " + c.max_batch + " at a time, " + c.monthly + " per 30 days"),
+      h("button", { class: "btn ghost small", id: "act-w-rm-" + i, onclick: async () => { try { paint((await call({ action: "creator_set", email: c.email, on: false })).creators); } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Remove")))); };
+  gbModal("act-w", "Who can create activation codes", h("p", { class: "muted", style: "font-size:13px" }, "Verified instructors get every course free and can make class join codes, but they can't create paid-access activation codes unless you allow it here. Their codes are limited to 50 students each."), box,
+    h("label", { class: "f", for: "act-w-email" }, "Allow a verified instructor"), em, h("label", { class: "f", for: "act-w-max" }, "Codes at a time"), mb, h("label", { class: "f", for: "act-w-month" }, "Codes per 30 days"), mo,
+    h("div", { class: "btnrow" }, h("button", { class: "btn", id: "act-w-add", onclick: async () => { try { paint((await call({ action: "creator_set", email: em.value, max_batch: +mb.value, monthly: +mo.value })).creators); em.value = ""; msg.textContent = "✅ Allowed"; } catch (e) { msg.textContent = "❌ " + e.message; } } }, "Allow")), msg);
+  try { paint((await call({ action: "creators" })).creators); } catch (e) { msg.textContent = "❌ " + e.message; }
+}
+VIEWS.acodes = function () {   // the Code Creator for instructors an administrator allowed
+  document.getElementById("title").textContent = "Course activation codes";
+  const box = h("div", { id: "acodes-box" }); app.appendChild(box); actAdminCard(box, false);
+};
 // ----- 5.0 Free instructor accounts: the application (after the academic email code), its status, and the review timeline
 const IA_POS = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Adjunct or part-time instructor", "Laboratory instructor", "Teaching staff", "Other academic teaching position"];
 const IA_EV = [["id", "College or university ID (photo or scan)"], ["directory", "Public faculty directory listing (link)"], ["webpage", "Official department webpage (link)"], ["letter", "Employment or appointment letter (upload)"], ["admin", "Department administrator who can confirm (name and email)"]];
@@ -8648,7 +8805,7 @@ VIEWS.admin = function () {
   const call = async (body) => { const t = await acctToken(); if (!t) throw Object.assign(new Error("Sign in with the administrator email under Settings → Sync first."), { status: 401 }); return DB.call(Object.assign({ op: "admin", token: t }, body)); };
   call({ action: "list" }).then(j => {
     S.isAdmin = true; save(); box.innerHTML = "";
-    adminDash(call, box); iaAdminCard(box); instAdminCard(box);
+    adminDash(call, box); iaAdminCard(box); instAdminCard(box); actAdminCard(box, true);
     const groups = [["pending", "⏳ Waiting for review"], ["verified", "✅ Verified"], ["rejected", "⛔ Rejected"], ["revoked", "🚫 Revoked"]];
     groups.forEach(([st, t]) => { const rows = j.instructors.filter(r => r.status === st); if (!rows.length && st !== "pending") return;
       const card = h("div", { class: "card", id: "admin-" + st }, h("b", {}, t + " (" + rows.length + ")"));
@@ -8865,6 +9022,7 @@ VIEWS.settings = function () {
   if (AUTH) app.appendChild(accountCard());
   { const rc = remSettingsCard(); if (rc) app.appendChild(rc); }
   if (S.edu && S.edu.email && !eduOk() && DB && DB.live) app.appendChild(h("div", { class: "card", id: "ia-settings" }, h("b", {}, "🎓 Instructor application"), h("p", { class: "muted" }, "Free instructor access for " + S.edu.email + ": see the status or add information."), h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "ia-settings-open", onclick: () => go("iapply") }, "Open my application"))));
+  if (S.act && S.act.creator && eduOk()) app.appendChild(h("div", { class: "card", id: "acodes-settings" }, h("b", {}, "🔑 Course activation codes"), h("p", { class: "muted" }, "An administrator allowed you to create activation codes that unlock specific courses for students."), h("div", { class: "btnrow" }, h("button", { class: "btn small", id: "acodes-open", onclick: () => go("acodes") }, "Open the Code Creator"))));
   { const nc = noticesCard(); if (nc) app.appendChild(nc); }
   app.appendChild(h("div", { class: "card", id: "sync-card" }, h("b", {}, "☁️ Sync across devices"), h("p", { class: "muted" }, S.acct && S.acct.email ? "Signed in as " + S.acct.email + (S.syncAt ? " · last synced " + new Date(S.syncAt).toLocaleString() : "") : "Sign in with your e-mail to continue on any device (Windows, Mac, iPhone, Android, web)."), h("button", { class: "btn small", id: "sync-btn", onclick: acctSheet }, S.acct && S.acct.email ? "Manage sync" : "☁️ Turn on sync")));
   { const wc = h("div", { class: "card", id: "work-card" }, h("b", {}, "📄 Photos of my work"), h("p", { class: "muted", id: "work-count" }, "Photos you take of your handwritten work are kept on this device, with their question."));
@@ -8918,7 +9076,8 @@ loadRemote(); setTimeout(checkContent, 1500); setTimeout(() => eduRefresh(true),
 stack = [{ view: S.profile ? "home" : "onboard" }];
 setTimeout(() => { if (S.profile) remStart(); }, 4000);   // Phase J: deadline reminders
 setTimeout(() => { if (S.profile) seenStart(); }, 2500);
-setTimeout(() => { if (S.profile) instRefresh(); }, 3500);   // 5.0: school licenses (once a day; kept for offline use until they end)   // 5.0: Student Activity and the notification bell
+setTimeout(() => { if (S.profile) instRefresh(); }, 3500);
+setTimeout(() => { if (S.profile) actRefresh(); }, 3900);   // 5.0: course activation codes (kept for offline use until they end)   // 5.0: school licenses (once a day; kept for offline use until they end)   // 5.0: Student Activity and the notification bell
 if (S.asgDraft) { const cut = Date.now() - 30 * 864e5; Object.keys(S.asgDraft).forEach(k => { if (!S.asgDraft[k] || S.asgDraft[k].t < cut) delete S.asgDraft[k]; }); }   // device copies of graded answers older than 30 days
 if (window.matchMedia) try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") applyTheme(); }); } catch (e) {}
 render();
